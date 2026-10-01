@@ -11,12 +11,14 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, TextInput } from '../composants/Texte'
 import {
   Loupe, Chevron, EnvoiMessage, Messages as IconeMessages,
-  NouveauGroupe, Eclair, BulleDemande, AppareilPhoto, ChevronDroit, Flamme,
+  NouveauGroupe, Eclair, BulleDemande,
 } from '../composants/Icones'
 import {
-  dateRelative, dernierMessage, conversationsTriees, demandesMessages,
+  etat, dateRelative, dernierMessage, conversationsTriees,
   type Conversation, type Message,
 } from '../lib/demo'
+import BandeStories from '../composants/BandeStories'
+import { useAuth } from '../lib/auth'
 import Notifications from './Notifications'
 
 // Teintes des avatars, piochees d'apres le pseudo : deux comptes differents
@@ -128,6 +130,7 @@ function Fil({ conversation, onRetour }: {
 // ------------------------------------------------------------
 
 export default function Messages() {
+  const { profil } = useAuth()
   // Conversation ouverte. Null = on est sur la boite de reception.
   const [ouverte, setOuverte] = useState<Conversation | null>(null)
   // Vrai quand un compte de service est ouvert : l'ecran
@@ -190,6 +193,9 @@ export default function Messages() {
           />
         </View>
       )}
+
+      <BandeStories pseudo={profil?.pseudo ?? 'moi'} stories={etat.stories}
+        clair />
 
       <FlatList
         data={conversations}

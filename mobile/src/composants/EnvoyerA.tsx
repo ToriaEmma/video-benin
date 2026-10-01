@@ -15,6 +15,7 @@ import {
   SousTitres, Crayon2, CadenasPlein, PhotoAnimee, EtiquetteGif,
   Portefeuille, MotsCles, AjoutStory, Corbeille,
   LogoWhatsApp, LogoSMS, LogoTelegram,
+  Republier, Drapeau, AppliEphemere, Megaphone,
 } from './Icones'
 import { comptesDemo } from '../lib/demo'
 
@@ -32,6 +33,32 @@ const APPLICATIONS = [
   { cle: 'status', nom: 'Status', Logo: LogoSMS },
   { cle: 'telegram', nom: 'Telegram', Logo: LogoTelegram },
 ] as const
+
+// Memes applications, precedees de « Republier » sur la publication
+// d'autrui : on relaie le contenu plutot que de le gerer.
+const APPLICATIONS_AUTRUI = [
+  { cle: 'republier', nom: 'Republier', fond: '#efc02c', Icone: Republier },
+  { cle: 'whatsapp', nom: 'WhatsApp', Logo: LogoWhatsApp },
+  { cle: 'lien', nom: 'Copier le lien', fond: '#3b7df6', Icone: Maillon },
+  { cle: 'status', nom: 'Status', Logo: LogoSMS },
+  { cle: 'ephemere', nom: 'Messages éphémères', Logo: AppliEphemere },
+  { cle: 'telegram', nom: 'Telegram', Logo: LogoTelegram },
+] as const
+
+// Actions offertes sur la publication de quelqu'un d'autre : ni
+// statistiques ni suppression, mais le signalement et la reprise.
+const ACTIONS_AUTRUI: Action[] = [
+  { cle: 'signaler', nom: 'Signaler', Icone: Drapeau },
+  { cle: 'telecharger', nom: 'Télécharger', Icone: Telecharger },
+  { cle: 'story', nom: 'Ajouter à la Story', Icone: AjoutStory },
+  { cle: 'promouvoir', nom: 'Promouvoir', Icone: Megaphone },
+  { cle: 'duo', nom: 'Duo', Icone: Duo },
+  { cle: 'collage', nom: 'Collage', Icone: Collage },
+  { cle: 'groupe', nom: 'Créer un groupe', Icone: Groupe },
+  { cle: 'animee', nom: 'Photo animée', Icone: PhotoAnimee },
+  { cle: 'sticker', nom: 'Créer un sticker', Icone: StickerPlus },
+  { cle: 'gif', nom: 'Partager en tant que GIF', Icone: EtiquetteGif },
+]
 
 // Troisieme rangee : les actions sur sa propre publication. Elles
 // defilent horizontalement, sur trois pages comme la reference.
@@ -59,6 +86,7 @@ const ACTIONS: Action[] = [
 
 export default function EnvoyerA({
   visible, legende, onFermer, onSupprimer, onAnalytiques,
+  sienne = true, auteur,
 }: {
   visible: boolean
   // Legende relayee au partage systeme.
@@ -67,6 +95,11 @@ export default function EnvoyerA({
   onSupprimer?: () => void
   // « Données analytiques » : ouvre l'ecran « Analyse vidéo ».
   onAnalytiques?: () => void
+  // Faux sur la publication de quelqu'un d'autre : la feuille
+  // propose alors de relayer et de signaler plutot que de gerer.
+  sienne?: boolean
+  // Pseudo de l'auteur, pour la premiere vignette « Répondre à ».
+  auteur?: string
 }) {
   const { height } = useWindowDimensions()
   const [message, setMessage] = useState('')
@@ -78,9 +111,8 @@ export default function EnvoyerA({
   }
 
   const agir = (cle: string, nom: string) => {
-    if (cle === 'lien' || cle === 'whatsapp' || cle === 'status' || cle === 'telegram') {
-      partager(); return
-    }
+    if (['lien', 'whatsapp', 'status', 'telegram', 'ephemere', 'republier']
+      .includes(cle)) { partager(); return }
     if (cle === 'supprimer') { onFermer(); onSupprimer?.(); return }
     if (cle === 'stats' && onAnalytiques) { onFermer(); onAnalytiques(); return }
     setMessage(`${nom} : disponible prochainement.`)
@@ -105,6 +137,19 @@ export default function EnvoyerA({
           {/* Destinataires */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={s.bande} contentContainerStyle={s.bandeContenu}>
+            {!sienne && !!auteur && (
+              <Pressable style={s.contact} onPress={partager}>
+                <View style={[s.avatar, s.avatarReponse]}>
+                  <Text style={s.avatarLettre}>
+                    {auteur.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={s.actionNom} numberOfLines={2}>
+                  Répondre à {auteur}
+                </Text>
+              </Pressable>
+            )}
+
             {comptesDemo.map(c => (
               <Pressable key={c.id} style={s.contact} onPress={partager}>
                 <View style={s.avatar}>
@@ -122,7 +167,7 @@ export default function EnvoyerA({
           {/* Applications de partage */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={s.bande} contentContainerStyle={s.bandeContenu}>
-            {APPLICATIONS.map(a => (
+            {(sienne ? APPLICATIONS : APPLICATIONS_AUTRUI).map(a => (
               <Pressable key={a.cle} style={s.action}
                 onPress={() => agir(a.cle, a.nom)}>
                 {'Logo' in a
@@ -138,7 +183,7 @@ export default function EnvoyerA({
           {/* Actions sur sa publication */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false}
             style={s.bande} contentContainerStyle={s.bandeContenu}>
-            {ACTIONS.map(a => (
+            {(sienne ? ACTIONS : ACTIONS_AUTRUI).map(a => (
               <Pressable key={a.cle} style={s.action}
                 onPress={() => agir(a.cle, a.nom)}>
                 <View style={s.pastilleGrise}>
@@ -175,6 +220,7 @@ const s = StyleSheet.create({
   contact: { width: 62, alignItems: 'center', gap: 7 },
   avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6f5bd4',
     alignItems: 'center', justifyContent: 'center' },
+  avatarReponse: { backgroundColor: '#8e8e93' },
   avatarLettre: { color: '#fff', fontSize: 22, fontWeight: '700' },
   contactNom: { fontSize: 11.5, color: '#111', textAlign: 'center' },
 

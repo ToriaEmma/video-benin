@@ -34,10 +34,11 @@ import {
   PlusStory, EtincelleEtiquette,
 } from '../composants/Icones'
 
-// Au-dela de ce decalage, la rangee de stories se tasse. Un seuil bas
-// suffit : le premier geste vers le haut doit deja rendre l'ecran a la
-// video.
-const SEUIL_REPLI = 48
+// La liste pagine : un geste vers le haut saute directement a la video
+// suivante, sans etat intermediaire ou la premiere s'agrandirait. Le
+// repli se declenche donc des que le doigt touche la video, avant que
+// le defilement ne commence, et la premiere video occupe alors tout
+// l'ecran sans qu'on ait quitte sa page.
 
 // Hauteur de l'entete (zone sure comprise) et de la rangee de stories.
 // Deployee, la carte repousse la video d'autant, pour que les bulles ne la
@@ -365,11 +366,12 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
   // mesurer evite de dependre de la hauteur de la fenetre, trop grande.
   const [hauteur, setHauteur] = useState(0)
 
-  // Le repli se decide au defilement, jamais dans un effet : l'etat suit
-  // directement le geste.
+  // Le repli se decide sur le geste, jamais dans un effet : l'etat suit
+  // directement la main. Il ne se deploie a nouveau qu'une fois revenu
+  // tout en haut de la premiere video.
+  const auContact = () => setReplie(true)
   const auDefilement = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const y = e.nativeEvent.contentOffset.y
-    setReplie(v => (v ? y > SEUIL_REPLI / 2 : y > SEUIL_REPLI))
+    if (e.nativeEvent.contentOffset.y <= 0) setReplie(false)
   }
 
   if (recherche) return (
@@ -396,6 +398,7 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
           snapToInterval={hauteur || undefined}
           decelerationRate="fast"
           scrollEventThrottle={16}
+          onScrollBeginDrag={auContact}
           onScroll={auDefilement}
           getItemLayout={(_, i) => (
             { length: hauteur, offset: hauteur * i, index: i })}

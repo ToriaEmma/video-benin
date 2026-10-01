@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { View, FlatList, Pressable, StyleSheet, Share } from 'react-native'
+import { View, FlatList, Pressable, StyleSheet } from 'react-native'
 import { Text } from '../composants/Texte'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -64,12 +64,6 @@ function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
     item.aime = n; item.nbAime += n ? 1 : -1
   }
 
-  const partager = async () => {
-    try {
-      await Share.share({ message: `${item.legende}\n\nRegarde cette vidéo sur Vidéo Bénin` })
-    } catch { /* annule */ }
-  }
-
   return (
     <View style={[s.carte, { height: hauteur }]}>
       <Pressable style={StyleSheet.absoluteFill}
@@ -115,7 +109,7 @@ function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
         </Pressable>
 
         <Pressable style={s.action} hitSlop={6}
-          onPress={() => sienne ? setEnvoyer(true) : partager()}>
+          onPress={() => setEnvoyer(true)}>
           {sienne
             ? <TroisPoints taille={34} couleur="#fff" />
             : <PartageFil taille={34} couleur="#fff" />}
@@ -145,6 +139,7 @@ function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
       </View>
 
       <EnvoyerA visible={envoyer} legende={item.legende}
+        sienne={!!sienne} auteur={item.pseudo}
         onFermer={() => setEnvoyer(false)}
         onAnalytiques={() => setAnalyse(true)} />
 
