@@ -1280,3 +1280,46 @@ export const CocheChoix = ({ taille = 20, couleur = '#111' }: P) => (
     <Path d="m4.5 12.6 4.8 5L19.5 6.6" />
   </Svg>
 )
+
+// ------------------------------------------------------------
+// Connexion et inscription.
+// ------------------------------------------------------------
+
+// Silhouette grise de l'onglet Profil deconnecte.
+export const SilhouetteVide = ({ taille = 96, couleur = '#b4b4b6' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.3} strokeLinecap="round">
+    <Circle cx="12" cy="8" r="4.2" />
+    <Path d="M5.2 20.4a6.8 6.8 0 0 1 13.6 0" />
+  </Svg>
+)
+
+// Enveloppe : s'inscrire avec une adresse electronique.
+export const Enveloppe = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24">
+    <Path d="M3 6.4A1.4 1.4 0 0 1 4.4 5h15.2A1.4 1.4 0 0 1 21 6.4v11.2a1.4 1.4 0 0 1-1.4 1.4H4.4A1.4 1.4 0 0 1 3 17.6Z"
+      fill={couleur} />
+    <Path d="m4.4 7 7.6 5.4L19.6 7" fill="none" stroke="#fff" strokeWidth={1.6}
+      strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+)
+
+// Point d'interrogation cercle : l'aide, en tete des feuilles de compte.
+export const AideRonde = ({ taille = 26, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="9.4" />
+    <Path d="M9.4 9.2a2.7 2.7 0 1 1 3.6 2.6v1.8" />
+    <Circle cx="12" cy="17" r="1" fill={couleur} stroke="none" />
+  </Svg>
+)
+
+// Silhouette pleine dans un rond gris : compte sans portrait, dans la
+// liste « Ravis de te revoir ».
+export const AvatarVide = ({ taille = 56, couleur = '#c7c7cc' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 48 48">
+    <Circle cx="24" cy="24" r="24" fill="#ececee" />
+    <Circle cx="24" cy="19" r="7.4" fill={couleur} />
+    <Path d="M11.6 40a12.4 12.4 0 0 1 24.8 0Z" fill={couleur} />
+  </Svg>
+)
