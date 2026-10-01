@@ -92,7 +92,6 @@ function Application() {
                   pseudo={profil.pseudo}
                   onRetour={() => { setMontage(false); setVideoChoisie(null) }}
                   onSuivant={() => setMontage(false)}
-                  onOutil={() => undefined}
                 />
               : <Publier
                   uriInitiale={videoChoisie}
