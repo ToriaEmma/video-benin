@@ -12,6 +12,7 @@ import {
   LoupeEntete, NoteDisque, Chevron, Loupe, TroisPoints,
 } from '../composants/Icones'
 import EnvoyerA from '../composants/EnvoyerA'
+import AnalyseVideo from './AnalyseVideo'
 
 // Memes categories que app/src/pages/Fil.tsx.
 const CATEGORIES = ['Communauté', 'Suivis', 'Pour toi']
@@ -34,6 +35,9 @@ function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
   // Pause demandee par l'utilisateur, a distinguer d'un simple chargement.
   const [pauseVoulue, setPauseVoulue] = useState(false)
   const [envoyer, setEnvoyer] = useState(false)
+  // « Données analytiques » de la feuille « Envoyer à » : l'ecran d'analyse
+  // se pose par-dessus la carte, et se referme sur lui-meme.
+  const [analyse, setAnalyse] = useState(false)
 
   // L'etat de lecture et la position viennent du lecteur : on les suit pour
   // afficher le bouton « lire » et la barre de progression.
@@ -141,7 +145,14 @@ function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
       </View>
 
       <EnvoyerA visible={envoyer} legende={item.legende}
-        onFermer={() => setEnvoyer(false)} />
+        onFermer={() => setEnvoyer(false)}
+        onAnalytiques={() => setAnalyse(true)} />
+
+      {analyse && (
+        <View style={StyleSheet.absoluteFill}>
+          <AnalyseVideo video={item} onRetour={() => setAnalyse(false)} />
+        </View>
+      )}
     </View>
   )
 }

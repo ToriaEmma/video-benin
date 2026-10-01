@@ -57,12 +57,16 @@ const ACTIONS: Action[] = [
   { cle: 'story', nom: 'Ajouter à la Story', Icone: AjoutStory },
 ]
 
-export default function EnvoyerA({ visible, legende, onFermer, onSupprimer }: {
+export default function EnvoyerA({
+  visible, legende, onFermer, onSupprimer, onAnalytiques,
+}: {
   visible: boolean
   // Legende relayee au partage systeme.
   legende: string
   onFermer: () => void
   onSupprimer?: () => void
+  // « Données analytiques » : ouvre l'ecran « Analyse vidéo ».
+  onAnalytiques?: () => void
 }) {
   const { height } = useWindowDimensions()
   const [message, setMessage] = useState('')
@@ -78,6 +82,7 @@ export default function EnvoyerA({ visible, legende, onFermer, onSupprimer }: {
       partager(); return
     }
     if (cle === 'supprimer') { onFermer(); onSupprimer?.(); return }
+    if (cle === 'stats' && onAnalytiques) { onFermer(); onAnalytiques(); return }
     setMessage(`${nom} : disponible prochainement.`)
     setTimeout(() => setMessage(''), 2200)
   }

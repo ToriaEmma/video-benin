@@ -10,12 +10,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, TextInput } from '../composants/Texte'
 import {
-  Loupe, Chevron, NouveauMessage, EnvoiMessage, Messages as IconeMessages,
+  Loupe, Chevron, EnvoiMessage, Messages as IconeMessages,
+  NouveauGroupe, Eclair, BulleDemande, AppareilPhoto, ChevronDroit, Flamme,
 } from '../composants/Icones'
 import {
-  dateRelative, dernierMessage, conversationsTriees,
+  dateRelative, dernierMessage, conversationsTriees, demandesMessages,
   type Conversation, type Message,
 } from '../lib/demo'
+import Notifications from './Notifications'
 
 // Teintes des avatars, piochees d'apres le pseudo : deux comptes differents
 // gardent ainsi la meme couleur d'un ecran a l'autre.
@@ -128,6 +130,9 @@ function Fil({ conversation, onRetour }: {
 export default function Messages() {
   // Conversation ouverte. Null = on est sur la boite de reception.
   const [ouverte, setOuverte] = useState<Conversation | null>(null)
+  // Vrai quand un compte de service est ouvert : l'ecran
+  // « Notifications système » remplace alors le fil de discussion.
+  const [notifications, setNotifications] = useState(false)
   const [recherche, setRecherche] = useState('')
   const [chercher, setChercher] = useState(false)
   // Incremente au retour d'un fil : la liste reprend alors le dernier
@@ -142,8 +147,15 @@ export default function Messages() {
   const ouvrir = (c: Conversation) => {
     // Ouvrir la conversation vaut lecture : la pastille disparait.
     c.nonLus = 0
+    // Les comptes de service n'ont pas de fil : ils menent aux
+    // notifications systeme.
+    if (c.systeme) { setNotifications(true); setRevision(n => n + 1); return }
     setOuverte(c)
   }
+
+  if (notifications) return (
+    <Notifications onRetour={() => setNotifications(false)} />
+  )
 
   if (ouverte) return (
     <Fil conversation={ouverte}
@@ -153,18 +165,16 @@ export default function Messages() {
   return (
     <SafeAreaView style={s.page} edges={['top']}>
       <View style={s.barre}>
-        <Text style={s.titre}>Boîte de réception</Text>
-        <View style={s.barreActions}>
-          <Pressable hitSlop={10} onPress={() => {
-            setChercher(v => !v)
-            if (chercher) setRecherche('')
-          }}>
-            <Loupe taille={23} couleur="#111" />
-          </Pressable>
-          <Pressable hitSlop={10}>
-            <NouveauMessage taille={23} couleur="#111" />
-          </Pressable>
-        </View>
+        <Pressable hitSlop={10}>
+          <NouveauGroupe taille={26} couleur="#111" />
+        </Pressable>
+        <Text style={s.titre}>Messages</Text>
+        <Pressable hitSlop={10} onPress={() => {
+          setChercher(v => !v)
+          if (chercher) setRecherche('')
+        }}>
+          <Loupe taille={25} couleur="#111" />
+        </Pressable>
       </View>
 
       {chercher && (
@@ -231,10 +241,9 @@ const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#fff' },
 
   // Barre du haut de la boite de reception.
-  barre: { flexDirection: 'row', alignItems: 'center', minHeight: 52,
-    paddingHorizontal: 16 },
-  titre: { flex: 1, color: '#111', fontSize: 17, fontWeight: '700' },
-  barreActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  barre: { flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', minHeight: 52, paddingHorizontal: 16 },
+  titre: { color: '#111', fontSize: 17, fontWeight: '700' },
 
   zoneRecherche: { flexDirection: 'row', alignItems: 'center', gap: 8,
     marginHorizontal: 16, marginBottom: 6, backgroundColor: '#f1f1f2',

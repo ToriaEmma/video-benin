@@ -1036,3 +1036,172 @@ export const NouveauMessage = ({ taille = 24, couleur = '#111' }: P) => (
     <Path d="M18.4 2.9a1.9 1.9 0 0 1 2.7 2.7l-8.2 8.2-3.4.7.7-3.4Z" />
   </Svg>
 )
+
+// ------------------------------------------------------------
+// Boite de reception.
+// ------------------------------------------------------------
+
+// Silhouette avec un plus : creer un groupe, en tete de la boite.
+export const NouveauGroupe = ({ taille = 26, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="10" cy="7.4" r="3.4" />
+    <Path d="M3.4 20.2v-.8c0-3 2.9-4.8 6.6-4.8 1 0 2 .1 2.9.4" />
+    <Path d="M17.6 14.6v5.6m-2.8-2.8h5.6" />
+  </Svg>
+)
+
+// Eclair de la pastille « Activite et nouveaux abonnes ».
+export const Eclair = ({ taille = 26, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24">
+    <Path d="M13.6 2.2 5.4 13.1h5.3l-1.3 8.7 8.4-11.1h-5.4Z" fill={couleur} />
+  </Svg>
+)
+
+// Bulle de dialogue pleine : pastille des demandes de messages.
+export const BulleDemande = ({ taille = 26, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24">
+    <Path d="M12 3.4c-5 0-9 3.3-9 7.4 0 2.2 1.1 4.1 2.9 5.5l-1 3.9 4.2-2.1c.9.2 1.9.3 2.9.3 5 0 9-3.3 9-7.6S17 3.4 12 3.4Z"
+      fill={couleur} />
+    <Path d="M8.2 9.4h7.6M8.2 12.6h5" stroke="#3b4472" strokeWidth={1.7}
+      strokeLinecap="round" />
+  </Svg>
+)
+
+// Appareil photo du bout de ligne, quand la conversation attend une photo.
+export const AppareilPhoto = ({ taille = 24, couleur = '#8e8e93' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3 8.4a2 2 0 0 1 2-2h2.3l1.2-2h7l1.2 2H19a2 2 0 0 1 2 2v9.2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+    <Circle cx="12" cy="12.6" r="3.4" />
+  </Svg>
+)
+
+// ------------------------------------------------------------
+// Onglet « Amis ».
+// ------------------------------------------------------------
+
+// Avion en papier plein : la pastille rose sous l'avatar du rail
+// d'actions, qui propose d'envoyer la video a un ami.
+export const AvionEnvoi = ({ taille = 14, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24">
+    <Path d="M21.4 3.2 2.9 10.6c-.9.4-.8 1.6.1 1.8l4.8 1.3 1.3 4.9c.2.9 1.4 1 1.8.1l7.4-18.5c.3-.7-.4-1.3-1-1Z"
+      fill={couleur} />
+    <Path d="M8.6 14.2 20.3 4.4" stroke="#ff2856" strokeWidth={1.4}
+      strokeLinecap="round" />
+  </Svg>
+)
+
+// Trois lignes suivies d'une note : la barre « Liste de lecture ».
+export const ListeLecture = ({ taille = 18, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.9} strokeLinecap="round">
+    <Path d="M3 6h12M3 11h12M3 16h7" />
+    <Path d="M20 7v8" />
+    <Ellipse cx="17.6" cy="16.4" rx="2.4" ry="2.1" fill={couleur} stroke="none" />
+  </Svg>
+)
+
+// Pastille « + » du bouton « Creer » de la rangee de stories.
+export const PlusStory = ({ taille = 14, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={3} strokeLinecap="round">
+    <Path d="M12 5v14M5 12h14" />
+  </Svg>
+)
+
+// ------------------------------------------------------------
+// Notifications systeme et analyse video.
+// ------------------------------------------------------------
+
+// Roue dentee : ouvre « Paramètres des notifications » depuis l'en-tete.
+export const Engrenage = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="3.2" />
+    <Path d="M12 2.4h0l.5 2.3a7.6 7.6 0 0 1 2.3 1l2-1.3 1.8 1.8-1.3 2a7.6 7.6 0 0 1 1 2.3l2.3.5v2.4l-2.3.5a7.6 7.6 0 0 1-1 2.3l1.3 2-1.8 1.8-2-1.3a7.6 7.6 0 0 1-2.3 1l-.5 2.3H9.6l-.5-2.3a7.6 7.6 0 0 1-2.3-1l-2 1.3-1.8-1.8 1.3-2a7.6 7.6 0 0 1-1-2.3l-2.3-.5v-2.4l2.3-.5a7.6 7.6 0 0 1 1-2.3l-1.3-2L5 4.4l2 1.3a7.6 7.6 0 0 1 2.3-1l.5-2.3Z" />
+  </Svg>
+)
+
+// Cloche barree : la ligne « Mettre en sourdine » des reglages.
+export const ClocheBarree = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M8.4 4.9A5.6 5.6 0 0 1 17.6 9v3.4l1.6 3.1H8.2" />
+    <Path d="M6.4 9v3.4L4.8 15.5h6.6" />
+    <Path d="M10.2 18.4a2 2 0 0 0 3.6 0" />
+    <Path d="m3.6 3.4 16.8 17.2" />
+  </Svg>
+)
+
+// Megaphone : canal « Assistance publicités ».
+export const CanalPublicite = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3.4 10.2v3.6a1.4 1.4 0 0 0 1.4 1.4h2.4l6.8 4V4.8l-6.8 4H4.8a1.4 1.4 0 0 0-1.4 1.4Z" />
+    <Path d="M7.2 15.2v4.4h2.6l-.4-4.4" />
+    <Path d="M17.4 9.4a4.2 4.2 0 0 1 0 5.2M19.8 7a7.4 7.4 0 0 1 0 10" />
+  </Svg>
+)
+
+// Fusee : canal « Assistant promotion ».
+export const CanalPromotion = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M11 15.4 8.6 13a11.4 11.4 0 0 1 3.2-6.6C14 4.2 17.4 3 20.4 3.2c.3 3-.9 6.4-3.2 8.6a11.4 11.4 0 0 1-6.2 3.6Z" />
+    <Circle cx="15.2" cy="8.8" r="1.7" />
+    <Path d="M8.6 13H5.4l1.4-3.2h3.2M11 15.4v3.2l3.2-1.4v-3.2" />
+    <Path d="M6.6 17.4 4.2 19.8" />
+  </Svg>
+)
+
+// Poignee de main stylisee : canal « Creator Marketplace ».
+export const CanalMarketplace = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3.2 7.4h17.6l-1.4 3.2H4.6Z" />
+    <Path d="M5 10.6v8.2a1.4 1.4 0 0 0 1.4 1.4h11.2a1.4 1.4 0 0 0 1.4-1.4v-8.2" />
+    <Path d="M9.4 7.4 10.4 3.6h3.2l1 3.8" />
+    <Path d="M9.8 14.6h4.4" />
+  </Svg>
+)
+
+// Antenne de diffusion : canal « LIVE » des reglages.
+export const CanalLive = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Circle cx="12" cy="12" r="2.4" />
+    <Path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 16.2a6 6 0 0 0 0-8.4" />
+    <Path d="M5 5a9.8 9.8 0 0 0 0 14M19 19a9.8 9.8 0 0 0 0-14" />
+  </Svg>
+)
+
+// Pile d'episodes : canal « Mini-série ».
+export const CanalMiniSerie = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="2.8" y="7" width="13.4" height="13.2" rx="2.4" />
+    <Path d="M6.4 4.4h10a3.4 3.4 0 0 1 3.4 3.4v9" />
+    <Path d="m8.4 11.4 4.2 2.4-4.2 2.4Z" />
+  </Svg>
+)
+
+// Pastille generique de l'application, posee sur les cartes et les
+// reglages : le logo de la marque n'est pas reproduit.
+export const CanalApplication = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="3.4" y="3.4" width="17.2" height="17.2" rx="5" />
+    <Path d="m9.8 8.6 6 3.4-6 3.4Z" />
+  </Svg>
+)
+
+// Silhouette avec une etoile : le bouton « Studio créateur » de
+// l'en-tete de l'analyse video.
+export const StudioPastille = ({ taille = 18, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24">
+    <Circle cx="9.4" cy="7" r="3.8" fill={couleur} />
+    <Path d="M2.4 20.4v-2.2c0-3.2 3.2-5 7-5 1.2 0 2.4.2 3.4.6l-1 6.6H2.4Z" fill={couleur} />
+    <Path d="m18 11.4 1.5 3.3 3.3 1.5-3.3 1.5L18 21l-1.5-3.3-3.3-1.5 3.3-1.5L18 11.4Z" fill={couleur} />
+  </Svg>
+)
