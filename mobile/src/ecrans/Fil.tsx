@@ -13,6 +13,8 @@ import {
 } from '../composants/Icones'
 import EnvoyerA from '../composants/EnvoyerA'
 import AnalyseVideo from './AnalyseVideo'
+import Communaute from './Communaute'
+import DirectLive from './DirectLive'
 
 // Memes categories que app/src/pages/Fil.tsx.
 const CATEGORIES = ['Communauté', 'Suivis', 'Pour toi']
@@ -178,6 +180,19 @@ export default function Fil({
   // fenetre, qui serait trop grande et desalignerait chaque video.
   const [hauteur, setHauteur] = useState(0)
 
+  // Carte touchee dans la mosaique « Communauté » : le fil bascule sur
+  // « Pour toi » et se positionne sur cette video, en reprenant le
+  // defilement par ecran deja en place.
+  // « Communauté » est le seul onglet sur fond blanc : la barre du haut
+  // s'y lit en sombre.
+  const clair = !autonome && categorie === 'Communauté'
+
+  const ouvrirVideo = (videoId: string) => {
+    const rang = liste.findIndex(v => v.id === videoId)
+    setIndex(rang < 0 ? 0 : rang)
+    setCategorie('Pour toi')
+  }
+
   return (
     <View style={s.page}
       onLayout={e => setHauteur(e.nativeEvent.layout.height)}>
@@ -189,7 +204,10 @@ export default function Fil({
           showsVerticalScrollIndicator={false}
           snapToInterval={hauteur || undefined}
           decelerationRate="fast"
-          initialScrollIndex={hauteur > 0 ? indexInitial : undefined}
+          // La liste s'ouvre sur la video courante, et non sur le seul
+          // `indexInitial` : une carte touchee dans « Communauté » change
+          // `index`, et c'est la que le fil doit se poser en revenant.
+          initialScrollIndex={hauteur > 0 ? index : undefined}
           getItemLayout={(_, i) => (
             { length: hauteur, offset: hauteur * i, index: i })}
           onMomentumScrollEnd={e => hauteur > 0 &&
@@ -200,21 +218,28 @@ export default function Fil({
               onCommenter={setVideoCom} onVisiter={onVisiter} />
           )}
         />
+      ) : categorie === 'LIVE' ? (
+        // Le LIVE se tient sur toute la hauteur, entete comprise : il
+        // porte sa propre barre du haut et sa propre croix de sortie.
+        <DirectLive onFermer={() => setCategorie('Pour toi')} />
+      ) : categorie === 'Communauté' ? (
+        <Communaute onOuvrir={ouvrirVideo} />
       ) : (
         <View style={s.attente}>
           <Text style={s.attenteTexte}>
-            {categorie === 'LIVE'
-              ? 'Aucun LIVE pour le moment'
-              : categorie === 'Suivis'
-              ? 'Le fil de tes abonnements sera disponible prochainement.'
-              : 'Le fil Communauté sera disponible prochainement.'}
+            Le fil de tes abonnements sera disponible prochainement.
           </Text>
         </View>
       )}
 
       {/* Barre du haut, par-dessus la video. En mode autonome elle porte le
-          retour et le champ de recherche ; sinon les categories du fil. */}
-      {autonome ? (
+          retour et le champ de recherche ; sinon les categories du fil.
+          Le LIVE la laisse de cote : il porte la sienne.
+
+          Sur « Communauté » le fond passe au blanc : la barre garde la
+          meme disposition, mais ses traits s'assombrissent, sans quoi ils
+          seraient blancs sur blanc. */}
+      {categorie === 'LIVE' ? null : autonome ? (
         <View style={s.enteteRecherche}>
           <Pressable hitSlop={10} onPress={onRetour} style={s.retour}>
             <Chevron taille={26} couleur="#fff" />
@@ -227,22 +252,28 @@ export default function Fil({
           </Pressable>
         </View>
       ) : (
-        <View style={s.entete}>
+        <View style={[s.entete, clair && s.enteteClaire]}>
           <Pressable hitSlop={10} onPress={() => setCategorie('LIVE')}>
-            <LiveEntete taille={26} couleur="#fff" />
+            <LiveEntete taille={26} couleur={clair ? '#111' : '#fff'} />
           </Pressable>
 
           <View style={s.categories}>
             {CATEGORIES.map(c => (
               <Pressable key={c} onPress={() => setCategorie(c)} hitSlop={8} style={s.categorieBoite}>
-                <Text style={[s.categorie, categorie === c && s.categorieActive]}>{c}</Text>
-                {categorie === c && <View style={s.soulignement} />}
+                <Text style={[
+                  s.categorie,
+                  clair && s.categorieClaire,
+                  categorie === c && (clair ? s.categorieActiveClaire : s.categorieActive),
+                ]}>{c}</Text>
+                {categorie === c && (
+                  <View style={[s.soulignement, clair && s.soulignementClair]} />
+                )}
               </Pressable>
             ))}
           </View>
 
           <Pressable hitSlop={10} onPress={onRechercher}>
-            <LoupeEntete taille={25} couleur="#fff" />
+            <LoupeEntete taille={25} couleur={clair ? '#111' : '#fff'} />
           </Pressable>
         </View>
       )}
@@ -293,6 +324,11 @@ const s = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,.33)', textShadowRadius: 3,
   },
   categorieActive: { color: '#fff' },
+  // Variantes sombres de la barre, pour l'onglet « Communauté ».
+  enteteClaire: { backgroundColor: '#fff' },
+  categorieClaire: { color: '#8a8a8e', textShadowColor: 'transparent' },
+  categorieActiveClaire: { color: '#111', fontWeight: '700' },
+  soulignementClair: { backgroundColor: '#111' },
   // .fil-entete .actif:after : 24px de large, 2px de haut, a -4px.
   // :after en position absolue : le trait ne decale pas le texte, donc les
   // trois categories restent sur la meme ligne que l'icone LIVE.

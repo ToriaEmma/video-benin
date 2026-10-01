@@ -1323,3 +1323,95 @@ export const AvatarVide = ({ taille = 56, couleur = '#c7c7cc' }: P) => (
     <Path d="M11.6 40a12.4 12.4 0 0 1 24.8 0Z" fill={couleur} />
   </Svg>
 )
+
+/* ---------- Icones de la grille « Communauté » et du LIVE ---------- */
+
+// Pile de carres : publication a plusieurs photos, dans le coin de la
+// vignette de la mosaique « Communauté ».
+export const Diaporama = ({ taille = 15, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Rect x="8" y="3" width="13" height="13" rx="2.4" />
+    <Path d="M16 20.5H5.5A2.5 2.5 0 0 1 3 18V7.5" />
+  </Svg>
+)
+
+// Triangle de lecture plein, pose sur la vignette d'une video.
+export const LectureVignette = ({ taille = 15, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill={couleur}>
+    <Path d="M7 3.5 20 12 7 20.5Z" />
+  </Svg>
+)
+
+// Petit coeur en contour, a cote du nombre de j'aime d'une carte.
+export const CoeurPetit = ({ taille = 14, couleur = '#777' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M12 20.5 4.3 13a4.9 4.9 0 0 1 7.7-6 4.9 4.9 0 0 1 7.7 6Z" />
+  </Svg>
+)
+
+// Calendrier etoile de l'entete « Découvrir » : meme trace que le
+// symbole des evenements de l'ecran LIVE, en icone autonome.
+export const CalendrierEtoile = ({ taille = 23, couleur = '#fff' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Rect x="3" y="5" width="18" height="17" rx="2" />
+    <Path d="M7 2v6M17 2v6" />
+    <Path d="m12 9 1.55 3.14 3.47.51-2.51 2.44.59 3.45L12 16.91l-3.1 1.63.59-3.45-2.51-2.44 3.47-.51Z" />
+  </Svg>
+)
+
+// Camera video pleine : la pastille rouge de « Passer en LIVE ».
+export const CameraLive = ({ taille = 14, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill={couleur}>
+    <Rect x="2" y="6.5" width="13" height="11" rx="2.6" />
+    <Path d="M16.5 11.2 22 8v8l-5.5-3.2Z" />
+  </Svg>
+)
+
+// Couronne : le rang de la diffusion, a cote du « 0/4 ».
+export const Couronne = ({ taille = 14, couleur = '#fcd116' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill={couleur}>
+    <Path d="M3 7.5l4 4 5-7 5 7 4-4-2 11H5Z" />
+  </Svg>
+)
+
+// Deux silhouettes dans un cadre : inviter des participants au LIVE.
+export const InvitesLive = ({ taille = 25, couleur = '#fff' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Rect x="2.5" y="4.5" width="19" height="15" rx="2.6" />
+    <Circle cx="9" cy="10.4" r="2.1" />
+    <Path d="M5.6 16.4a3.6 3.6 0 0 1 6.8 0" />
+    <Path d="M15 9.5h4M15 13h3" />
+  </Svg>
+)
+
+// Paquet cadeau : le panneau des cadeaux du LIVE.
+export const CadeauLive = ({ taille = 25, couleur = '#fff' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Rect x="3" y="9" width="18" height="12" rx="2" />
+    <Path d="M2 9h20M12 9v12" />
+    <Path d="M12 9S9.5 3 7 4.4 9.6 9 12 9Zm0 0s2.5-6 5-4.6S14.4 9 12 9Z" />
+  </Svg>
+)
+
+// Chevron vers le bas : reduire le bandeau du LIVE.
+export const ChevronBas = ({ taille = 18, couleur = '#fff' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Path d="m6 9.5 6 6 6-6" />
+  </Svg>
+)
+
+// Chevron vers le haut : la poignee qui deplie le LIVE en plein ecran.
+export const ChevronHaut = ({ taille = 18, couleur = '#fff' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Path d="m6 14.5 6-6 6 6" />
+  </Svg>
+)
+
+// Coeur plein : les coeurs qui montent le long du bord du LIVE.
+export const CoeurPlein = ({ taille = 20, couleur = '#ff2856' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill={couleur}>
+    <Path d="M12 21 3.6 12.6a5.4 5.4 0 0 1 8.4-6.6 5.4 5.4 0 0 1 8.4 6.6Z" />
+  </Svg>
+)

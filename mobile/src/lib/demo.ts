@@ -85,6 +85,36 @@ export type Story = {
   vue?: boolean
 }
 
+// Entree de la grille « Communauté » : la mosaique a deux colonnes du
+// premier onglet du fil. Chaque entree pointe sur une video du fil et y
+// ajoute ce que la grille montre en propre : l'apercu, le nombre de
+// photos quand la publication en est un diaporama, et la hauteur de la
+// vignette, qui varie d'une carte a l'autre pour decaler les colonnes.
+export type EntreeCommunaute = {
+  id: string
+  // Video du fil ouverte au toucher de la carte.
+  videoId: string
+  pseudo: string
+  legende: string
+  nbAime: number
+  // Au-dela de une, la vignette porte la pastille « diaporama » au lieu
+  // du triangle de lecture.
+  nbPhotos?: number
+  // Rapport hauteur / largeur de la vignette, entre 1.0 et 1.5 : c'est
+  // lui qui donne a la mosaique son decalage entre colonnes.
+  rapport: number
+}
+
+// Message du tchat d'un LIVE. Un message `systeme` n'est pas une parole
+// mais un evenement de la diffusion (« a partagé la vidéo LIVE ») : il
+// s'affiche sur une seule ligne grise, sans avatar.
+export type MessageLive = {
+  id: string
+  pseudo: string
+  texte: string
+  systeme?: boolean
+}
+
 export type Commentaire = {
   id: string
   videoId: string
@@ -213,6 +243,52 @@ export const reglagesDefaut: Reglages = {
   telechargementWifi: true,
   filtreCommentaires: true,
 }
+
+// Grille « Communauté ». Les rapports sont volontairement varies : deux
+// colonnes de cartes de meme hauteur ne decaleraient pas, et la mosaique
+// ressemblerait a une grille ordinaire.
+export const communauteDemo: EntreeCommunaute[] = [
+  { id: 'g1', videoId: 'v1', pseudo: 'kossi_bj', legende: 'Coucher de soleil sur la plage de Fidjrossè 🌅', nbAime: 843, rapport: 1.34 },
+  { id: 'g2', videoId: 'v2', pseudo: 'mama_cuisine', legende: 'Recette du amiwo traditionnel, étape par étape', nbAime: 612, nbPhotos: 6, rapport: 1.06 },
+  { id: 'g3', videoId: 'v3', pseudo: 'vie_cotonou', legende: 'Le marché Dantokpa un samedi matin', nbAime: 1920, rapport: 1.45 },
+  { id: 'g4', videoId: 'v4', pseudo: 'rire_229', legende: 'Zémidjan challenge 😂', nbAime: 3400, rapport: 1.18 },
+  { id: 'g5', videoId: 'v5', pseudo: 'culture_bj', legende: 'Les tisserands de Parakou', nbAime: 489, nbPhotos: 4, rapport: 1.5 },
+  { id: 'g6', videoId: 'v1', pseudo: 'ama_bj', legende: 'La route des pêches au petit matin', nbAime: 1204, rapport: 1.12 },
+  { id: 'g7', videoId: 'v3', pseudo: 'jean229', legende: 'Trois adresses à Ganhi pour manger à midi sans se ruiner', nbAime: 731, nbPhotos: 3, rapport: 1.28 },
+  { id: 'g8', videoId: 'v2', pseudo: 'studio_229', legende: 'Montage de la semaine', nbAime: 2150, rapport: 1.4 },
+  { id: 'g9', videoId: 'v5', pseudo: 'culture_bj', legende: 'Abomey, les bas-reliefs du palais royal', nbAime: 968, rapport: 1.0 },
+  { id: 'g10', videoId: 'v4', pseudo: 'kossi_bj', legende: 'Le pont de Cotonou vu du zémidjan', nbAime: 1572, rapport: 1.22 },
+]
+
+// Comptes en direct, montres en rond en haut de la feuille « Découvrir ».
+export const livesDemo = [
+  { id: 'l1', pseudo: 'vie_cotonou', spectateurs: 5700, abonnes: 671600 },
+  { id: 'l2', pseudo: 'rire_229', spectateurs: 1240, abonnes: 92300 },
+  { id: 'l3', pseudo: 'mama_cuisine', spectateurs: 860, abonnes: 45100 },
+  { id: 'l4', pseudo: 'studio_229', spectateurs: 410, abonnes: 18700 },
+]
+
+// Tchat du LIVE au moment ou on le rejoint. L'ecran en ajoute d'autres
+// toutes les quelques secondes, pour que le fil ne reste pas figé.
+export const messagesLiveDemo: MessageLive[] = [
+  { id: 'm1', pseudo: 'kossi_bj', texte: 'Bonsoir tout le monde 👋' },
+  { id: 'm2', pseudo: 'ama_bj', texte: 'Le son est parfait ce soir' },
+  { id: 'm3', pseudo: 'jean229', texte: 'a partagé la vidéo LIVE', systeme: true },
+  { id: 'm4', pseudo: 'mama_cuisine', texte: 'Tu passes à Dantokpa après ?' },
+  { id: 'm5', pseudo: 'culture_bj', texte: 'On te suit depuis Parakou 🇧🇯' },
+  { id: 'm6', pseudo: 'rire_229', texte: 'Mets la musique plus fort 😂' },
+]
+
+// Messages piochés au hasard par le minuteur du tchat.
+export const messagesLiveSuite: MessageLive[] = [
+  { id: 'x1', pseudo: 'studio_229', texte: 'Grosse ambiance ce soir' },
+  { id: 'x2', pseudo: 'ama_bj', texte: 'a partagé la vidéo LIVE', systeme: true },
+  { id: 'x3', pseudo: 'jean229', texte: 'Tu refais un direct demain ?' },
+  { id: 'x4', pseudo: 'kossi_bj', texte: 'La lumière est top 🔥' },
+  { id: 'x5', pseudo: 'vie_cotonou', texte: 'Salut les nouveaux arrivants' },
+  { id: 'x6', pseudo: 'culture_bj', texte: 'a partagé la vidéo LIVE', systeme: true },
+  { id: 'x7', pseudo: 'mama_cuisine', texte: 'Je prépare le dîner en écoutant 😋' },
+]
 
 // Les dates des conversations de demonstration sont exprimees en minutes
 // avant le lancement : l'horodatage reste coherent quelle que soit la date.
