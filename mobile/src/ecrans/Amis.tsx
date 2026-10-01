@@ -15,7 +15,7 @@
 
 import React, { useEffect, useState } from 'react'
 import {
-  View, FlatList, Pressable, ScrollView, StyleSheet, Share,
+  View, FlatList, Pressable, ScrollView, StyleSheet, Share, PanResponder,
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native'
 import { Text } from '../composants/Texte'
@@ -34,11 +34,11 @@ import {
   PlusStory, EtincelleEtiquette,
 } from '../composants/Icones'
 
-// La liste pagine : un geste vers le haut saute directement a la video
-// suivante, sans etat intermediaire ou la premiere s'agrandirait. Le
-// repli se declenche donc des que le doigt touche la video, avant que
-// le defilement ne commence, et la premiere video occupe alors tout
-// l'ecran sans qu'on ait quitte sa page.
+// Le premier geste vers le haut n'avance pas d'une video : il rend
+// d'abord l'ecran entier a la premiere, en tassant la rangee de recits.
+// La liste paginant, le moindre defilement sauterait sinon directement
+// a la video suivante. On la fige donc tant que ce premier palier n'est
+// pas franchi, et le geste suivant reprend son cours normal.
 
 // Hauteur de l'entete (zone sure comprise) et de la rangee de stories.
 // Deployee, la carte repousse la video d'autant, pour que les bulles ne la
@@ -369,10 +369,19 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
   // Le repli se decide sur le geste, jamais dans un effet : l'etat suit
   // directement la main. Il ne se deploie a nouveau qu'une fois revenu
   // tout en haut de la premiere video.
-  const auContact = () => setReplie(true)
   const auDefilement = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (e.nativeEvent.contentOffset.y <= 0) setReplie(false)
   }
+
+  // Premier palier : la liste etant figee, elle ne recoit aucun geste.
+  // Cette reponse-ci guette donc le glissement vers le haut et rend
+  // l'ecran entier a la premiere video. Creee une fois pour toutes :
+  // la lire pendant le rendu interdit de passer par une ref.
+  const [deploiement] = useState(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) => g.dy < -6,
+    onPanResponderRelease: () => setReplie(true),
+    onPanResponderTerminate: () => setReplie(true),
+  }))
 
   if (recherche) return (
     <Decouvrir
@@ -389,16 +398,19 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
           stories se posent par-dessus. Sa hauteur ne bouge donc pas quand
           la rangee se tasse, et le pas du defilement reste juste. */}
       <View style={s.fil}
-        onLayout={e => setHauteur(e.nativeEvent.layout.height)}>
+        onLayout={e => setHauteur(e.nativeEvent.layout.height)}
+        {...(replie ? {} : deploiement.panHandlers)}>
         <FlatList
           data={liste}
           keyExtractor={v => v.id}
           pagingEnabled
+          // Figee tant que la premiere video n'occupe pas tout l'ecran :
+          // le geste sert alors a la deployer, pas a changer de video.
+          scrollEnabled={replie}
           showsVerticalScrollIndicator={false}
           snapToInterval={hauteur || undefined}
           decelerationRate="fast"
           scrollEventThrottle={16}
-          onScrollBeginDrag={auContact}
           onScroll={auDefilement}
           getItemLayout={(_, i) => (
             { length: hauteur, offset: hauteur * i, index: i })}
