@@ -6,7 +6,7 @@
 // bas et se referment par la croix.
 // ============================================================
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   View, Pressable, StyleSheet, ScrollView, Modal,
   KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions,
@@ -14,20 +14,35 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, TextInput } from '../composants/Texte'
 import {
-  SilhouetteVide, Enveloppe, AideRonde, AvatarVide,
+  SilhouetteVide, Enveloppe, AideRonde,
   FeuilleCroix, ChevronDroit, Menu,
 } from '../composants/Icones'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useAuth } from '../lib/auth'
-import { comptesDemo } from '../lib/demo'
 
-// Comptes deja connus de l'appareil, avec l'identifiant qui a servi a
-// les creer. La vraie liste viendra de la base ; ceux-ci donnent sa
-// forme a l'ecran « Ravis de te revoir ».
-const CONNUS = [
-  { pseudo: comptesDemo[0].pseudo, identifiant: '+229 •••• 8025' },
-  { pseudo: comptesDemo[1].pseudo, identifiant: 'm•••e@gmail.com' },
-  { pseudo: comptesDemo[2].pseudo, identifiant: 'Sans portrait', vide: true },
-]
+// Comptes deja utilises sur cet appareil. La liste s'ecrit a chaque
+// connexion reussie : tant qu'on ne s'est jamais connecte, elle est
+// vide et l'ecran propose directement de saisir ses identifiants.
+const CLE_CONNUS = 'tiktok-benin-comptes-connus-v1'
+
+type CompteConnu = { pseudo: string; telephone: string }
+
+export async function retenirCompte(pseudo: string, telephone: string) {
+  try {
+    const brut = await AsyncStorage.getItem(CLE_CONNUS)
+    const liste: CompteConnu[] = brut ? JSON.parse(brut) : []
+    const sansDoublon = liste.filter(c => c.pseudo !== pseudo)
+    await AsyncStorage.setItem(CLE_CONNUS,
+      JSON.stringify([{ pseudo, telephone }, ...sansDoublon].slice(0, 5)))
+  } catch { /* Stockage indisponible : la liste restera vide. */ }
+}
+
+// « +229 •• •• •• 42 » : seuls les deux derniers chiffres restent lisibles.
+const masquer = (telephone: string) => {
+  const chiffres = telephone.replace(/\D/g, '')
+  if (chiffres.length < 4) return telephone
+  return `+229 •• •• •• ${chiffres.slice(-2)}`
+}
 
 // Teintes des avatars, tirees du pseudo pour qu'un compte garde la
 // sienne d'un ecran a l'autre.
@@ -204,10 +219,20 @@ function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
   const [mdp, setMdp] = useState('')
   const [erreur, setErreur] = useState('')
   const [occupe, setOccupe] = useState(false)
+  // Comptes deja utilises sur cet appareil, relus a l'ouverture.
+  const [connus, setConnus] = useState<CompteConnu[]>([])
 
-  const entrer = async () => {
+  useEffect(() => {
+    let vivant = true
+    AsyncStorage.getItem(CLE_CONNUS)
+      .then(brut => { if (vivant && brut) setConnus(JSON.parse(brut)) })
+      .catch(() => { /* Stockage illisible : la liste reste vide. */ })
+    return () => { vivant = false }
+  }, [])
+
+  const entrer = async (telephone?: string) => {
     setErreur('')
-    const chiffres = tel.replace(/\D/g, '')
+    const chiffres = (telephone ?? tel).replace(/\D/g, '')
     if (chiffres.length < 8) { setErreur('Numéro de téléphone incomplet'); return }
     if (mdp.length < 6) {
       setErreur('Le mot de passe doit faire au moins 6 caractères'); return
@@ -215,6 +240,7 @@ function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
     setOccupe(true)
     try {
       await connecter(chiffres, mdp)
+      await retenirCompte(choisi ?? chiffres, chiffres)
       onSucces?.(); onFermer()
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Une erreur est survenue')
@@ -235,10 +261,12 @@ function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
               contentContainerStyle={s.corpsFeuille}
               keyboardShouldPersistTaps="handled">
               <Text style={s.grandTitre}>
-                {choisi ? 'Entre ton mot de passe' : 'Ravis de te revoir'}
+                {connus.length === 0 ? 'Connexion'
+                  : choisi ? 'Entre ton mot de passe'
+                  : 'Ravis de te revoir'}
               </Text>
 
-              {choisi ? <>
+              {(choisi || connus.length === 0) ? <>
                 <View style={s.champ}>
                   <TextInput style={s.saisie} placeholder="Numéro de téléphone"
                     placeholderTextColor="#aaa" keyboardType="phone-pad"
@@ -251,30 +279,32 @@ function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
                 </View>
 
                 <Pressable style={[s.principal, occupe && s.principalInactif]}
-                  onPress={entrer} disabled={occupe}>
+                  onPress={() => entrer()} disabled={occupe}>
                   {occupe
                     ? <ActivityIndicator color="#fff" />
                     : <Text style={s.principalTexte}>Connexion</Text>}
                 </Pressable>
 
-                <Pressable hitSlop={8} onPress={() => setChoisi(null)}>
-                  <Text style={s.retourEtape}>Choisir un autre compte</Text>
-                </Pressable>
+                {connus.length > 0 && (
+                  <Pressable hitSlop={8} onPress={() => setChoisi(null)}>
+                    <Text style={s.retourEtape}>Choisir un autre compte</Text>
+                  </Pressable>
+                )}
               </> : <>
-                {CONNUS.map(c => (
+                {connus.map(c => (
                   <Pressable key={c.pseudo} style={s.ligneCompte}
-                    onPress={() => setChoisi(c.pseudo)}>
-                    {c.vide
-                      ? <AvatarVide taille={46} />
-                      : <View style={[s.avatar,
-                          { backgroundColor: teinte(c.pseudo) }]}>
-                          <Text style={s.avatarLettre}>
-                            {c.pseudo.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>}
+                    onPress={() => { setChoisi(c.pseudo); setTel(c.telephone) }}>
+                    <View style={[s.avatar,
+                      { backgroundColor: teinte(c.pseudo) }]}>
+                      <Text style={s.avatarLettre}>
+                        {c.pseudo.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
                     <View style={s.compteCorps}>
                       <Text style={s.comptePseudo}>{c.pseudo}</Text>
-                      <Text style={s.compteIdentifiant}>{c.identifiant}</Text>
+                      <Text style={s.compteIdentifiant}>
+                        {masquer(c.telephone)}
+                      </Text>
                     </View>
                     <ChevronDroit taille={20} couleur="#c4c4c6" />
                   </Pressable>
