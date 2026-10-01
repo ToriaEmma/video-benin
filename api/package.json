@@ -1,0 +1,21 @@
+{
+  "name": "tiktok-benin-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "API entre l'application mobile et la base Neon : le mot de passe de la base ne quitte jamais le serveur.",
+  "main": "serveur.js",
+  "scripts": {
+    "start": "node serveur.js",
+    "dev": "node --watch serveur.js",
+    "schema": "node appliquer-schema.js"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}
