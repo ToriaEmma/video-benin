@@ -4,6 +4,8 @@ import { preparerInterface, masquerEcranDemarrage } from './lib/natif'
 import Connexion from './pages/Connexion'
 import Fil from './pages/Fil'
 import Publier from './pages/Publier'
+import Camera from './pages/Camera'
+import Montage from './pages/Montage'
 import Profil from './pages/Profil'
 import Decouvrir from './pages/Decouvrir'
 import { Accueil, Amis, Messages, Plus, Personne } from './components/Icones'
@@ -22,6 +24,11 @@ function Application() {
     preparerInterface()
     masquerEcranDemarrage()
   }, [])
+  // Video filmee ou importee a la camera, passee au montage puis a la
+  // publication. Null = on est encore sur l'ecran de tournage.
+  const [videoChoisie, setVideoChoisie] = useState<string | null>(null)
+  // Vrai tant qu'on est sur l'ecran de montage, avant la publication.
+  const [montage, setMontage] = useState(false)
   // Pseudo du profil consulte. Null = on est sur son propre profil.
   const [profilVisite, setProfilVisite] = useState<string | null>(null)
 
@@ -40,13 +47,27 @@ function Application() {
         {onglet === 'decouvrir' && <Decouvrir onVisiter={visiter} />}
         {onglet === 'messages' && <section className="page page-messages"><h1>Messages</h1><div><Messages taille={48}/><h2>Aucun message pour le moment</h2><p>La messagerie sera disponible prochainement.</p></div></section>}
         {onglet === 'publier' && (
-          <Publier
-            onFermer={() => setOnglet('fil')}
-            onPublie={() => {
-              setCleFil((n) => n + 1)
-              setOnglet('fil')
-            }}
-          />
+          videoChoisie
+            ? montage
+              ? <Montage
+                  url={videoChoisie}
+                  pseudo={session.user.email?.split('@')[0] ?? 'vous'}
+                  onRetour={() => { setMontage(false); setVideoChoisie(null) }}
+                  onSuivant={() => setMontage(false)}
+                />
+              : <Publier
+                  urlInitiale={videoChoisie}
+                  onFermer={() => setVideoChoisie(null)}
+                  onPublie={() => {
+                    setVideoChoisie(null)
+                    setCleFil((n) => n + 1)
+                    setOnglet('fil')
+                  }}
+                />
+            : <Camera
+                onFermer={() => setOnglet('fil')}
+                onChoisir={(url) => { setVideoChoisie(url); setMontage(true) }}
+              />
         )}
         {onglet === 'profil' && (
           <Profil
@@ -70,7 +91,7 @@ function Application() {
           <span>Amis</span>
         </button>
 
-        <button className="nav-creer" aria-label="Créer une publication" onClick={() => setOnglet('publier')}>
+        <button className="nav-creer" aria-label="Créer une publication" onClick={() => { setVideoChoisie(null); setMontage(false); setOnglet('publier') }}>
           <span className="pastille"><Plus taille={24} /></span>
         </button>
 

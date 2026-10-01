@@ -96,6 +96,18 @@ export const comptesDemo = [
   { id: 'u5', pseudo: 'culture_bj', bio: 'Patrimoine et savoir-faire' },
 ]
 
+// Video mise de cote avant publication, depuis l'ecran de montage.
+export type BrouillonDemo = {
+  id: string
+  url: string
+  legende: string
+  octets: number
+  // Date d'enregistrement, en millisecondes.
+  date: number
+  // Son ou effet retenu, affiche sous la vignette.
+  etiquette?: { type: 'son' | 'effet'; nom: string }
+}
+
 // Etat mutable de la session de demonstration.
 export const etatDemo = {
   connecte: false,
@@ -104,4 +116,5 @@ export const etatDemo = {
   commentaires: [...commentairesDemo],
   mesVideos: [] as VideoDemo[],
   corbeille: [] as VideoDemo[],
+  brouillons: [] as BrouillonDemo[],
 }

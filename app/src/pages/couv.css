@@ -1,0 +1,96 @@
+/* ============================================================
+   Choix de la couverture
+   Theme clair, bande de vignettes et styles de titre.
+   ============================================================ */
+
+.couv-page{position:absolute;inset:0;z-index:64;background:#fff;color:#111;color-scheme:light;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);padding-top:env(safe-area-inset-top);}
+.app:has(.couv-page)>.nav,.app:has(.couv-saisie)>.nav{display:none;}
+.couv-page button{color:inherit;}
+.couv-page button:focus-visible,.couv-saisie button:focus-visible{outline:2px solid #555;outline-offset:2px;}
+
+.couv-entete{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;min-height:48px;flex-shrink:0;}
+.couv-entete button{font-size:21px;font-weight:400;min-height:40px;}
+
+.couv-cadre{position:relative;flex:1;min-height:0;margin:0 22px;background:#dfe1e3;border-radius:2px;overflow:hidden;}
+.couv-cadre>img{width:100%;height:100%;object-fit:contain;}
+.couv-cadre-zone{position:absolute;inset:0;background:transparent;}
+.couv-erreur{font-size:13px;line-height:1.35;color:#8a8a8e;padding:10px 22px 0;}
+
+/* ---------- Cartouche de titre pose sur l'image ---------- */
+.couv-titre-zone{position:absolute;left:24px;right:24px;top:40%;}
+.couv-titre-fond{background:#f0455c;border-radius:2px;padding:18px 16px;}
+.couv-titre-zone.style-standard .couv-titre-fond{background:transparent;padding:0;}
+.couv-titre-zone.style-glitch .couv-titre-fond{background:#111;}
+.couv-titre-fond textarea{display:block;width:100%;background:transparent;border:0;outline:none;resize:none;color:#fff;font-size:30px;font-weight:400;text-align:center;min-height:36px;line-height:1.2;}
+.couv-titre-fond textarea::placeholder{color:rgba(255,255,255,.65);}
+
+/* Decorations du style « Vector » : deux cadres decales, croix et points. */
+.couv-titre-zone.style-vector::before,.couv-titre-zone.style-vector::after{content:'';position:absolute;border:2.5px solid #111;}
+.couv-titre-zone.style-vector::before{left:-8px;right:4px;top:-14px;bottom:18px;}
+.couv-titre-zone.style-vector::after{left:-4px;right:8px;top:-4px;bottom:8px;border-color:#fff;}
+
+.couv-apercu{display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:14px 18px;flex-shrink:0;}
+.couv-apercu span{font-size:17px;font-weight:600;}
+
+/* ---------- Bande de selection ---------- */
+.couv-bande-ligne{display:flex;align-items:center;gap:12px;padding:0 16px;margin-bottom:18px;flex-shrink:0;}
+.couv-bande{flex:1;min-width:0;display:flex;border-radius:4px;}
+.couv-bande-image{flex:1;min-width:0;height:86px;overflow:hidden;}
+.couv-bande-image img{display:block;width:100%;height:100%;object-fit:cover;}
+/* L'image retenue deborde de la bande sur les quatre cotes, cadre rouge arrondi. */
+.couv-bande-image.actif{height:98px;margin:-6px 0;border:3px solid #ff2856;border-radius:10px;}
+
+.couv-importer{width:90px;height:86px;flex-shrink:0;border-radius:10px;background:#f1f1f2;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
+.couv-importer b{font-size:30px;font-weight:300;line-height:1;}
+.couv-importer span{font-size:13px;}
+
+/* ---------- Styles de titre ---------- */
+.couv-styles{display:flex;gap:14px;padding:0 16px 6px;overflow-x:auto;flex-shrink:0;scrollbar-width:none;}
+.couv-styles::-webkit-scrollbar{display:none;}
+.couv-style{width:82px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.couv-style small{font-size:15px;}
+.couv-style.actif small{color:#ff2856;}
+.couv-style-carre{width:82px;height:76px;border-radius:12px;background:#f1f1f2;display:grid;place-items:center;}
+.couv-style.actif .couv-style-carre{background:#fff;box-shadow:inset 0 0 0 2.5px #ff2856;}
+.couv-style-aa{font-size:28px;font-weight:700;}
+
+.couv-badge-vector,.couv-badge-emboss,.couv-badge-glitch em,.couv-badge-tint em{font-size:11px;font-weight:700;}
+.couv-badge-vector{background:#ff2856;color:#fff;border-radius:3px;padding:4px 7px;}
+.couv-badge-emboss{background:#111;color:#fff;border-radius:13px;padding:5px 8px;}
+.couv-badge-glitch,.couv-badge-tint{position:relative;width:54px;height:26px;display:flex;align-items:center;}
+.couv-badge-glitch i,.couv-badge-tint i{position:absolute;border-radius:3px;}
+.couv-badge-glitch i{left:4px;right:0;top:3px;bottom:0;background:#ff2856;}
+.couv-badge-glitch em{position:relative;background:#111;color:#fff;border-radius:3px;padding:4px 7px;font-style:normal;}
+.couv-badge-tint i{left:0;right:4px;top:0;bottom:3px;background:#16cce0;}
+.couv-badge-tint em{position:relative;margin-left:auto;background:#fff;color:#111;border:1px solid #111;border-radius:3px;padding:3px 6px;font-style:normal;}
+
+/* ============================================================
+   Mode saisie libre : fond assombri, clavier ouvert.
+   ============================================================ */
+
+.couv-saisie{position:absolute;inset:0;z-index:66;background:#8f8f8f;color:#fff;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom);}
+.couv-saisie button{color:inherit;}
+.couv-saisie>header{display:flex;justify-content:flex-end;align-items:center;padding:10px 16px;min-height:44px;flex-shrink:0;}
+.couv-saisie>header button{font-size:19px;font-weight:600;min-height:40px;}
+
+.couv-saisie-cadre{position:relative;flex:1;min-height:0;margin:0 30px;background:#d4d4d4;border-radius:4px;overflow:hidden;display:grid;place-items:center;}
+.couv-saisie-cadre>img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;}
+.couv-saisie-texte{position:relative;width:100%;background:transparent;border:0;outline:none;resize:none;padding:0 20px;font-size:27px;font-weight:700;line-height:1.2;}
+
+.couv-barre-texte{display:flex;align-items:center;gap:14px;padding:12px 14px;flex-shrink:0;}
+.couv-barre-texte>button{display:grid;place-items:center;min-height:40px;flex-shrink:0;}
+.couv-barre-trait{width:1px;height:26px;background:rgba(255,255,255,.5);flex-shrink:0;}
+.couv-polices{display:flex;gap:10px;overflow-x:auto;padding-right:14px;scrollbar-width:none;}
+.couv-polices::-webkit-scrollbar{display:none;}
+.couv-police{flex-shrink:0;border:1.5px solid rgba(255,255,255,.55);border-radius:22px;padding:8px 18px;font-size:17px;font-weight:600;white-space:nowrap;}
+.couv-police.actif{border-width:2px;border-color:#fff;}
+.couv-police.elegance{font-style:italic;font-weight:400;}
+.couv-police.neon{color:#f2e9a0;}
+.couv-police.retro{font-style:italic;font-weight:800;}
+
+.couv-palette{display:flex;gap:12px;padding:0 14px 12px;overflow-x:auto;flex-shrink:0;scrollbar-width:none;}
+.couv-palette::-webkit-scrollbar{display:none;}
+.couv-pastille{width:42px;height:42px;border-radius:50%;flex-shrink:0;box-shadow:0 0 0 2.5px #fff;}
+.couv-pastille.actif{box-shadow:0 0 0 4px #fff;}
+
+@media(max-width:350px){.couv-entete button{font-size:18px;}.couv-cadre{margin:0 14px;}.couv-importer{width:76px;}}

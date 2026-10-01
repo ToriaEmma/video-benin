@@ -1,0 +1,49 @@
+/* ============================================================
+   Feuille « Ajouter un son »
+   Deux crans de hauteur : 46 % puis 82 % de la fenetre.
+   ============================================================ */
+
+.son-fond{position:absolute;inset:0;z-index:70;display:flex;flex-direction:column;justify-content:flex-end;color-scheme:light;}
+.son-voile{flex:1;background:transparent;}
+.son-feuille{background:#fff;color:#111;border-radius:16px 16px 0 0;overflow:hidden;height:46dvh;display:flex;flex-direction:column;transition:height .22s ease-out;}
+.son-feuille.deploye{height:82dvh;}
+
+.son-poignee-zone{display:grid;place-items:center;padding:10px 0 6px;flex-shrink:0;touch-action:none;}
+.son-poignee{width:44px;height:5px;border-radius:3px;background:#d2d2d4;}
+
+/* ---------- Onglets ---------- */
+.son-onglets{display:flex;align-items:center;border-bottom:1px solid #ececec;flex-shrink:0;}
+.son-onglets-liste{display:flex;gap:22px;padding:0 16px;overflow-x:auto;scrollbar-width:none;}
+.son-onglets-liste::-webkit-scrollbar{display:none;}
+.son-onglets-liste button{padding:12px 0 9px;font-size:15.5px;font-weight:600;color:#9a9a9c;white-space:nowrap;border-bottom:2.5px solid transparent;border-radius:2px;}
+.son-onglets-liste button.actif{color:#111;border-bottom-color:#111;}
+.son-loupe{padding:12px 16px;color:#111;display:grid;place-items:center;}
+
+/* ---------- Territoire, onglet « Populaire » ---------- */
+.son-zones{display:flex;gap:9px;padding:14px 16px 4px;flex-shrink:0;}
+.son-zones button{background:#f1f1f2;color:#111;border-radius:18px;min-height:34px;padding:0 18px;font-size:14.5px;font-weight:600;}
+.son-zones button.actif{background:#111;color:#fff;}
+
+/* ---------- Liste ---------- */
+.son-liste{flex:1;overflow-y:auto;padding-bottom:24px;-webkit-overflow-scrolling:touch;}
+.son-vide{color:#9a9a9c;font-size:14px;text-align:center;padding:40px;}
+
+.son-ligne{display:flex;align-items:center;gap:12px;padding:0 16px;border-bottom:1px solid #f2f2f3;}
+.son-ligne.actif{background:#f7f7f8;border-bottom-color:transparent;}
+.son-choisir{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 0;text-align:left;color:#111;}
+.son-rang{width:18px;flex-shrink:0;font-size:15px;color:#9a9a9c;font-style:italic;}
+.son-pochette{width:49px;height:49px;border-radius:9px;flex-shrink:0;display:grid;place-items:center;color:#fff;font-size:20px;font-weight:800;}
+.son-ligne.actif .son-pochette{box-shadow:inset 0 0 0 2px #ff2856;}
+
+.son-corps{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.son-titre-ligne{display:flex;align-items:center;gap:5px;min-width:0;color:#ff2856;}
+.son-titre-ligne b{font-size:14.5px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.son-ligne.actif .son-titre-ligne b{color:#ff2856;}
+.son-meta{font-size:12.5px;color:#9a9a9c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.son-licence{font-size:11px;color:#b4b4b6;}
+
+.son-actions{display:flex;align-items:center;gap:18px;flex-shrink:0;color:#111;}
+.son-actions button{display:grid;place-items:center;min-width:32px;min-height:40px;}
+.son-feuille button:focus-visible{outline:2px solid #555;outline-offset:2px;}
+
+@media(prefers-reduced-motion:reduce){.son-feuille{transition:none;}}

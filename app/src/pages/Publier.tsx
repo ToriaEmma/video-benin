@@ -4,6 +4,7 @@ import { etatDemo } from '../lib/demo'
 import { useAuth } from '../lib/auth'
 import { Camera } from '../components/Icones'
 import CreationCamera from '../components/CreationCamera'
+import Couverture from './Couverture'
 
 const TAILLE_MAX = 50 * 1024 * 1024 // 50 Mo
 const DUREE_MAX = 90 // secondes
@@ -13,11 +14,19 @@ const DEPARTEMENTS = [
   'Donga', 'Littoral', 'Mono', 'Ouémé', 'Plateau', 'Zou',
 ]
 
-export default function Publier({ onPublie, onFermer }: { onPublie: () => void; onFermer: () => void }) {
+export default function Publier({ onPublie, onFermer, urlInitiale }: {
+  onPublie: () => void
+  onFermer: () => void
+  // Video arrivant du montage : elle existe deja en blob, il n'y a donc plus
+  // de fichier a choisir et le formulaire s'ouvre directement.
+  urlInitiale?: string
+}) {
   const { session } = useAuth()
   const champFichier = useRef<HTMLInputElement>(null)
   const [fichier, setFichier] = useState<File | null>(null)
-  const [apercu, setApercu] = useState('')
+  const [apercu, setApercu] = useState(urlInitiale ?? '')
+  // Editeur de couverture, ouvert depuis l'apercu.
+  const [couverture, setCouverture] = useState(false)
   const [legende, setLegende] = useState('')
   const [departement, setDepartement] = useState('Littoral')
   const [progression, setProgression] = useState(0)
@@ -54,7 +63,7 @@ export default function Publier({ onPublie, onFermer }: { onPublie: () => void; 
   }
 
   const publier = async () => {
-    if (!fichier || !session) return
+    if ((!fichier && !urlInitiale) || !session) return
     setEnvoi(true)
     setErreur('')
     setProgression(10)
@@ -84,12 +93,15 @@ export default function Publier({ onPublie, onFermer }: { onPublie: () => void; 
         return
       }
 
-      const extension = fichier.name.split('.').pop() ?? 'mp4'
+      // Une video venue du montage n'existe que comme blob : on la relit pour
+      // obtenir le corps a televerser et son type reel.
+      const corps = fichier ?? await (await fetch(apercu)).blob()
+      const extension = fichier?.name.split('.').pop() ?? (corps.type.includes('mp4') ? 'mp4' : 'webm')
       const chemin = `${session.user.id}/${Date.now()}.${extension}`
 
       const { error: erreurEnvoi } = await supabase.storage
         .from('videos')
-        .upload(chemin, fichier, { contentType: fichier.type })
+        .upload(chemin, corps, { contentType: corps.type })
       if (erreurEnvoi) throw erreurEnvoi
 
       setProgression(70)
@@ -117,7 +129,10 @@ export default function Publier({ onPublie, onFermer }: { onPublie: () => void; 
     }
   }
 
-  if (!fichier) return <><CreationCamera onChoisir={choisir} onFermer={onFermer}/>{erreur && <p role="alert" style={{position:'absolute',bottom:100,left:20,right:20,background:'#111',color:'white',padding:12,zIndex:5}}>{erreur}</p>}</>
+  if (couverture) return <Couverture url={apercu}
+    onAnnuler={() => setCouverture(false)}
+    onEnregistrer={() => setCouverture(false)} />
+  if (!fichier && !urlInitiale) return <><CreationCamera onChoisir={choisir} onFermer={onFermer}/>{erreur && <p role="alert" style={{position:'absolute',bottom:100,left:20,right:20,background:'#111',color:'white',padding:12,zIndex:5}}>{erreur}</p>}</>
   return (
     <div className="page">
       <h1 className="titre">Publier une vidéo</h1>
@@ -143,7 +158,11 @@ export default function Publier({ onPublie, onFermer }: { onPublie: () => void; 
           </div>
         </div>
       ) : (
-        <video className="apercu" src={apercu} controls playsInline />
+        <>
+          <video className="apercu" src={apercu} controls playsInline />
+          <button className="bouton secondaire" style={{ marginTop: 10 }}
+            onClick={() => setCouverture(true)}>Modifier la couverture</button>
+        </>
       )}
 
       {apercu && (
