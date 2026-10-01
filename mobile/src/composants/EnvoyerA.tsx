@@ -1,0 +1,188 @@
+// ============================================================
+// Feuille « Envoyer à » : destinataires, applications de partage,
+// puis les actions sur sa propre publication.
+// ============================================================
+
+import React, { useState } from 'react'
+import {
+  View, StyleSheet, Pressable, ScrollView, Modal, Share,
+  useWindowDimensions,
+} from 'react-native'
+import { Text } from '../composants/Texte'
+import {
+  Loupe, FeuilleCroix, Maillon, Telecharger, Statistiques, Flamme,
+  Diffuser, Epingle, Groupe, Duo, Collage, StickerPlus, Vitesse,
+  SousTitres, Crayon2, CadenasPlein, PhotoAnimee, EtiquetteGif,
+  Portefeuille, MotsCles, AjoutStory, Corbeille,
+  LogoWhatsApp, LogoSMS, LogoTelegram,
+} from './Icones'
+import { comptesDemo } from '../lib/demo'
+
+type Action = {
+  cle: string
+  nom: string
+  Icone: React.ComponentType<{ taille?: number; couleur?: string }>
+}
+
+// Deuxieme rangee : le lien et les applications externes. Chacune
+// porte sa couleur de marque, sur une pastille pleine.
+const APPLICATIONS = [
+  { cle: 'lien', nom: 'Copier le lien', fond: '#3b7df6', Icone: Maillon },
+  { cle: 'whatsapp', nom: 'WhatsApp', Logo: LogoWhatsApp },
+  { cle: 'status', nom: 'Status', Logo: LogoSMS },
+  { cle: 'telegram', nom: 'Telegram', Logo: LogoTelegram },
+] as const
+
+// Troisieme rangee : les actions sur sa propre publication. Elles
+// defilent horizontalement, sur trois pages comme la reference.
+const ACTIONS: Action[] = [
+  { cle: 'stats', nom: 'Données analytiques', Icone: Statistiques },
+  { cle: 'telecharger', nom: 'Télécharger', Icone: Telecharger },
+  { cle: 'booster', nom: 'Augmenter le nombre de…', Icone: Flamme },
+  { cle: 'diffuser', nom: 'Diffuser', Icone: Diffuser },
+  { cle: 'epingler', nom: 'Épingler', Icone: Epingle },
+  { cle: 'groupe', nom: 'Créer un groupe', Icone: Groupe },
+  { cle: 'duo', nom: 'Duo', Icone: Duo },
+  { cle: 'collage', nom: 'Collage', Icone: Collage },
+  { cle: 'sticker', nom: 'Créer un sticker', Icone: StickerPlus },
+  { cle: 'vitesse', nom: 'Vitesse de lecture', Icone: Vitesse },
+  { cle: 'legendes', nom: 'Modifier les légendes', Icone: SousTitres },
+  { cle: 'modifier', nom: 'Modifier la publication', Icone: Crayon2 },
+  { cle: 'confidentialite', nom: 'Paramètres de confiden…', Icone: CadenasPlein },
+  { cle: 'animee', nom: 'Photo animée', Icone: PhotoAnimee },
+  { cle: 'gif', nom: 'Partager en tant que GIF', Icone: EtiquetteGif },
+  { cle: 'pub', nom: 'Paramètres publicitaires', Icone: Portefeuille },
+  { cle: 'supprimer', nom: 'Supprimer', Icone: Corbeille },
+  { cle: 'motscles', nom: 'Gérer les mots-clés', Icone: MotsCles },
+  { cle: 'story', nom: 'Ajouter à la Story', Icone: AjoutStory },
+]
+
+export default function EnvoyerA({ visible, legende, onFermer, onSupprimer }: {
+  visible: boolean
+  // Legende relayee au partage systeme.
+  legende: string
+  onFermer: () => void
+  onSupprimer?: () => void
+}) {
+  const { height } = useWindowDimensions()
+  const [message, setMessage] = useState('')
+
+  const partager = async () => {
+    try {
+      await Share.share({ message: `${legende}\n\nRegarde cette vidéo sur Vidéo Bénin` })
+    } catch { /* Partage annule. */ }
+  }
+
+  const agir = (cle: string, nom: string) => {
+    if (cle === 'lien' || cle === 'whatsapp' || cle === 'status' || cle === 'telegram') {
+      partager(); return
+    }
+    if (cle === 'supprimer') { onFermer(); onSupprimer?.(); return }
+    setMessage(`${nom} : disponible prochainement.`)
+    setTimeout(() => setMessage(''), 2200)
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="slide"
+      onRequestClose={onFermer} statusBarTranslucent>
+      <View style={s.fond}>
+        <Pressable style={s.voile} onPress={onFermer} />
+
+        <View style={[s.feuille, { maxHeight: height * .56 }]}>
+          <View style={s.entete}>
+            <Pressable hitSlop={10}><Loupe taille={24} couleur="#111" /></Pressable>
+            <Text style={s.titre}>Envoyer à</Text>
+            <Pressable hitSlop={10} onPress={onFermer} style={s.croix}>
+              <FeuilleCroix taille={18} couleur="#111" />
+            </Pressable>
+          </View>
+
+          {/* Destinataires */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={s.bande} contentContainerStyle={s.bandeContenu}>
+            {comptesDemo.map(c => (
+              <Pressable key={c.id} style={s.contact} onPress={partager}>
+                <View style={s.avatar}>
+                  <Text style={s.avatarLettre}>
+                    {c.pseudo.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <Text style={s.contactNom} numberOfLines={1}>{c.pseudo}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View style={s.trait} />
+
+          {/* Applications de partage */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={s.bande} contentContainerStyle={s.bandeContenu}>
+            {APPLICATIONS.map(a => (
+              <Pressable key={a.cle} style={s.action}
+                onPress={() => agir(a.cle, a.nom)}>
+                {'Logo' in a
+                  ? <a.Logo taille={52} />
+                  : <View style={[s.pastille, { backgroundColor: a.fond }]}>
+                      <a.Icone taille={24} couleur="#fff" />
+                    </View>}
+                <Text style={s.actionNom} numberOfLines={2}>{a.nom}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          {/* Actions sur sa publication */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            style={s.bande} contentContainerStyle={s.bandeContenu}>
+            {ACTIONS.map(a => (
+              <Pressable key={a.cle} style={s.action}
+                onPress={() => agir(a.cle, a.nom)}>
+                <View style={s.pastilleGrise}>
+                  <a.Icone taille={23} couleur="#111" />
+                </View>
+                <Text style={s.actionNom} numberOfLines={2}>{a.nom}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          {!!message && <Text style={s.message}>{message}</Text>}
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+const s = StyleSheet.create({
+  fond: { flex: 1, backgroundColor: 'rgba(0,0,0,.35)', justifyContent: 'flex-end' },
+  voile: { flex: 1 },
+  feuille: { backgroundColor: '#fff', borderTopLeftRadius: 16,
+    borderTopRightRadius: 16, paddingBottom: 18 },
+
+  entete: { flexDirection: 'row', alignItems: 'center', minHeight: 54,
+    paddingHorizontal: 18 },
+  titre: { flex: 1, fontSize: 18, fontWeight: '700', color: '#111',
+    textAlign: 'center' },
+  croix: { width: 30, height: 30, borderRadius: 15, backgroundColor: '#f1f1f2',
+    alignItems: 'center', justifyContent: 'center' },
+
+  bande: { flexGrow: 0 },
+  bandeContenu: { gap: 14, paddingHorizontal: 16, paddingVertical: 12 },
+
+  contact: { width: 62, alignItems: 'center', gap: 7 },
+  avatar: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#6f5bd4',
+    alignItems: 'center', justifyContent: 'center' },
+  avatarLettre: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  contactNom: { fontSize: 11.5, color: '#111', textAlign: 'center' },
+
+  trait: { height: 1, backgroundColor: '#f0f0f1', marginHorizontal: 0 },
+
+  action: { width: 62, alignItems: 'center', gap: 7 },
+  pastille: { width: 52, height: 52, borderRadius: 26,
+    alignItems: 'center', justifyContent: 'center' },
+  pastilleGrise: { width: 52, height: 52, borderRadius: 26,
+    backgroundColor: '#f1f1f2', alignItems: 'center', justifyContent: 'center' },
+  actionNom: { fontSize: 11.5, color: '#111', textAlign: 'center',
+    lineHeight: 15 },
+
+  message: { fontSize: 12.5, color: '#8e8e93', textAlign: 'center',
+    paddingHorizontal: 20, paddingTop: 6 },
+})
