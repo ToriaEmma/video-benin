@@ -1,6 +1,10 @@
 // ============================================================
-// Portage de app/src/pages/Decouvrir.tsx : recherche de comptes
-// et de videos, grille des videos populaires.
+// Recherche de l'onglet « Amis » : recherche de comptes et de
+// videos, grille des videos populaires.
+//
+// Portage de app/src/pages/Decouvrir.tsx. L'ecran est ouvert par la
+// loupe de l'entete de Amis.tsx ; une case de la grille ouvre la
+// video dans le lecteur, via `onOuvrirVideo`.
 // ============================================================
 
 import React, { useMemo, useState } from 'react'
@@ -13,22 +17,28 @@ import { Text, TextInput } from '../composants/Texte'
 import { Loupe, Chevron, Lecture } from '../composants/Icones'
 import { etat, comptesDemo, abreger, type Video } from '../lib/demo'
 
-function Case({ item, largeur }: { item: Video; largeur: number }) {
+function Case({ item, largeur, onOuvrir }: {
+  item: Video; largeur: number; onOuvrir?: () => void
+}) {
   const lecteur = useVideoPlayer(item.url, p => { p.muted = true })
   return (
-    <View style={[s.case, { width: largeur, height: largeur * 4 / 3 }]}>
+    <Pressable style={[s.case, { width: largeur, height: largeur * 4 / 3 }]}
+      onPress={onOuvrir}>
       <VideoView player={lecteur} style={StyleSheet.absoluteFill}
         contentFit="cover" nativeControls={false} />
       <View style={s.vues}>
         <Lecture taille={11} couleur="#fff" />
         <Text style={s.vuesTexte}>{abreger(item.vues)}</Text>
       </View>
-    </View>
+    </Pressable>
   )
 }
 
-export default function Decouvrir({ onVisiter }: {
+export default function Decouvrir({ onVisiter, onOuvrirVideo }: {
   onVisiter?: (pseudo: string) => void
+  // Ouvre le lecteur plein ecran sur la case touchee, dans la liste
+  // affichee par la grille.
+  onOuvrirVideo?: (videos: Video[], index: number) => void
 }) {
   const { width } = useWindowDimensions()
   const largeurCase = (width - 32 - 8) / 3
@@ -112,7 +122,10 @@ export default function Decouvrir({ onVisiter }: {
             </>}
           </View>
         }
-        renderItem={({ item }) => <Case item={item} largeur={largeurCase} />}
+        renderItem={({ item, index }) => (
+          <Case item={item} largeur={largeurCase}
+            onOuvrir={() => onOuvrirVideo?.(grille, index)} />
+        )}
       />
     </SafeAreaView>
   )

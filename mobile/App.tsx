@@ -11,15 +11,21 @@ import Camera from './src/ecrans/Camera'
 import Montage from './src/ecrans/Montage'
 import Profil from './src/ecrans/Profil'
 import Brouillons from './src/ecrans/Brouillons'
-import Decouvrir from './src/ecrans/Decouvrir'
+import AmisEcran from './src/ecrans/Amis'
 import MessagesEcran from './src/ecrans/Messages'
-import type { Video } from './src/lib/demo'
+import { restaurer, type Video } from './src/lib/demo'
 import { Accueil, Amis, Messages, Plus, Personne } from './src/composants/Icones'
 
 type Onglet = 'fil' | 'amis' | 'publier' | 'messages' | 'profil'
 
 function Application() {
   const { profil, chargement } = useAuth()
+  // Vrai tant que l'etat enregistre n'a pas ete relu : afficher avant
+  // montrerait les donnees d'origine, puis les ferait sauter.
+  const [restauration, setRestauration] = useState(true)
+  useEffect(() => {
+    restaurer().finally(() => setRestauration(false))
+  }, [])
   const [onglet, setOnglet] = useState<Onglet>('fil')
   const [cleFil, setCleFil] = useState(0)
   // Video choisie a la camera, passee a l'ecran de publication.
@@ -52,7 +58,7 @@ function Application() {
   const teinte = clair ? '#111' : '#fff'
   const teinteAttenuee = clair ? 'rgba(17,17,17,.55)' : 'rgba(255,255,255,.62)'
 
-  if (chargement) return (
+  if (chargement || restauration) return (
     <View style={s.centre}><ActivityIndicator color="#fff" /></View>
   )
 
@@ -64,7 +70,19 @@ function Application() {
         {onglet === 'fil' && (
           <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')} />
         )}
-        {onglet === 'amis' && <Decouvrir onVisiter={visiter} />}
+        {onglet === 'amis' && (
+          lecture
+            ? <Fil
+                videos={lecture.videos}
+                indexInitial={lecture.index}
+                onRetour={() => setLecture(null)}
+                onVisiter={visiter}
+              />
+            : <AmisEcran
+                onVisiter={visiter}
+                onOuvrirVideo={(videos, index) => setLecture({ videos, index })}
+              />
+        )}
         {onglet === 'messages' && <MessagesEcran />}
         {onglet === 'publier' && (
           videoChoisie
@@ -121,13 +139,15 @@ function Application() {
       </View>
 
       {!camera && <View style={[s.nav, clair && s.navClair]}>
-        <Pressable style={s.navBouton} onPress={() => setOnglet('fil')}>
+        <Pressable style={s.navBouton}
+          onPress={() => { setLecture(null); setOnglet('fil') }}>
           <Accueil taille={23} plein={onglet === 'fil'}
             couleur={onglet === 'fil' ? teinte : teinteAttenuee} />
           <Text style={[s.navTexte, { color: onglet === 'fil' ? teinte : teinteAttenuee }]}>Accueil</Text>
         </Pressable>
 
-        <Pressable style={s.navBouton} onPress={() => setOnglet('amis')}>
+        <Pressable style={s.navBouton}
+          onPress={() => { setLecture(null); setOnglet('amis') }}>
           <Amis taille={23} couleur={onglet === 'amis' ? teinte : teinteAttenuee} />
           <Text style={[s.navTexte, { color: onglet === 'amis' ? teinte : teinteAttenuee }]}>Amis</Text>
         </Pressable>
@@ -145,7 +165,8 @@ function Application() {
           </View>
         </Pressable>
 
-        <Pressable style={s.navBouton} onPress={() => setOnglet('messages')}>
+        <Pressable style={s.navBouton}
+          onPress={() => { setLecture(null); setOnglet('messages') }}>
           <Messages taille={23} couleur={onglet === 'messages' ? teinte : teinteAttenuee} />
           <Text style={[s.navTexte, { color: onglet === 'messages' ? teinte : teinteAttenuee }]}>Messages</Text>
         </Pressable>
