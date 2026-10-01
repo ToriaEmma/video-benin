@@ -265,7 +265,7 @@ function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
                   <Pressable key={c.pseudo} style={s.ligneCompte}
                     onPress={() => setChoisi(c.pseudo)}>
                     {c.vide
-                      ? <AvatarVide taille={56} />
+                      ? <AvatarVide taille={46} />
                       : <View style={[s.avatar,
                           { backgroundColor: teinte(c.pseudo) }]}>
                           <Text style={s.avatarLettre}>
@@ -325,7 +325,7 @@ export default function Connexion({ onSucces }: { onSucces?: () => void } = {}) 
       </View>
 
       <View style={s.centre}>
-        <SilhouetteVide taille={110} couleur="#b4b4b6" />
+        <SilhouetteVide taille={92} couleur="#b4b4b6" />
         <Text style={s.invite}>Connecte-toi à un compte existant</Text>
         <Pressable style={s.bouton} onPress={() => setFeuille('comptes')}>
           <Text style={s.boutonTexte}>Connexion</Text>
@@ -350,15 +350,15 @@ const s = StyleSheet.create({
   barre: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     minHeight: 52, paddingHorizontal: 16, borderBottomWidth: 1,
     borderBottomColor: '#f0f0f1' },
-  titre: { color: '#111', fontSize: 17, fontWeight: '700' },
+  titre: { color: '#111', fontSize: 16.5, fontWeight: '700' },
   menu: { position: 'absolute', right: 16 },
 
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32, marginTop: -40 },
-  invite: { color: '#8e8e93', fontSize: 16, marginTop: 18, marginBottom: 26 },
-  bouton: { backgroundColor: '#ef4a5e', borderRadius: 10, minHeight: 52,
+  invite: { color: '#8e8e93', fontSize: 14, marginTop: 16, marginBottom: 22 },
+  bouton: { backgroundColor: '#ef4a5e', borderRadius: 9, minHeight: 46,
     alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' },
-  boutonTexte: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  boutonTexte: { color: '#fff', fontSize: 15, fontWeight: '600' },
 
   // --- Feuilles ---
   fond: { flex: 1, backgroundColor: 'rgba(0,0,0,.42)', justifyContent: 'flex-end' },
@@ -370,63 +370,63 @@ const s = StyleSheet.create({
     paddingBottom: 4 },
   corpsFeuille: { paddingHorizontal: 24, paddingBottom: 20 },
 
-  grandTitre: { color: '#111', fontSize: 28, fontWeight: '800',
-    letterSpacing: -.6, marginTop: 24, marginBottom: 30 },
+  grandTitre: { color: '#111', fontSize: 21, fontWeight: '800',
+    letterSpacing: -.4, marginTop: 18, marginBottom: 24 },
 
-  champTelephone: { flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#f1f1f2', borderRadius: 7, paddingHorizontal: 14,
-    minHeight: 50, marginBottom: 12 },
-  indicatif: { color: '#111', fontSize: 16, fontWeight: '600' },
+  champTelephone: { flexDirection: 'row', alignItems: 'center', gap: 11,
+    backgroundColor: '#f1f1f2', borderRadius: 7, paddingHorizontal: 13,
+    minHeight: 46, marginBottom: 10 },
+  indicatif: { color: '#111', fontSize: 14.5, fontWeight: '600' },
   traitChamp: { width: 1, height: 22, backgroundColor: '#d4d4d6' },
-  saisieTelephone: { flex: 1, color: '#111', fontSize: 16 },
+  saisieTelephone: { flex: 1, color: '#111', fontSize: 14.5 },
 
-  champ: { backgroundColor: '#f1f1f2', borderRadius: 7, paddingHorizontal: 14,
-    minHeight: 50, justifyContent: 'center', marginBottom: 12 },
-  saisie: { color: '#111', fontSize: 16 },
+  champ: { backgroundColor: '#f1f1f2', borderRadius: 7, paddingHorizontal: 13,
+    minHeight: 46, justifyContent: 'center', marginBottom: 10 },
+  saisie: { color: '#111', fontSize: 14.5 },
 
-  principal: { backgroundColor: '#ef4a5e', borderRadius: 26, minHeight: 50,
+  principal: { backgroundColor: '#ef4a5e', borderRadius: 23, minHeight: 46,
     alignItems: 'center', justifyContent: 'center', marginTop: 4 },
   principalInactif: { backgroundColor: '#f3a9b2' },
-  principalTexte: { color: '#fff', fontSize: 17, fontWeight: '600' },
+  principalTexte: { color: '#fff', fontSize: 15, fontWeight: '600' },
 
   separateur: { flexDirection: 'row', alignItems: 'center', gap: 14,
     marginVertical: 24 },
   trait: { flex: 1, height: 1, backgroundColor: '#ececee' },
-  ou: { color: '#8e8e93', fontSize: 14 },
+  ou: { color: '#8e8e93', fontSize: 12.5 },
 
   autre: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 12, backgroundColor: '#f1f1f2', borderRadius: 7, minHeight: 50,
-    marginBottom: 12 },
-  autreTexte: { color: '#111', fontSize: 16, fontWeight: '600' },
+    gap: 11, backgroundColor: '#f1f1f2', borderRadius: 7, minHeight: 46,
+    marginBottom: 10 },
+  autreTexte: { color: '#111', fontSize: 14.5, fontWeight: '600' },
 
-  retourEtape: { color: '#8e8e93', fontSize: 14, textAlign: 'center',
-    marginTop: 16 },
-  erreur: { color: '#ef4a5e', fontSize: 14, textAlign: 'center',
+  retourEtape: { color: '#8e8e93', fontSize: 12.5, textAlign: 'center',
     marginTop: 14 },
-  mentions: { color: '#8e8e93', fontSize: 12, lineHeight: 17,
-    textAlign: 'center', marginTop: 28 },
+  erreur: { color: '#ef4a5e', fontSize: 12.5, textAlign: 'center',
+    marginTop: 12 },
+  mentions: { color: '#8e8e93', fontSize: 11, lineHeight: 15,
+    textAlign: 'center', marginTop: 22 },
 
   piedFeuille: { flexDirection: 'row', alignItems: 'center',
     justifyContent: 'center', minHeight: 56, borderTopWidth: 1,
     borderTopColor: '#f0f0f1', backgroundColor: '#fafafa' },
-  piedTexte: { color: '#8e8e93', fontSize: 15 },
-  piedLien: { color: '#ef4a5e', fontSize: 15, fontWeight: '700' },
+  piedTexte: { color: '#8e8e93', fontSize: 13 },
+  piedLien: { color: '#ef4a5e', fontSize: 13, fontWeight: '700' },
 
   // --- Liste des comptes ---
   ligneCompte: { flexDirection: 'row', alignItems: 'center', gap: 16,
     paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#f0f0f1' },
-  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center',
+  avatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center',
     justifyContent: 'center' },
-  avatarLettre: { color: '#fff', fontSize: 22, fontWeight: '700' },
+  avatarLettre: { color: '#fff', fontSize: 18, fontWeight: '700' },
   compteCorps: { flex: 1, gap: 4 },
-  comptePseudo: { color: '#111', fontSize: 17 },
-  compteIdentifiant: { color: '#8e8e93', fontSize: 15 },
+  comptePseudo: { color: '#111', fontSize: 15 },
+  compteIdentifiant: { color: '#8e8e93', fontSize: 12.5 },
 
-  avatarAjout: { width: 56, height: 56, borderRadius: 28,
+  avatarAjout: { width: 46, height: 46, borderRadius: 23,
     backgroundColor: '#f1f1f2', alignItems: 'center', justifyContent: 'center' },
-  plus: { color: '#111', fontSize: 28, lineHeight: 32 },
-  ajoutTexte: { flex: 1, color: '#111', fontSize: 17 },
+  plus: { color: '#111', fontSize: 23, lineHeight: 27 },
+  ajoutTexte: { flex: 1, color: '#111', fontSize: 15 },
 
   gerer: { alignItems: 'center', paddingVertical: 24 },
-  gererTexte: { color: '#111', fontSize: 16, fontWeight: '600' },
+  gererTexte: { color: '#111', fontSize: 14, fontWeight: '600' },
 })
