@@ -1,0 +1,49 @@
+/* Onglet Profil deconnecte : silhouette, invite, bouton rouge. */
+.cnx-page{color-scheme:light;background:#fff;color:#111;height:100%;display:flex;flex-direction:column;}
+.cnx-barre{display:flex;align-items:center;justify-content:center;position:relative;min-height:52px;border-bottom:1px solid #f0f0f1;}
+.cnx-barre h1{font-size:16.5px;font-weight:700;margin:0;}
+.cnx-menu{position:absolute;right:16px;display:grid;place-items:center;min-height:44px;}
+.cnx-centre{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;margin-top:-40px;}
+.cnx-silhouette{color:#b4b4b6;}
+.cnx-invite{color:#8e8e93;font-size:14px;margin:16px 0 22px;}
+.cnx-bouton{background:#ef4a5e;color:#fff;border-radius:9px;min-height:46px;width:100%;font-size:15px;font-weight:600;}
+
+/* Feuilles : elles remontent du bas, par-dessus la page assombrie. */
+.cnx-dialog{position:fixed;inset:0;margin:0;width:100%;max-width:100%;height:100dvh;max-height:100dvh;border:0;padding:0;background:transparent;color:#111;color-scheme:light;}
+.cnx-dialog::backdrop{background:#0006;}
+.cnx-voile{position:absolute;inset:0;width:100%;height:100%;}
+.cnx-feuille{position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:14px 14px 0 0;max-height:92dvh;display:flex;flex-direction:column;}
+.cnx-entete{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 4px;}
+.cnx-entete button{display:grid;place-items:center;min-height:40px;min-width:32px;color:#111;}
+.cnx-corps{padding:0 24px 20px;overflow-y:auto;flex:1;}
+.cnx-titre{font-size:21px;font-weight:800;letter-spacing:-.4px;margin:18px 0 24px;}
+
+/* Champs et boutons des deux feuilles. */
+.cnx-champ{display:flex;align-items:center;gap:11px;background:#f1f1f2;border-radius:7px;padding:0 13px;min-height:46px;margin-bottom:10px;}
+.cnx-champ input{flex:1;min-width:0;border:0;background:transparent;color:#111;font-size:14.5px;outline:none;}
+.cnx-champ input::placeholder{color:#aaa;}
+.cnx-indicatif{font-size:14.5px;font-weight:600;white-space:nowrap;}
+.cnx-trait{width:1px;height:22px;background:#d4d4d6;}
+.cnx-principal{display:block;width:100%;background:#ef4a5e;color:#fff;border-radius:23px;min-height:46px;font-size:15px;font-weight:600;margin-top:4px;}
+.cnx-principal:disabled{background:#f3a9b2;cursor:default;}
+.cnx-separateur{display:flex;align-items:center;gap:14px;margin:24px 0;}
+.cnx-separateur i{flex:1;height:1px;background:#ececee;}
+.cnx-separateur span{color:#8e8e93;font-size:12.5px;}
+.cnx-autre{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;background:#f1f1f2;border-radius:7px;min-height:46px;font-size:14.5px;font-weight:600;color:#111;margin-bottom:10px;}
+.cnx-retour{display:block;width:100%;color:#8e8e93;font-size:12.5px;text-align:center;margin-top:14px;}
+.cnx-erreur{color:#ef4a5e;font-size:12.5px;text-align:center;margin-top:12px;}
+.cnx-mentions{color:#8e8e93;font-size:11px;line-height:1.4;text-align:center;margin-top:22px;}
+
+/* Comptes deja connus sur cet appareil. */
+.cnx-compte{display:flex;align-items:center;gap:16px;width:100%;padding:14px 0;border-bottom:1px solid #f0f0f1;text-align:left;}
+.cnx-avatar{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:18px;font-weight:700;flex-shrink:0;}
+.cnx-compte-corps{flex:1;min-width:0;}
+.cnx-pseudo{font-size:15px;display:block;}
+.cnx-identifiant{color:#8e8e93;font-size:12.5px;display:block;margin-top:4px;}
+.cnx-ajout{width:46px;height:46px;border-radius:50%;background:#f1f1f2;display:grid;place-items:center;font-size:23px;flex-shrink:0;}
+.cnx-gerer{display:block;width:100%;text-align:center;padding:24px 0;font-size:14px;font-weight:600;color:#111;}
+
+/* Pied de feuille : bascule entre connexion et inscription. */
+.cnx-pied{display:flex;align-items:center;justify-content:center;min-height:56px;border-top:1px solid #f0f0f1;background:#fafafa;flex-shrink:0;}
+.cnx-pied span{color:#8e8e93;font-size:13px;}
+.cnx-pied button{color:#ef4a5e;font-size:13px;font-weight:700;}
