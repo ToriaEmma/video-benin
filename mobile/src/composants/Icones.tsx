@@ -1205,3 +1205,78 @@ export const StudioPastille = ({ taille = 18, couleur = '#111' }: P) => (
     <Path d="m18 11.4 1.5 3.3 3.3 1.5-3.3 1.5L18 21l-1.5-3.3-3.3-1.5 3.3-1.5L18 11.4Z" fill={couleur} />
   </Svg>
 )
+
+// ------------------------------------------------------------
+// « Envoyer a » sur la publication de quelqu'un d'autre.
+// ------------------------------------------------------------
+
+// Deux fleches en boucle : republier la video sur son profil.
+export const Republier = ({ taille = 24, couleur = '#fff' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={2.1} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M4 9.2V8a2.6 2.6 0 0 1 2.6-2.6h9.8" />
+    <Path d="m13.6 2.6 3 2.8-3 2.8" />
+    <Path d="M20 14.8V16a2.6 2.6 0 0 1-2.6 2.6H7.6" />
+    <Path d="m10.4 21.4-3-2.8 3-2.8" />
+  </Svg>
+)
+
+// Drapeau : signaler une publication.
+export const Drapeau = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M5.4 21V3.6" />
+    <Path d="M5.4 4.4h12.4l-2.2 4.4 2.2 4.4H5.4Z" fill={couleur} stroke="none" />
+    <Path d="M5.4 4.4h12.4l-2.2 4.4 2.2 4.4H5.4Z" />
+  </Svg>
+)
+
+// Pastille jaune d'une application de messagerie ephemere : un
+// glyphe de bulle generique, et non le logo de la marque.
+export const AppliEphemere = ({ taille = 33 }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 48 48">
+    <Circle cx="24" cy="24" r="24" fill="#f7e03c" />
+    <Path d="M24 13.5c-6 0-10.8 4-10.8 8.9 0 2.6 1.3 4.9 3.5 6.5l-1.2 4.7 5-2.5c1.1.3 2.3.4 3.5.4 6 0 10.8-4 10.8-8.9s-4.8-9.1-10.8-9.1Z"
+      fill="#111" />
+  </Svg>
+)
+
+// Megaphone : promouvoir la publication.
+export const Megaphone = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
+    stroke={couleur} strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round">
+    <Path d="M3.4 9.6v4.8a1.2 1.2 0 0 0 1.2 1.2h2.6L14 19.8V4.2L7.2 8.4H4.6a1.2 1.2 0 0 0-1.2 1.2Z"
+      fill={couleur} stroke="none" />
+    <Path d="M17.4 8.8a4.6 4.6 0 0 1 0 6.4M19.8 6a8.2 8.2 0 0 1 0 12" />
+  </Svg>
+)
+
+// Combine telephonique : la ligne « Numéro de téléphone » du compte.
+export const Telephone = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Path d="M7 3.5h3l1.6 4-2 1.5a10.5 10.5 0 0 0 5.4 5.4l1.5-2 4 1.6v3a1.9 1.9 0 0 1-2.1 1.9A16.4 16.4 0 0 1 5.1 5.6 1.9 1.9 0 0 1 7 3.5Z" />
+  </Svg>
+)
+
+// Cle : la ligne « Mot de passe ».
+export const Cle = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Circle cx="8.4" cy="15.6" r="4.1" />
+    <Path d="m11.3 12.7 7.4-7.4M16.3 7.7l2.2 2.2M18.7 5.3l2.1 2.1" />
+  </Svg>
+)
+
+// Telephone mobile : la liste des appareils connectes.
+export const Appareil = ({ taille = 24, couleur = '#111' }: P) => (
+  <Svg {...base(taille, couleur)}>
+    <Rect x="6.3" y="2.6" width="11.4" height="18.8" rx="2.4" />
+    <Path d="M10.6 18.4h2.8" />
+  </Svg>
+)
+
+// Coche seule : le choix retenu dans une liste a selection unique.
+export const CocheChoix = ({ taille = 20, couleur = '#111' }: P) => (
+  <Svg {...base(taille, couleur)} strokeWidth={2.2}>
+    <Path d="m4.5 12.6 4.8 5L19.5 6.6" />
+  </Svg>
+)

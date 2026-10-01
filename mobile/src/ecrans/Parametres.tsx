@@ -4,16 +4,31 @@ import {
 } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Text } from '../composants/Texte'
-import { Chevron, ChevronDroit } from '../composants/Icones'
+import { Chevron, ChevronDroit, Maillon } from '../composants/Icones'
 import IconeParametre from '../composants/IconesParametres'
+import Interrupteur from '../composants/Interrupteur'
+import Feuille from '../composants/Feuille'
+import ComptesProfil from '../composants/ComptesProfil'
 import GererPublications from './GererPublications'
 import PreferencesContenu from './PreferencesContenu'
 import Live from './Live'
+import {
+  Notifications, Compte, Securite, Langues, Affichage, LibererEspace,
+  EconomiseurDonnees, SectionInformative, SECTIONS_INFO, partagerProfil,
+  lienProfil,
+} from './ParametresDetail'
 import { useAuth } from '../lib/auth'
+import { etat, enregistrer } from '../lib/demo'
 
 // Sections extraites de app/src/pages/Parametres.tsx : memes intitules,
 // meme ordre, memes pastilles de nouveaute.
-const SECTIONS: { titre: string; lignes: { nom: string; icone: string; pastille?: boolean }[] }[] =
+// `bascule` marque les lignes qui portent un interrupteur au lieu d'un
+// chevron : « Compte prive » se regle sur place, l'ouvrir dans un
+// sous-ecran pour une seule case induisait en erreur.
+const SECTIONS: {
+  titre: string
+  lignes: { nom: string; icone: string; pastille?: boolean; bascule?: boolean }[]
+}[] =
 [
   {
     "titre": "Activité",
@@ -41,7 +56,7 @@ const SECTIONS: { titre: string; lignes: { nom: string; icone: string; pastille?
       {
         "nom": "Temps d'écran et bien-être",
         "icone": "sablier",
-        "pastille": true
+        "pastille": false
       },
       {
         "nom": "Connexion Famille",
@@ -76,7 +91,8 @@ const SECTIONS: { titre: string; lignes: { nom: string; icone: string; pastille?
       {
         "nom": "Compte privé",
         "icone": "cadenas",
-        "pastille": false
+        "pastille": false,
+        "bascule": true
       }
     ]
   },
@@ -111,7 +127,7 @@ const SECTIONS: { titre: string; lignes: { nom: string; icone: string; pastille?
       {
         "nom": "Lecture",
         "icone": "lecture",
-        "pastille": true
+        "pastille": false
       },
       {
         "nom": "Langues",
@@ -126,7 +142,7 @@ const SECTIONS: { titre: string; lignes: { nom: string; icone: string; pastille?
       {
         "nom": "Accessibilité",
         "icone": "accessibilite",
-        "pastille": true
+        "pastille": false
       },
       {
         "nom": "Contacts et localisation",
@@ -183,8 +199,15 @@ const CLE_ACCUEIL = 'parametres-reutilisation-vu'
 export default function Parametres({ onRetour, pseudo }: {
   onRetour: () => void; pseudo: string
 }) {
-  const { deconnecter } = useAuth()
+  const { deconnecter, profil } = useAuth()
   const [selection, setSelection] = useState<string | null>(null)
+  // Panneau « Changer de compte » et feuille « Partager le profil ».
+  const [comptes, setComptes] = useState(false)
+  const [partage, setPartage] = useState(false)
+  // Les reglages vivent hors de React : ce compteur redessine la liste
+  // apres une bascule faite sur place.
+  const [, setTour] = useState(0)
+  const rafraichir = () => setTour(n => n + 1)
   // Le panneau de reutilisation n'apparait qu'a la toute premiere visite,
   // comme sur la reference. Le choix est conserve d'une session a l'autre.
   const [accueil, setAccueil] = useState(false)
@@ -204,28 +227,30 @@ export default function Parametres({ onRetour, pseudo }: {
     setAccueil(false)
   }
 
+  const fermer = () => setSelection(null)
+
   // Les trois sections portees depuis la version web.
   if (selection === 'Gérer les publications')
-    return <GererPublications onRetour={() => setSelection(null)} />
+    return <GererPublications onRetour={fermer} />
   if (selection === 'Préférences de contenu')
-    return <PreferencesContenu onRetour={() => setSelection(null)} />
+    return <PreferencesContenu onRetour={fermer} />
   if (selection === 'LIVE')
-    return <Live onRetour={() => setSelection(null)} />
+    return <Live onRetour={fermer} />
 
-  if (selection) {
-    return (
-      <SafeAreaView style={s.page}>
-        <View style={s.barre}>
-          <Pressable onPress={() => setSelection(null)} hitSlop={10}>
-            <Chevron taille={24} couleur="#111" />
-          </Pressable>
-          <Text style={s.barreTitre} numberOfLines={1}>{selection}</Text>
-          <View style={{ width: 44 }} />
-        </View>
-        <Text style={s.indisponible}>Cette section sera disponible prochainement.</Text>
-      </SafeAreaView>
-    )
-  }
+  // Sous-ecrans qui agissent vraiment.
+  if (selection === 'Notifications') return <Notifications onRetour={fermer} />
+  if (selection === 'Compte') return <Compte onRetour={fermer} />
+  if (selection === 'Sécurité et autorisations') return <Securite onRetour={fermer} />
+  if (selection === 'Langues') return <Langues onRetour={fermer} />
+  if (selection === 'Affichage') return <Affichage onRetour={fermer} />
+  if (selection === "Libérer de l'espace") return <LibererEspace onRetour={fermer} />
+  if (selection === 'Économiseur de données')
+    return <EconomiseurDonnees onRetour={fermer} />
+
+  // Sections encore informatives : titre, explication, et les
+  // interrupteurs qui existent deja.
+  const info = selection ? SECTIONS_INFO[selection] : undefined
+  if (info) return <SectionInformative info={info} onRetour={fermer} />
 
   return (
     <SafeAreaView style={s.page}>
@@ -242,8 +267,34 @@ export default function Parametres({ onRetour, pseudo }: {
           <View style={s.section} key={section.titre}>
             <Text style={s.sectionTitre}>{section.titre}</Text>
             <View style={s.carte}>
-              {section.lignes.map(ligne => (
-                <Pressable style={s.ligne} key={ligne.nom} onPress={() => setSelection(ligne.nom)}>
+              {section.lignes.map(ligne => ligne.bascule ? (
+                <View key={ligne.nom}>
+                  <View style={s.ligne}>
+                    <IconeParametre nom={ligne.icone} taille={24} couleur="#111" />
+                    <Text style={s.nom}>{ligne.nom}</Text>
+                    <Interrupteur actif={etat.reglages.comptePrive}
+                      onChange={v => {
+                        etat.reglages.comptePrive = v
+                        enregistrer()
+                        rafraichir()
+                      }} />
+                  </View>
+                  {etat.reglages.comptePrive && (
+                    <Text style={s.explication}>
+                      Lorsque ton compte est privé, seules les personnes que tu
+                      approuves peuvent voir tes vidéos, tes j&apos;aime et tes
+                      abonnements. Les demandes d&apos;abonnement arrivent dans
+                      « Messages ». Ton pseudo et ta photo restent visibles de
+                      tous.
+                    </Text>
+                  )}
+                </View>
+              ) : (
+                <Pressable style={s.ligne} key={ligne.nom}
+                  onPress={() => {
+                    if (ligne.nom === 'Partager le profil') setPartage(true)
+                    else setSelection(ligne.nom)
+                  }}>
                   <IconeParametre nom={ligne.icone} taille={24} couleur="#111" />
                   <Text style={s.nom}>{ligne.nom}</Text>
                   {ligne.pastille && <View style={s.pastille} />}
@@ -257,7 +308,7 @@ export default function Parametres({ onRetour, pseudo }: {
         <View style={s.section}>
           <Text style={s.sectionTitre}>Connexion</Text>
           <View style={s.carte}>
-            <Pressable style={s.ligne}>
+            <Pressable style={s.ligne} onPress={() => setComptes(true)}>
               <IconeParametre nom="changer" taille={24} couleur="#111" />
               <Text style={s.nom}>Changer de compte</Text>
               <View style={s.avatar}>
@@ -275,6 +326,36 @@ export default function Parametres({ onRetour, pseudo }: {
 
         <Text style={s.version}>v1.0.0 (démonstration)</Text>
       </ScrollView>
+
+      {comptes && (
+        <ComptesProfil pseudo={profil?.pseudo || pseudo}
+          avatar={profil?.avatar_url} onFermer={() => setComptes(false)} />
+      )}
+
+      <Feuille visible={partage} titre="Partager le profil"
+        onFermer={() => setPartage(false)}>
+        <View style={s.partage}>
+          <View style={s.partageAvatar}>
+            <Text style={s.partageLettre}>
+              {(profil?.pseudo || pseudo).charAt(0).toUpperCase()}
+            </Text>
+          </View>
+          <Text style={s.partagePseudo}>@{profil?.pseudo || pseudo}</Text>
+          <Text style={s.partageLien}>{lienProfil(profil?.pseudo || pseudo)}</Text>
+          <Pressable style={s.partageBouton}
+            onPress={() => {
+              setPartage(false)
+              partagerProfil(profil?.pseudo || pseudo)
+            }}>
+            <Maillon taille={20} couleur="#fff" />
+            <Text style={s.partageBoutonTexte}>Copier le lien du profil</Text>
+          </Pressable>
+          <Text style={s.partageNote}>
+            Le lien ouvre ton profil dans un navigateur. La page web arrive
+            avec la prochaine version du site.
+          </Text>
+        </View>
+      </Feuille>
 
       <Modal visible={accueil} transparent animationType="slide"
         statusBarTranslucent onRequestClose={() => { /* choix obligatoire */ }}>
@@ -340,7 +421,22 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center' },
   avatarLettre: { color: '#555', fontSize: 13, fontWeight: '700' },
   version: { textAlign: 'center', color: '#9b9b9f', fontSize: 13, marginTop: 26 },
-  indisponible: { textAlign: 'center', color: '#8a8a8e', fontSize: 15, padding: 60 },
+  explication: { fontSize: 12.5, lineHeight: 18, color: '#8a8a8e',
+    paddingHorizontal: 16, paddingBottom: 14, marginTop: -4 },
+
+  // Feuille « Partager le profil ».
+  partage: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 6 },
+  partageAvatar: { width: 66, height: 66, borderRadius: 33,
+    backgroundColor: '#eee', alignItems: 'center', justifyContent: 'center' },
+  partageLettre: { fontSize: 28, color: '#555', fontWeight: '700' },
+  partagePseudo: { fontSize: 17, fontWeight: '700', color: '#111', marginTop: 12 },
+  partageLien: { fontSize: 13, color: '#8a8a8e', marginTop: 5 },
+  partageBouton: { flexDirection: 'row', alignItems: 'center', gap: 9,
+    alignSelf: 'stretch', justifyContent: 'center', marginTop: 20,
+    backgroundColor: '#ff2856', borderRadius: 30, minHeight: 48 },
+  partageBoutonTexte: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  partageNote: { fontSize: 12, lineHeight: 17, color: '#9b9b9f',
+    textAlign: 'center', marginTop: 14 },
 
   // Panneau de premiere visite : .param-voile / .param-feuille du web.
   voile: { flex: 1, backgroundColor: 'rgba(0,0,0,.35)', justifyContent: 'flex-end' },

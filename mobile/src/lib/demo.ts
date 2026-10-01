@@ -145,6 +145,75 @@ export const storiesDemo: Story[] = [
   { id: 's5', pseudo: 'culture_bj', libelle: 'culture_bj' },
 ]
 
+// Reglages de l'ecran « Parametres et confidentialite ». Ils sont ranges
+// a part des donnees de demonstration : ce sont des choix de
+// l'utilisateur, pas du contenu, et ils doivent survivre a un
+// redemarrage de l'application.
+export type Reglages = {
+  // --- Notifications ---
+  notifJaime: boolean
+  notifCommentaires: boolean
+  notifAbonnes: boolean
+  notifMentions: boolean
+  notifSuggestions: boolean
+  notifLive: boolean
+  notifMessages: boolean
+  notifRappels: boolean
+  // --- Visibilite ---
+  comptePrive: boolean
+  // --- Securite ---
+  doubleFacteur: boolean
+  alertesConnexion: boolean
+  // --- Preferences ---
+  langue: 'fr' | 'fon' | 'yo' | 'en'
+  theme: 'clair' | 'sombre' | 'systeme'
+  // Trois crans de taille de texte, appliques par le composant Texte
+  // seulement si l'application le prevoit un jour.
+  tailleTexte: 'petit' | 'normal' | 'grand'
+  economieDonnees: boolean
+  // --- Reglages des sections encore informatives ---
+  lectureAuto: boolean
+  boucle: boolean
+  sonDemarrage: boolean
+  animationsReduites: boolean
+  sousTitresAuto: boolean
+  pubPersonnalisees: boolean
+  rappelPause: boolean
+  syncContacts: boolean
+  localisation: boolean
+  telechargementWifi: boolean
+  filtreCommentaires: boolean
+}
+
+export const reglagesDefaut: Reglages = {
+  notifJaime: true,
+  notifCommentaires: true,
+  notifAbonnes: true,
+  notifMentions: true,
+  notifSuggestions: true,
+  notifLive: true,
+  notifMessages: true,
+  notifRappels: false,
+  comptePrive: false,
+  doubleFacteur: false,
+  alertesConnexion: true,
+  langue: 'fr',
+  theme: 'systeme',
+  tailleTexte: 'normal',
+  economieDonnees: false,
+  lectureAuto: true,
+  boucle: true,
+  sonDemarrage: true,
+  animationsReduites: false,
+  sousTitresAuto: false,
+  pubPersonnalisees: true,
+  rappelPause: false,
+  syncContacts: false,
+  localisation: false,
+  telechargementWifi: true,
+  filtreCommentaires: true,
+}
+
 // Les dates des conversations de demonstration sont exprimees en minutes
 // avant le lancement : l'horodatage reste coherent quelle que soit la date.
 const MINUTE = 60_000
@@ -321,6 +390,8 @@ export const etat = {
   favoris: [] as string[],
   // Pseudos auxquels le compte connecte s'est abonne.
   abonnements: [] as string[],
+  // Choix faits dans l'ecran des parametres.
+  reglages: { ...reglagesDefaut } as Reglages,
 }
 
 // Mois abreges tels que les affiche la pastille de date d'un brouillon.
@@ -407,7 +478,8 @@ const CLE_ETAT = 'tiktok-benin-etat-v1'
 // et les videos d'origine se retrouvent dans le code.
 type EtatConserve = Pick<typeof etat,
   'videos' | 'mesVideos' | 'brouillons' | 'corbeille'
-  | 'commentaires' | 'conversations' | 'favoris' | 'abonnements'>
+  | 'commentaires' | 'conversations' | 'favoris' | 'abonnements'
+  | 'reglages'>
 
 let minuterie: ReturnType<typeof setTimeout> | null = null
 
@@ -426,6 +498,7 @@ export function enregistrer() {
       conversations: etat.conversations,
       favoris: etat.favoris,
       abonnements: etat.abonnements,
+      reglages: etat.reglages,
     }
     AsyncStorage.setItem(CLE_ETAT, JSON.stringify(aConserver))
       .catch(() => { /* Stockage indisponible : la session reste utilisable. */ })
@@ -446,6 +519,17 @@ export async function restaurer() {
     ] as const) {
       const valeur = conserve[cle]
       if (Array.isArray(valeur)) (etat as Record<string, unknown>)[cle] = valeur
+    }
+    // Les reglages sont un objet, pas une liste : on repart des valeurs
+    // par defaut et on ne reprend que les cles reconnues, pour qu'un
+    // enregistrement ecrit par une version plus ancienne reste lisible.
+    if (conserve.reglages && typeof conserve.reglages === 'object') {
+      const lus = conserve.reglages as Record<string, unknown>
+      const fusion = { ...reglagesDefaut } as Record<string, unknown>
+      for (const cle of Object.keys(reglagesDefaut)) {
+        if (typeof lus[cle] === typeof fusion[cle]) fusion[cle] = lus[cle]
+      }
+      etat.reglages = fusion as unknown as Reglages
     }
   } catch { /* Enregistrement illisible : on repart des donnees d'origine. */ }
 }
