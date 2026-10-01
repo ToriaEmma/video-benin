@@ -6,3 +6,9 @@ app/android/app/build/
 app/android/.gradle/
 app/ios/App/Pods/
 app/ios/App/build/
+
+# API : dependances et secrets de connexion a la base.
+api/node_modules/
+api/.env
+# Application mobile
+mobile/node_modules/
