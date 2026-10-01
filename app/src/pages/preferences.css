@@ -1,0 +1,164 @@
+/* ============================================================
+   Preferences de contenu
+   ============================================================ */
+
+.pref-page {
+  position: absolute; inset: 0; z-index: 63;
+  background: #f1f1f2; color: #111;
+  display: flex; flex-direction: column;
+}
+/* Les ecrans d'activation sont sur fond blanc, pas gris. */
+.pref-blanc { background: #fff; }
+
+/* ---------- Barre ---------- */
+.pref-barre {
+  display: grid; grid-template-columns: 44px 1fr 44px;
+  align-items: center; padding: 6px 8px; flex-shrink: 0;
+}
+.pref-barre button {
+  min-width: 44px; min-height: 44px;
+  display: grid; place-items: center; color: #111;
+}
+.pref-titre-groupe { text-align: center; min-width: 0; }
+.pref-titre-groupe h1 {
+  font-size: 16px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pref-titre-groupe span { display: block; font-size: 12.5px; color: #8a8a8e; margin-top: 1px; }
+.pref-action { display: grid; place-items: center; }
+
+/* Barre a boutons textuels (ecran « Gerer les sujets »). */
+.pref-barre--texte { grid-template-columns: auto 1fr auto; padding: 6px 16px; }
+.pref-barre--texte button {
+  min-width: auto; font-size: 16px; padding: 0 2px;
+}
+.pref-enregistrer { color: #b4b4b8; font-weight: 500; }
+
+/* ---------- Corps ---------- */
+.pref-corps {
+  flex: 1; overflow-y: auto;
+  padding: 8px 16px 24px;
+  -webkit-overflow-scrolling: touch;
+}
+.pref-centre { display: flex; align-items: center; justify-content: center; }
+
+/* ---------- Menu ---------- */
+.pref-carte { background: #fff; border-radius: 12px; overflow: hidden; }
+.pref-ligne {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 18px 16px; min-height: 60px; color: #111; text-align: left;
+}
+.pref-ligne:active { background: #f6f6f7; }
+.pref-nom { flex: 1; font-size: 16.5px; }
+.pref-valeur { font-size: 16px; color: #8a8a8e; }
+.pref-ligne svg { color: #c4c4c6; flex-shrink: 0; }
+
+/* ---------- Etats vides ---------- */
+.pref-vide { text-align: center; padding: 10px 20px; }
+.pref-vide > svg { color: #a8a8ac; margin: 0 auto 20px; display: block; }
+.pref-vide b {
+  display: block; font-size: 18px; font-weight: 700;
+  color: #111; margin-bottom: 10px;
+}
+.pref-vide p { font-size: 14px; line-height: 1.48; color: #8a8a8e; margin: 0; }
+
+/* ---------- Pied fixe ---------- */
+.pref-pied {
+  flex-shrink: 0; padding: 12px 16px 20px;
+  background: inherit;
+}
+.pref-bouton {
+  width: 100%; border-radius: 30px; background: #ff2856;
+  color: #fff; padding: 13px; font-size: 15px; font-weight: 600;
+  min-height: 46px;
+}
+.pref-note {
+  text-align: center; font-size: 13.5px; color: #8a8a8e; margin: 12px 0 0;
+}
+
+/* ---------- Ecrans d'activation ---------- */
+.pref-illustration { display: grid; place-items: center; margin: 22px 0 18px; }
+.pref-illustration--serree { margin: 30px 0 10px; }
+.pref-grand-titre {
+  font-size: 27px; font-weight: 800; text-align: center; margin: 0 0 30px;
+}
+.pref-grand-titre--gauche { text-align: left; margin: 6px 0 10px; font-size: 31px; }
+.pref-titre-etat {
+  font-size: 23px; font-weight: 800; text-align: center; margin: 0 0 18px;
+}
+.pref-titre-etat span { color: #8a8a8e; font-weight: 700; }
+.pref-filet { border: 0; border-top: 1px solid #ececee; margin: 0 0 22px; }
+
+.pref-avantage { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 22px; }
+.pref-avantage svg { color: #111; flex-shrink: 0; margin-top: 1px; }
+.pref-avantage p { font-size: 16px; line-height: 1.45; margin: 0; }
+
+/* ---------- Gerer les sujets ---------- */
+.pref-intro { font-size: 15.5px; line-height: 1.45; color: #6a6a6e; margin: 0 0 26px; }
+.pref-intro b { color: #111; }
+
+.pref-sujet { margin-bottom: 24px; }
+.pref-sujet-entete {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 10px;
+}
+.pref-sujet-nom {
+  font-size: 17px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.pref-sujet-nom svg { color: #8a8a8e; }
+.pref-sujet-valeur { font-size: 15px; color: #8a8a8e; }
+
+/* Curseur a trois crans */
+.pref-curseur {
+  position: relative; background: #f1f1f2;
+  border-radius: 10px; height: 54px;
+}
+.pref-cran {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  width: 1.5px; height: 13px; background: #c8c8cc;
+}
+.pref-cran--g { left: 25%; }
+.pref-cran--d { left: 75%; }
+
+.pref-curseur input {
+  appearance: none; width: 100%; height: 100%;
+  background: transparent; margin: 0; position: relative; z-index: 2;
+}
+.pref-curseur input::-webkit-slider-thumb {
+  appearance: none; width: 26px; height: 40px;
+  background: #fff; border-radius: 13px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .18); cursor: pointer;
+}
+.pref-curseur input::-moz-range-thumb {
+  width: 26px; height: 40px; border: 0;
+  background: #fff; border-radius: 13px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .18); cursor: pointer;
+}
+
+/* ---------- Actualiser le fil ---------- */
+.pref-corps--actualiser { display: flex; flex-direction: column; }
+.pref-pilule {
+  align-self: center; background: #c4c4c6; color: #fff;
+  border-radius: 20px; padding: 10px 16px; font-size: 15px;
+  display: inline-flex; align-items: center; gap: 6px;
+  margin: 46px 0 auto;
+}
+.pref-points { display: flex; justify-content: center; gap: 7px; margin-bottom: 26px; }
+.pref-points i { width: 7px; height: 7px; border-radius: 50%; background: #d8d8dc; }
+.pref-points i.actif { background: #111; }
+
+.pref-etapes { list-style: none; padding: 0; margin: 0; }
+.pref-etapes li { display: flex; gap: 14px; margin-bottom: 20px; }
+.pref-etapes span {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: #f1f1f2; color: #6a6a6e;
+  display: grid; place-items: center;
+  font-size: 15px; flex-shrink: 0;
+}
+.pref-etapes p { font-size: 16px; line-height: 1.42; margin: 0; }
+
+@media (max-width: 350px) {
+  .pref-corps { padding-left: 12px; padding-right: 12px; }
+  .pref-grand-titre { font-size: 24px; }
+}

@@ -1,0 +1,77 @@
+.solde-page{color-scheme:light;--texte:#111;--fond:#f5f5f5;--surface:#fff;color:#111;background:#f5f5f5;min-height:100%;padding:16px 16px 28px;display:flex;flex-direction:column;font-size:14px;}
+.app:has(.solde-page)>.nav{display:none;}
+.solde-page button,.solde-dialog button{color:inherit;}
+.solde-page svg,.solde-dialog svg{flex-shrink:0;}
+.solde-entete{display:grid;grid-template-columns:32px 1fr 32px;align-items:center;gap:8px;min-height:48px;margin-bottom:24px;}
+.solde-entete>button{min-height:40px;display:grid;place-items:center;}
+.solde-entete h1{font-size:17px;font-weight:600;line-height:1.2;text-align:center;margin:0;}
+.solde-entete>div{text-align:center;}
+.solde-securise{font-size:12px;color:#74877f;display:block;margin-top:3px;}
+.solde-solde{background:radial-gradient(ellipse 90% 20% at 0 0,#a7dfe7,transparent),radial-gradient(ellipse 90% 22% at 100% 0,#ffc1d0,transparent),#f5f5f5;}
+.solde-montant{text-align:center;margin:6px 0 12px;}
+.solde-montant>div{display:flex;align-items:center;justify-content:center;gap:8px;color:#888;font-size:16px;font-weight:500;}
+.solde-montant>div button{display:grid;place-items:center;min-width:28px;min-height:30px;}
+.solde-total{display:flex;justify-content:center;align-items:center;gap:8px;font-size:44px;font-weight:700;margin:6px auto;}
+.solde-total svg,.solde-ligne span svg{transform:rotate(180deg);}
+.solde-pieces{border:1px solid #fff;border-radius:30px;display:flex;align-items:center;justify-content:center;gap:5px;font-size:13px;align-self:center;padding:10px 12px;margin:0 0 24px;white-space:nowrap;}
+.solde-pieces i{height:16px;width:1px;background:#ddd;margin:0 4px;}
+.solde-pieces strong{display:flex;align-items:center;gap:3px;color:#ff2856;font-weight:600;}
+.solde-or{color:#edaa00;}
+.solde-carte{background:#fff;border-radius:14px;margin-bottom:12px;padding:17px;width:100%;text-align:left;}
+.solde-ligne{display:flex;align-items:center;gap:9px;min-height:58px;}
+.solde-ligne b{font-size:15px;font-weight:600;}
+.solde-ligne>span{margin-left:auto;display:flex;align-items:center;gap:6px;color:#999;}
+.solde-promo{display:flex;align-items:center;gap:12px;}
+.solde-promo b{font-size:15px;font-weight:600;}
+.solde-promo p{font-size:13px;color:#999;line-height:1.3;margin:6px 0 0;}
+.solde-promo>span{background:#ff5670;color:white;border-radius:50%;width:55px;height:55px;display:grid;place-items:center;flex-shrink:0;}
+.solde-outils{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px 10px;padding:18px 10px;}
+.solde-outils button{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;font-size:13px;font-weight:500;line-height:1.3;}
+.solde-outils button>span{display:grid;place-items:center;background:#f5f5f5;border-radius:10px;width:42px;height:42px;}
+.solde-disclaimer{text-align:center;color:#aaa;font-size:10px;line-height:1.4;margin-top:auto;padding-top:70px;}
+.solde-rubrique{font-size:14px;font-weight:500;color:#888;margin:8px 16px 12px;}
+.solde-devise,.solde-aide{background:white;}
+.solde-devise .solde-entete{grid-template-columns:auto 1fr auto;gap:8px;}
+.solde-devise .solde-entete h1{font-size:17px;}
+.solde-devise .solde-entete button{font-size:16px;font-weight:500;min-height:44px;display:flex;align-items:center;white-space:nowrap;}
+.solde-devise .solde-entete button:disabled{opacity:.35;}
+.solde-entete button:disabled{color:#aaa;}
+.solde-recherche{border:0;border-radius:10px;background:#f1f1f1;padding:12px;color:#111;font-size:16px;width:100%;}
+.solde-devises h2{font-size:13px;color:#999;font-weight:500;margin:18px 0 0;}
+.solde-devises label{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:59px;font-size:15px;font-weight:500;}
+.solde-devises input{appearance:none;width:23px;height:23px;border:1.5px solid #ddd;border-radius:50%;flex-shrink:0;}
+.solde-devises input:checked{border:7px solid #ff2856;}
+.solde-faq details{border-bottom:1px solid #ddd;padding:18px 8px;}
+.solde-faq summary{font-size:17px;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;}
+.solde-faq summary:after{content:'⌄';color:#999;}.solde-faq details[open] summary:after{content:'⌃';}
+.solde-faq p{color:#777;line-height:1.5;}
+.solde-vide{flex:1;min-height:360px;display:flex;align-items:center;justify-content:center;flex-direction:column;color:#999;gap:16px;font-size:15px;}
+.solde-vide svg{color:#777;}.tickets-vide{justify-content:flex-start;padding-top:115px;}.tickets-vide svg{color:#bbb;transform:rotate(9deg);}.tickets-vide b{color:#111;font-size:17px;}
+.solde-onglets{display:flex;gap:6px;overflow:auto;margin:0 -8px;scrollbar-width:none;}
+.solde-onglets button,.solde-filtres button{padding:12px;background:#eee;border-radius:9px;color:#888;font-size:14px;font-weight:500;white-space:nowrap;}
+.solde-onglets button.actif,.solde-filtres button.actif{background:#000;color:white;}
+.solde-note{font-size:12px;line-height:1.4;color:#888;}
+.solde-dialog{position:fixed;inset:0;margin:0 auto;width:min(100vw,480px);max-width:100vw;height:100dvh;max-height:100dvh;border:0;padding:0;background:transparent;color:#111;color-scheme:light;}
+.solde-dialog::backdrop{background:#0008;}
+.solde-voile{position:absolute;inset:0;width:100%;height:100%;}
+.solde-feuille{position:absolute;bottom:0;left:0;right:0;background:#fff;border-radius:24px 24px 0 0;padding:26px 20px calc(30px + env(safe-area-inset-bottom));max-height:88dvh;overflow:auto;animation:solde-montee .22s ease-out;}
+.solde-fermer{position:absolute;right:14px;top:13px;width:34px;height:34px;display:grid;place-items:center;}
+.solde-feuille h2{font-size:24px;line-height:1.2;font-weight:700;margin:26px 0;}
+.solde-feuille h3{font-size:16px;font-weight:600;margin:24px 0 16px;}
+.solde-feuille p{line-height:1.35;font-size:14px;}
+.solde-action{display:block;width:100%;border-radius:30px;background:#ff2856!important;color:#fff!important;padding:15px;font-size:16px;font-weight:500;margin-top:34px;}
+.bienvenue .solde-feuille{left:16px;right:16px;bottom:20px;border-radius:30px;padding:20px 28px 34px;max-height:85dvh;}
+.solde-illustration{position:relative;color:#7044ff;background:#6de4da;border-radius:48% 52% 44% 56%;width:108px;height:85px;display:grid;place-items:center;margin:34px auto 26px;transform:rotate(-8deg);}
+.solde-illustration span{position:absolute;right:-8px;top:-13px;color:#ff6279;font-size:40px;}.solde-illustration i{position:absolute;bottom:-5px;left:3px;background:#ff647b;color:#fff;border-radius:50%;font-style:normal;font-size:26px;}
+.solde-avantage{display:flex;align-items:flex-start;gap:12px;margin-top:20px;}.solde-avantage b{font-weight:600;font-size:16px;}.solde-avantage p{color:#777;margin:7px 0;}
+.guide .solde-feuille{text-align:center;}.solde-guide-dessin{position:relative;color:#e5e5e5;margin:30px auto;width:155px;}.solde-guide-dessin span{position:absolute;right:0;top:0;border-radius:50%;padding:16px;background:#fff;box-shadow:0 5px 20px #0002;color:#111;}
+.filtres .solde-feuille>h2{text-align:center;font-size:18px;margin:0 25px 30px;}
+.solde-filtres{display:flex;flex-wrap:wrap;gap:8px;}.solde-filtres+h3{margin-top:42px;}
+.solde-mois{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:42px;font-size:16px;font-weight:500;}.solde-mois input{max-width:60%;border:0;background:transparent;color:#888;font-size:14px;}
+.solde-actions{display:flex;gap:10px;margin-top:30px;}.solde-actions button{width:50%;border-radius:30px;background:#f0f0f0;padding:15px 8px;font-size:16px;font-weight:600;margin:0;}
+.offre .solde-feuille{background:#f5f5f5;padding:24px 16px;}.offre .solde-feuille>h2{font-size:23px;margin:20px 20px 8px 0;}.offre .solde-carte h3{margin:0;}.solde-bonus>div{display:flex;align-items:center;gap:18px;margin-bottom:20px;}.solde-bonus>div:last-child{margin-bottom:0;}.solde-bonus>div>span{font-size:42px;width:46px;flex-shrink:0;display:flex;align-items:center;justify-content:center;line-height:1;}.solde-bonus b{font-size:15px;font-weight:600;}.solde-bonus p{margin:5px 0 0;}
+.solde-packs{display:flex;gap:8px;overflow:auto;padding-top:8px;}.solde-packs button{min-width:118px;border:1px solid #ddd;border-radius:5px;padding:20px 10px;display:flex;flex-direction:column;align-items:center;gap:5px;}.solde-packs button.selectionne{border:2px solid #ff2856;padding:19px 9px;}.solde-packs b{font-size:21px;white-space:nowrap;}.solde-packs em{font-style:normal;color:#ff2856;}.solde-packs button>span{color:#888;font-size:13px;}
+.solde-page button:focus-visible,.solde-dialog button:focus-visible{outline:2px solid #555;outline-offset:2px;}
+@keyframes solde-montee{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.solde-feuille{animation:none;}}
+@media(max-width:350px){.solde-page{padding-left:12px;padding-right:12px;}.solde-pieces{font-size:11px;padding:10px 8px;}.solde-entete h1{font-size:15px;}.solde-ligne b{font-size:13px;}.solde-feuille{padding-left:16px;padding-right:16px;}}

@@ -1,0 +1,57 @@
+.creation-camera{height:100%;display:flex;flex-direction:column;background:#000;color:#fff;padding-top:env(safe-area-inset-top);overflow:hidden;container-type:inline-size;}
+.creation-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}.creation-video.miroir{transform:scaleX(-1);}
+.creation-viseur header{position:relative;z-index:1;}.creation-son{display:flex;align-items:center;gap:5px;}.creation-son svg{width:18px;}
+.creation-enregistrer.en-cours span{width:55%;height:55%;margin:auto;border-radius:8px;}.creation-enregistrer:disabled{cursor:not-allowed;}
+.creation-capture.creation-carrousel{display:grid;grid-template-columns:1fr 1fr 1.5fr 1fr 1fr;gap:12px;padding:0 7px;margin-top:18px;justify-items:center;align-items:center;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab;}
+.creation-capture.creation-carrousel:active{cursor:grabbing;}
+.creation-carrousel .creation-vignette-effet{pointer-events:auto;}
+.creation-carrousel img,.creation-carrousel .creation-vignette-effet span{pointer-events:none;-webkit-user-drag:none;}
+.creation-carrousel .creation-enregistrer{position:relative;display:block;width:100%;max-width:104px;height:auto;aspect-ratio:1;padding:0;}
+.creation-carrousel .creation-enregistrer>span{position:absolute;inset:4px;width:auto;height:auto;margin:0;border-radius:50%;}
+.creation-carrousel .creation-enregistrer.en-cours>span{inset:24%;border-radius:8px;}
+.creation-vignette-effet{width:100%;max-width:68px;aspect-ratio:1;border-radius:50%;overflow:hidden;padding:0;}
+.creation-vignette-effet img,.creation-vignette-effet>span{display:block;width:100%;height:100%;object-fit:cover;background:linear-gradient(145deg,#eab99e,#956d84 55%,#446c82);}
+.creation-vignette-effet:focus-visible{outline:2px solid white;outline-offset:3px;}
+.creation-camera>footer{position:relative;display:grid;grid-template-columns:auto auto auto;justify-content:center;padding:12px 0 calc(24px + env(safe-area-inset-bottom));gap:26px;flex-shrink:0;min-height:80px;font-size:16px;}
+.creation-camera footer .creation-galerie{position:absolute;left:14px;top:17px;width:30px;height:30px;min-height:30px;padding:3px;box-shadow:3px 2px 0 #777;border-radius:7px;display:grid;place-items:center;}
+.creation-camera footer .creation-galerie svg{width:20px;height:20px;}
+.creation-filtres{position:absolute;z-index:4;bottom:160px;left:12px;right:12px;border-radius:16px;background:#181818ed;padding:12px;color:#fff;}
+.creation-filtres>div:first-child{display:flex;justify-content:space-between;align-items:center;}.creation-filtres>div:first-child button{font-size:25px;width:32px;}
+.creation-filtres-liste{display:flex;gap:12px;overflow-x:auto;padding:8px 2px;}.creation-filtres-liste button{display:flex;flex-direction:column;align-items:center;gap:6px;min-width:58px;}
+.creation-filtres-liste span{display:block;width:46px;height:46px;border-radius:50%;background:linear-gradient(140deg,#f9cfad,#ad7182 55%,#4a7793);border:2px solid transparent;}
+.creation-filtres-liste button[aria-pressed=true]{color:#ff6687;}.creation-filtres-liste button[aria-pressed=true] span{outline:2px solid white;outline-offset:2px;}
+.creation-filtres small{font-size:11px;white-space:nowrap;}.creation-filtres p{font-size:11px;color:#aaa;margin-top:8px;}
+.app:has(.creation-camera)>.nav{display:none;}
+.creation-viseur{position:relative;flex:1;min-height:0;border-radius:22px;background:#171717;overflow:hidden;}
+.creation-viseur header{display:grid;grid-template-columns:32px minmax(0,1fr) 32px;align-items:center;padding:12px 16px;gap:12px;}
+.creation-camera svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+.creation-camera button{min-height:36px;}
+.creation-son{justify-self:center;border-radius:30px;background:#3338;padding:12px 16px;font-size:16px;font-weight:600;white-space:nowrap;}
+.creation-son svg{width:18px;height:22px;}
+.creation-outils{position:absolute;right:12px;top:74px;display:flex;flex-direction:column;gap:clamp(9px,2.3dvh,22px);}
+.creation-outils button{display:grid;place-items:center;width:32px;min-height:32px;}
+.creation-outils button:first-child{margin-bottom:10px;position:relative;}.creation-outils button:first-child:after{content:'';position:absolute;width:20px;height:1px;background:#ffffff60;bottom:-10px;}
+.creation-indication{position:absolute;top:45%;left:18px;right:60px;text-align:center;color:#ddd;}.creation-indication p{font-size:19px;margin-bottom:8px;}.creation-indication span{font-size:13px;}
+.creation-commandes{position:absolute;bottom:26px;left:0;right:0;}.creation-durees{display:flex;justify-content:center;gap:clamp(12px,4cqw,22px);align-items:center;font-size:14px;}.creation-durees button{min-height:28px;white-space:nowrap;}.creation-durees .active{background:white;color:black;border-radius:22px;padding:4px 9px;}
+.creation-capture{display:flex;align-items:center;justify-content:center;gap:30px;margin-top:22px;}.creation-enregistrer{width:86px;height:86px;border:3px solid white;border-radius:50%;padding:4px;}.creation-enregistrer span{display:block;width:100%;height:100%;border-radius:50%;background:#ff2856;}.creation-effet{border-radius:50%;width:54px;height:54px;background:#ffffff25;font-size:28px;}
+.creation-camera footer{align-items:center;color:#888;font-weight:600;}.creation-camera>footer>button:not(.creation-galerie){padding:6px 4px;min-height:44px;white-space:nowrap;}.creation-camera footer .active{color:#fff;}.creation-galerie{border:2px solid white;border-radius:10px;padding:4px;color:#fff;}.creation-message{position:absolute;bottom:165px;left:20px;right:60px;padding:10px;background:#0009;border-radius:10px;font-size:13px;}
+
+/* ---------- Filtre actif au centre du carrousel ---------- */
+/* Le bouton d'enregistrement EST le filtre selectionne : l'apercu remplit le
+   disque, et l'anneau rouge ne reste visible qu'en bordure. Sur « Original »
+   aucun apercu n'est pose, donc le bouton garde son aspect rouge habituel. */
+.creation-carrousel .creation-enregistrer { overflow: hidden; }
+.creation-enregistrer-apercu {
+  position: absolute; inset: 4px;
+  width: auto; height: auto;
+  border-radius: 50%; object-fit: cover;
+  z-index: 1; pointer-events: none;
+}
+.creation-carrousel .creation-enregistrer > span { z-index: 2; }
+.creation-enregistrer-apercu + span { background: transparent; box-shadow: inset 0 0 0 3px #ff2856; }
+
+.creation-filtre-actif {
+  text-align: center; color: #fff; font-size: 12px;
+  margin: 8px 0 0; text-shadow: 0 1px 3px rgba(0,0,0,.7);
+  min-height: 15px;
+}

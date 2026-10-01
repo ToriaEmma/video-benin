@@ -1,0 +1,229 @@
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { supabase, MODE_DEMO } from '../lib/supabase'
+import { etatDemo } from '../lib/demo'
+import { useAuth } from '../lib/auth'
+import { partager as partagerNatif } from '../lib/natif'
+import Commentaires from '../components/Commentaires'
+import { Film } from '../components/Icones'
+import { Loupe } from '../components/Icones'
+import './fil.css'
+
+export type Video = {
+  id: string
+  url: string
+  legende: string
+  vues: number
+  auteur_id: string
+  profils: { pseudo: string; avatar_url?: string | null } | null
+}
+
+const abreger = (n: number) =>
+  n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} M`
+  : n >= 1_000 ? `${(n / 1_000).toFixed(1)} K`
+  : String(n)
+
+function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVisiter: (p: string) => void }) {
+  const { session } = useAuth()
+  const ref = useRef<HTMLVideoElement>(null)
+  const [aime, setAime] = useState(false)
+  const [nbAime, setNbAime] = useState(0)
+  const [nbCom, setNbCom] = useState(0)
+  const [ouvrirCom, setOuvrirCom] = useState(false)
+  const [vueComptee, setVueComptee] = useState(false)
+  const [pause, setPause] = useState(true)
+  const [progression, setProgression] = useState(0)
+  const [favori, setFavori] = useState(false)
+  const [developpe, setDeveloppe] = useState(false)
+
+  useEffect(() => {
+    if (MODE_DEMO) {
+      const d = etatDemo.videos.find((v) => v.id === video.id)
+      setNbAime(d?.nbAime ?? 0)
+      setAime(d?.aime ?? false)
+      setNbCom(etatDemo.commentaires.filter((c) => c.video_id === video.id).length)
+      return
+    }
+    let annule = false
+    const charger = async () => {
+      const [{ count: likes }, { count: coms }] = await Promise.all([
+        supabase.from('jaime').select('*', { count: 'exact', head: true }).eq('video_id', video.id),
+        supabase.from('commentaires').select('*', { count: 'exact', head: true }).eq('video_id', video.id),
+      ])
+      if (annule) return
+      setNbAime(likes ?? 0)
+      setNbCom(coms ?? 0)
+
+      if (session) {
+        const { data } = await supabase
+          .from('jaime').select('video_id')
+          .eq('video_id', video.id).eq('profil_id', session.user.id).maybeSingle()
+        if (!annule) setAime(Boolean(data))
+      }
+    }
+    charger()
+    return () => { annule = true }
+  }, [video.id, session])
+
+  // La lecture ne demarre que sur la carte visible : lire les autres en fond
+  // consommerait des donnees pour rien, ce qui est le premier critere produit
+  // du projet (cout du megaoctet au Benin).
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    if (actif) {
+      el.play().catch(() => undefined)
+      if (!vueComptee) {
+        if (!MODE_DEMO) supabase.rpc('incrementer_vues', { id_video: video.id })
+        setVueComptee(true)
+      }
+    } else {
+      el.pause()
+      el.currentTime = 0
+    }
+  }, [actif, video.id, vueComptee])
+
+  const basculerAime = async () => {
+    if (!session) return
+    if (MODE_DEMO) {
+      const d = etatDemo.videos.find((v) => v.id === video.id)
+      if (d) { d.aime = !aime; d.nbAime += aime ? -1 : 1 }
+      setAime(!aime)
+      setNbAime((n) => n + (aime ? -1 : 1))
+      return
+    }
+    if (aime) {
+      setAime(false); setNbAime((n) => n - 1)
+      await supabase.from('jaime').delete()
+        .eq('video_id', video.id).eq('profil_id', session.user.id)
+    } else {
+      setAime(true); setNbAime((n) => n + 1)
+      await supabase.from('jaime').insert({ video_id: video.id, profil_id: session.user.id })
+    }
+  }
+
+  const partager = async () => {
+    const lien = `${window.location.origin}/?v=${video.id}`
+    const resultat = await partagerNatif(
+      video.profils?.pseudo ? `@${video.profils.pseudo}` : 'Vidéo',
+      video.legende || 'Regarde cette vidéo',
+      lien,
+    )
+    if (resultat === 'copie') alert('Lien copié')
+  }
+
+  const pseudo = video.profils?.pseudo ?? 'inconnu'
+
+  return (
+    <div className="video-carte">
+      <video
+        ref={ref}
+        src={video.url}
+        loop
+        playsInline
+        muted={false}
+        preload={actif ? 'auto' : 'none'}
+        onPlay={() => setPause(false)}
+        onPause={() => setPause(true)}
+        onTimeUpdate={e => { const v = e.currentTarget; setProgression(v.duration ? v.currentTime / v.duration * 100 : 0) }}
+        onClick={(e) => {
+          const el = e.currentTarget
+          if (el.paused) el.play().catch(() => undefined)
+          else el.pause()
+        }}
+      />
+      {pause && <button className="fil-play" aria-label="Lire la vidéo" onClick={() => ref.current?.play().catch(() => undefined)}><svg width="60" height="66" viewBox="0 0 60 66" aria-hidden="true"><path d="M8 4Q3 1 3 8v50q0 7 5 4l46-26q6-3 0-6Z" fill="white"/></svg></button>}
+
+      <div className="actions">
+        <button className="avatar" onClick={() => onVisiter(pseudo)} aria-label={`Profil de ${pseudo}`}>
+          {pseudo.charAt(0).toUpperCase()}
+        </button>
+
+        <button className={`action${aime ? ' aime' : ''}`} onClick={basculerAime}>
+          <span className="glyphe"><svg width="34" height="34" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 29C12 26 2 19 2 10.7 2 5.5 5.3 2 9.7 2c2.8 0 5 1.5 6.3 3.8C17.3 3.5 19.5 2 22.3 2 26.7 2 30 5.5 30 10.7 30 19 20 26 16 29Z"/></svg></span>
+          <span>{abreger(nbAime)}</span>
+        </button>
+
+        <button className="action" onClick={() => setOuvrirCom(true)}>
+          <span className="glyphe"><svg width="34" height="34" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path fillRule="evenodd" d="M16 2C7.7 2 1 7.7 1 14.7c0 6.6 5.7 12 13 12.7V32l7.1-5.4C27 24.8 31 20.1 31 14.7 31 7.7 24.3 2 16 2ZM7 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm9 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm9 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z"/></svg></span>
+          <span>{abreger(nbCom)}</span>
+        </button>
+
+        <button className="action" onClick={partager}>
+          <span className="glyphe"><svg width="34" height="34" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M19 2a1 1 0 0 1 1.7-.7l11 11a2 2 0 0 1 0 2.8l-11 11A1 1 0 0 1 19 25.4V19C10 18 5 21 1.8 25.5c-.7 1-1.8.5-1.7-.6C.8 14 7.1 8.5 19 8V2Z"/></svg></span>
+          <span>Partager</span>
+        </button>
+        <button className="action fil-favori" aria-label={favori ? 'Retirer des favoris' : 'Enregistrer en favori'} aria-pressed={favori} onClick={() => setFavori(!favori)}><svg width="27" height="32" viewBox="0 0 24 28" fill={favori ? '#ffd15b' : 'white'} aria-hidden="true"><path d="M5 2h14a2 2 0 0 1 2 2v22l-9-6-9 6V4a2 2 0 0 1 2-2Z"/></svg><span>{favori ? 'Enregistré' : 'Favoris'}</span></button>
+        <span className={`fil-disque${actif && !pause ? ' tourne' : ''}`} role="img" aria-label={`Son de ${pseudo}`}>{video.profils?.avatar_url ? <img src={video.profils.avatar_url} alt=""/> : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2" fill="currentColor"/><ellipse cx="17" cy="16" rx="3" ry="2" fill="currentColor"/></svg>}</span>
+      </div>
+
+      <div className="infos">
+        <button className="pseudo" onClick={() => onVisiter(pseudo)}>@{pseudo}</button>
+        {video.legende && <button className={`legende ${developpe ? 'developpee' : ''}`} onClick={() => setDeveloppe(!developpe)} aria-expanded={developpe}>{video.legende}{!developpe && <span>… plus</span>}</button>}
+      </div>
+      <input className="fil-progression" style={{'--progression': `${progression}%`} as CSSProperties} type="range" aria-label="Position de lecture" min="0" max="100" step="0.1" value={progression} onChange={e => {const v = ref.current;if(v && Number.isFinite(v.duration)) {v.currentTime = Number(e.target.value)/100*v.duration;setProgression(Number(e.target.value))}}}/>
+
+      {ouvrirCom && (
+        <Commentaires
+          videoId={video.id}
+          onFermer={() => setOuvrirCom(false)}
+          onAjout={() => setNbCom((n) => n + 1)}
+        />
+      )}
+    </div>
+  )
+}
+
+export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string) => void; onRechercher: () => void }) {
+  const [categorie, setCategorie] = useState('Pour toi')
+  const [videos, setVideos] = useState<Video[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [indexActif, setIndexActif] = useState(0)
+  const filRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (MODE_DEMO) {
+      setVideos(etatDemo.videos as unknown as Video[])
+      setChargement(false)
+      return
+    }
+    supabase
+      .from('videos')
+      .select('id, url, legende, vues, auteur_id, profils(pseudo, avatar_url)')
+      .order('publiee_le', { ascending: false })
+      .limit(30)
+      .then(({ data }) => {
+        setVideos((data ?? []) as unknown as Video[])
+        setChargement(false)
+      })
+  }, [])
+
+  // Determine la carte visible d'apres la position de defilement plutot que par
+  // un IntersectionObserver : le scroll-snap garantit qu'une carte occupe
+  // toujours exactement la hauteur du conteneur.
+  const auDefilement = () => {
+    const el = filRef.current
+    if (!el) return
+    const i = Math.round(el.scrollTop / el.clientHeight)
+    if (i !== indexActif) setIndexActif(i)
+  }
+
+  if (chargement) return <div className="chargement">Chargement…</div>
+
+  if (videos.length === 0)
+    return (
+      <div className="vide">
+        <span className="glyphe"><Film taille={46} /></span>
+        <b>Aucune vidéo pour le moment</b>
+        <span>Soyez le premier à publier</span>
+      </div>
+    )
+
+  return (
+    <div className="fil-ecran"><header className="fil-entete"><button aria-label="Vidéos LIVE" onClick={() => setCategorie('LIVE')}><svg width="27" height="27" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 2 5 5 5-5M3 12V8h22v4M3 23v3h22v-3"/><text x="14" y="20" textAnchor="middle" fill="currentColor" stroke="none" fontSize="10" fontWeight="700">LIVE</text></svg></button><div>{['Communauté','Suivis','Pour toi'].map(c => <button key={c} className={categorie===c?'actif':''} onClick={() => setCategorie(c)}>{c}</button>)}</div><button aria-label="Rechercher" onClick={onRechercher}><Loupe taille={25}/></button></header>
+    {categorie !== 'Pour toi' ? <div className="fil-attente"><p>{categorie === 'LIVE' ? 'Aucun LIVE pour le moment' : categorie === 'Suivis' ? 'Le fil de tes abonnements sera disponible prochainement.' : 'Le fil Communauté sera disponible prochainement.'}</p></div> : <div className="fil" ref={filRef} onScroll={auDefilement}>
+      {videos.map((v, i) => (
+        <Carte key={v.id} video={v} actif={i === indexActif} onVisiter={onVisiter} />
+      ))}
+    </div>}</div>
+  )
+}

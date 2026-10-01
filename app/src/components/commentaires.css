@@ -1,0 +1,24 @@
+.commentaires-feuille{background:transparent;color:#111;--texte-attenue:#999;color-scheme:light;}
+.commentaires-feuille .feuille-panneau{height:68%;max-height:68%;background:#fff;border-radius:18px 18px 0 0;overflow:hidden;}
+.commentaires-feuille .feuille-entete{position:relative;justify-content:center;border:0;padding:15px 40px;font-size:13px;flex-shrink:0;}
+.commentaires-feuille .feuille-entete>span{display:flex;align-items:center;gap:6px;}
+.commentaires-feuille .feuille-entete>button{position:absolute;right:12px;top:10px;min-height:30px;}
+.commentaires-feuille .feuille-corps{min-height:0;padding:10px 12px;overscroll-behavior:contain;}
+.commentaires-feuille .commentaire{gap:9px;margin-bottom:24px;}
+.commentaires-feuille .commentaire .avatar{width:36px;height:36px;background:#ddd;border:0;color:#888;}
+.commentaires-feuille .commentaire .corps{min-width:0;}
+.commentaires-feuille .auteur{font-size:13px;font-weight:500;color:#999;}
+.commentaires-feuille .texte{font-size:15px;line-height:1.35;overflow-wrap:anywhere;}
+.commentaire-meta{display:flex;gap:18px;align-items:center;color:#999;font-size:12px;margin-top:10px;}.commentaire-meta button{font-weight:500;}
+.commentaires-feuille .feuille-pied{border:0;padding:10px 12px calc(12px + env(safe-area-inset-bottom));align-items:center;flex-shrink:0;}
+.commentaire-moi{width:35px;height:35px;border-radius:50%;background:#ddd;display:grid;place-items:center;overflow:hidden;flex-shrink:0;}.commentaire-moi img{width:100%;height:100%;object-fit:cover;}
+.commentaire-saisie{display:flex;align-items:center;flex:1;min-width:0;background:#f2f2f2;border-radius:28px;padding-right:7px;}
+.commentaires-feuille .feuille-pied input{background:transparent;min-width:0;width:100%;padding:12px;font-size:14px;color:#111;outline:none;}
+.commentaires-feuille .feuille-pied button{color:#111;padding:0 5px;display:grid;place-items:center;}
+.commentaire-mention{font-size:26px;}.commentaires-message{color:#888;font-size:12px;padding:0 16px 12px;}
+.app:has(.commentaires-feuille)>.nav{display:none;}
+.fil-ecran:has(.commentaires-feuille) .fil-entete{display:none;}
+.fil-ecran:has(.commentaires-feuille) .fil{overflow:hidden;}
+.fil-ecran .video-carte:has(.commentaires-feuille)>video{position:absolute;top:0;left:0;height:32%;width:100%;object-fit:contain;background:#000;}
+.video-carte:has(.commentaires-feuille)>.actions,.video-carte:has(.commentaires-feuille)>.infos,.video-carte:has(.commentaires-feuille)>.fil-progression,.video-carte:has(.commentaires-feuille)>.fil-play{display:none;}
+.video-carte:has(.commentaires-feuille):after{display:none;}

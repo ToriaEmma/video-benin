@@ -1,0 +1,270 @@
+/* ============================================================
+   Plateforme nationale de video courte
+   Interface sombre, pensee pour le mobile d'abord.
+   ============================================================ */
+
+:root {
+  --fond: #000000;
+  --surface: #161616;
+  --surface-haute: #232323;
+  --texte: #ffffff;
+  --texte-attenue: rgba(255, 255, 255, 0.62);
+  --bordure: rgba(255, 255, 255, 0.12);
+
+  /* Accent : vert et jaune du drapeau beninois, plutot que le cyan/magenta
+     de TikTok -- voir section 2 du cahier des charges sur le risque lie a la
+     reproduction des elements de marque. */
+  --accent: #00a550;
+  --accent-chaud: #fcd116;
+  --danger: #e8334a;
+
+  color-scheme: dark;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--fond);
+  color: var(--texte);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+}
+
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+input, textarea { font: inherit; color: inherit; }
+
+/* ---------- Mise en page ---------- */
+.app {
+  height: 100dvh; display: flex; flex-direction: column;
+  max-width: 480px; margin: 0 auto; position: relative; background: var(--fond);
+}
+.contenu { flex: 1; overflow: hidden; position: relative; }
+
+/* ---------- Navigation ---------- */
+.nav {
+  min-height: calc(54px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); display: flex; align-items: stretch;
+  border-top: 1px solid var(--bordure); background: var(--fond); flex-shrink: 0;
+}
+.nav button {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px; font-size: 10px; font-weight: 500;
+  color: var(--texte-attenue); min-height: 44px;
+}
+.nav button.actif { color: var(--texte); }
+.nav button>svg{width:23px;height:23px;}
+.nav-creer .pastille svg{width:21px;height:21px;}
+.nav-creer { min-width: 0; }
+.nav-creer .pastille {
+  width: 36px; height: 27px; border-radius: 9px; background: #fff;
+  color: #000; display: grid; place-items: center; box-shadow:-5px 0 #16cce0,5px 0 #ff2856;
+}
+.app:has(.page-profil) .nav button,.app:has(.page-messages) .nav button{color:#111;}
+.app:has(.page-profil) .nav-creer .pastille,.app:has(.page-messages) .nav-creer .pastille{background:#000;color:#fff;}
+.page-messages{background:#fff;color:#111;}
+.page-messages h1{font-size:22px;text-align:center;}
+.page-messages>div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding-top:25vh;}
+.page-messages h2{font-size:17px;}.page-messages p{font-size:14px;color:#888;}
+.app:has(.page-messages)>.nav{background:white;border-color:#e8e8e8;}
+
+/* ---------- Fil vertical ---------- */
+.fil { height: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }
+.fil::-webkit-scrollbar { display: none; }
+
+.video-carte {
+  height: 100%; scroll-snap-align: start; scroll-snap-stop: always;
+  position: relative; background: #000; display: grid; place-items: center; overflow: hidden;
+}
+.video-carte video { width: 100%; height: 100%; object-fit: contain; }
+
+/* ---------- Colonne d'actions ---------- */
+.actions {
+  position: absolute; right: 12px; bottom: 96px;
+  display: flex; flex-direction: column; gap: 18px; align-items: center;
+}
+.action {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-size: 11px; min-width: 44px; min-height: 44px; justify-content: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,.6);
+}
+.action .glyphe { font-size: 28px; line-height: 1; }
+.action.aime .glyphe { color: var(--danger); }
+
+.avatar {
+  width: 46px; height: 46px; border-radius: 50%; border: 2px solid #fff;
+  object-fit: cover; background: var(--surface-haute);
+  display: grid; place-items: center; font-size: 18px; font-weight: 700;
+}
+
+/* ---------- Bloc d'information ---------- */
+.infos { position: absolute; left: 16px; right: 76px; bottom: 24px; text-shadow: 0 1px 4px rgba(0,0,0,.7); }
+.infos .pseudo { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+.infos .legende {
+  font-size: 14px; line-height: 1.4; display: -webkit-box;
+  -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.infos .meta { font-size: 12px; color: var(--texte-attenue); margin-top: 6px; }
+
+/* ---------- Formulaires ---------- */
+.page { height: 100%; overflow-y: auto; padding: 24px 20px 32px; }
+.titre { font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+.sous-titre { color: var(--texte-attenue); font-size: 14px; margin-bottom: 28px; }
+.champ { margin-bottom: 16px; }
+.champ label { display: block; font-size: 13px; color: var(--texte-attenue); margin-bottom: 6px; }
+.champ input, .champ textarea {
+  width: 100%; background: var(--surface); border: 1px solid var(--bordure);
+  border-radius: 10px; padding: 14px;
+  font-size: 16px; /* 16px minimum : en dessous, iOS zoome au focus */
+}
+.champ input:focus, .champ textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.bouton {
+  width: 100%; padding: 15px; border-radius: 10px; background: var(--accent);
+  color: #000; font-weight: 700; font-size: 16px; min-height: 44px;
+}
+.bouton:disabled { opacity: .5; }
+.bouton.secondaire { background: var(--surface-haute); color: var(--texte); }
+.lien { color: var(--accent); text-align: center; display: block; margin-top: 18px; font-size: 14px; }
+
+.erreur {
+  background: rgba(232,51,74,.15); border: 1px solid var(--danger); color: #ff8b9b;
+  padding: 12px; border-radius: 10px; font-size: 14px; margin-bottom: 16px;
+}
+
+/* ---------- Profil ---------- */
+.profil-entete { text-align: center; padding: 20px 0 24px; }
+.profil-entete .avatar { width: 88px; height: 88px; margin: 0 auto 12px; font-size: 32px; }
+.stats { display: flex; justify-content: center; gap: 32px; margin: 16px 0 20px; }
+.stat { text-align: center; }
+.stat b { display: block; font-size: 17px; }
+.stat span { font-size: 12px; color: var(--texte-attenue); }
+
+.grille { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.grille .case { aspect-ratio: 9/16; background: var(--surface); position: relative; overflow: hidden; }
+.grille .case video { width: 100%; height: 100%; object-fit: cover; }
+.grille .case .vues { position: absolute; left: 6px; bottom: 6px; font-size: 11px; text-shadow: 0 1px 3px #000; }
+
+/* ---------- Etats ---------- */
+.vide { height: 100%; display: grid; place-content: center; text-align: center; gap: 10px; padding: 40px 24px; color: var(--texte-attenue); }
+.vide .glyphe { font-size: 44px; }
+.chargement { height: 100%; display: grid; place-items: center; color: var(--texte-attenue); }
+
+/* ---------- Commentaires ---------- */
+.feuille { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; z-index: 30; }
+.feuille-panneau { width: 100%; max-height: 72%; background: var(--surface); border-radius: 16px 16px 0 0; display: flex; flex-direction: column; }
+.feuille-entete { padding: 14px 16px; border-bottom: 1px solid var(--bordure); display: flex; justify-content: space-between; align-items: center; font-size: 14px; font-weight: 600; }
+.feuille-corps { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.commentaire { display: flex; gap: 10px; margin-bottom: 16px; }
+.commentaire .avatar { width: 32px; height: 32px; font-size: 13px; flex-shrink: 0; border-width: 1px; }
+.commentaire .corps { flex: 1; }
+.commentaire .auteur { font-size: 13px; color: var(--texte-attenue); margin-bottom: 2px; }
+.commentaire .texte { font-size: 14px; line-height: 1.4; }
+.feuille-pied { padding: 12px 16px; border-top: 1px solid var(--bordure); display: flex; gap: 8px; }
+.feuille-pied input { flex: 1; background: var(--surface-haute); border: none; border-radius: 20px; padding: 11px 14px; font-size: 16px; }
+.feuille-pied button { color: var(--accent); font-weight: 700; padding: 0 8px; min-height: 44px; }
+
+/* ---------- Envoi ---------- */
+.depot { border: 2px dashed var(--bordure); border-radius: 14px; padding: 40px 20px; text-align: center; color: var(--texte-attenue); margin-bottom: 20px; }
+.depot .glyphe { font-size: 40px; display: block; margin-bottom: 10px; }
+.apercu { width: 100%; max-height: 300px; border-radius: 14px; background: #000; margin-bottom: 16px; }
+.barre-progression { height: 4px; background: var(--surface-haute); border-radius: 2px; overflow: hidden; margin-bottom: 16px; }
+.barre-progression div { height: 100%; background: var(--accent); transition: width .2s; }
+
+/* ---------- Recherche ---------- */
+.recherche { display: flex; gap: 8px; margin-bottom: 20px; }
+.recherche input { flex: 1; background: var(--surface); border: 1px solid var(--bordure); border-radius: 10px; padding: 12px 14px; font-size: 16px; }
+.resultat { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--bordure); }
+.resultat .avatar { width: 44px; height: 44px; font-size: 17px; border-width: 1px; }
+
+/* ---------- Profil : barre superieure ---------- */
+.profil-barre {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 0 14px; font-size: 22px;
+}
+.profil-barre .groupe { display: flex; gap: 18px; align-items: center; }
+.profil-barre button { min-width: 44px; min-height: 44px; display: grid; place-items: center; }
+
+/* ---------- Profil : identite ---------- */
+.profil-identite { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.profil-nom { font-size: 30px; font-weight: 800; line-height: 1.1; }
+.profil-pseudo { color: var(--texte-attenue); font-size: 15px; margin-top: 2px; }
+.profil-avatar {
+  width: 86px; height: 86px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface-haute); display: grid; place-items: center;
+  font-size: 32px; font-weight: 700; overflow: hidden;
+}
+.profil-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- Profil : statistiques ---------- */
+.profil-stats { display: flex; gap: 30px; margin: 20px 0 18px; }
+.profil-stats .bloc b { font-size: 19px; font-weight: 700; display: block; }
+.profil-stats .bloc span { font-size: 13px; color: var(--texte-attenue); }
+
+/* ---------- Profil : actions ---------- */
+.profil-actions { display: flex; gap: 8px; margin-bottom: 18px; }
+.profil-actions .principal {
+  flex: 1; padding: 13px; border-radius: 8px; font-weight: 700; font-size: 15px;
+  background: var(--accent); color: #000; min-height: 44px;
+}
+.profil-actions .principal.suivi { background: var(--surface-haute); color: var(--texte); }
+.profil-actions .secondaire {
+  flex: 1; padding: 13px; border-radius: 8px; font-weight: 600; font-size: 15px;
+  background: var(--surface-haute); color: var(--texte); min-height: 44px;
+}
+.profil-actions .secondaire:disabled { opacity: .45; }
+.profil-actions .carre {
+  width: 46px; border-radius: 8px; background: var(--surface-haute);
+  display: grid; place-items: center; font-size: 18px; min-height: 44px;
+}
+.profil-studio {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--bordure); border-radius: 20px;
+  padding: 8px 14px; font-size: 14px; font-weight: 600; margin-bottom: 18px;
+}
+
+/* ---------- Profil : bio ---------- */
+.profil-bio { font-size: 14px; line-height: 1.55; white-space: pre-line; margin-bottom: 16px; }
+.profil-bio a { color: var(--texte); text-decoration: none; font-weight: 600; }
+
+/* ---------- Profil : onglets ---------- */
+.profil-onglets {
+  display: flex; border-bottom: 1px solid var(--bordure); margin-bottom: 2px;
+}
+.profil-onglets button {
+  flex: 1; padding: 12px 0; font-size: 18px; color: var(--texte-attenue);
+  border-bottom: 2px solid transparent; min-height: 44px;
+}
+.profil-onglets button.actif { color: var(--texte); border-bottom-color: var(--texte); }
+
+/* ---------- Profil : vignette ---------- */
+.case .duree {
+  position: absolute; right: 6px; top: 6px; font-size: 10px;
+  background: rgba(0,0,0,.55); padding: 2px 5px; border-radius: 4px;
+}
+
+/* ---------- Icones SVG ---------- */
+/* Les glyphes sont desormais des <svg> : ils doivent se centrer dans leur
+   conteneur et suivre la couleur du texte, ce que les emojis ne faisaient pas. */
+svg { display: block; flex-shrink: 0; }
+
+.action .glyphe { display: grid; place-items: center; }
+.nav button svg { margin-bottom: 1px; }
+.nav-creer .pastille svg { stroke-width: 2.6; }
+.profil-barre button svg { display: block; }
+.profil-onglets button { display: grid; place-items: center; }
+.profil-studio { display: inline-flex; align-items: center; gap: 8px; }
+.vide .glyphe { display: grid; place-items: center; }
+.depot .glyphe { display: grid; place-items: center; margin: 0 auto 10px; }
+.case .vues { display: inline-flex; align-items: center; gap: 3px; }
+.profil-actions .carre svg { margin: 0 auto; }
+
+/* ---------- Ecrans plein ecran ---------- */
+/* Parametres, Gerer les publications et Preferences de contenu couvrent tout
+   l'ecran : la barre de navigation n'a pas a rester visible dessous. Ces
+   ecrans vivent dans .contenu, et `:has` permet de reagir a leur presence
+   sans faire remonter un etat jusqu'a App. */
+.app:has(.param-page) .nav,
+.app:has(.ger-page) .nav,
+.app:has(.pref-page) .nav {
+  display: none;
+}
