@@ -812,4 +812,10 @@ app.use((erreur, _req, res, _suite) => {
 })
 
 const port = process.env.PORT || 4000
-app.listen(port, () => console.log(`API à l'écoute sur le port ${port}`))
+// En local, le serveur ecoute lui-meme. Sur Vercel, la plateforme
+// importe `app` et se charge de l'ecoute : ouvrir un port y echouerait.
+if (!process.env.VERCEL) {
+  app.listen(port, () => console.log(`API à l'écoute sur le port ${port}`))
+}
+
+export default app

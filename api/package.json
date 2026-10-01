@@ -8,7 +8,8 @@
   "scripts": {
     "start": "node serveur.js",
     "dev": "node --watch serveur.js",
-    "schema": "node appliquer-schema.js"
+    "schema": "node appliquer-schema.js",
+    "vercel-build": "echo 'aucune compilation necessaire'"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
