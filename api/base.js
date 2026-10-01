@@ -11,15 +11,19 @@ import { neon } from '@neondatabase/serverless'
 
 const chaine = process.env.DATABASE_URL
 
-if (!chaine) {
-  console.error(
-    'DATABASE_URL manquant. Copiez api/.env.exemple vers api/.env et\n' +
-    'collez-y la chaine de connexion du projet Neon.',
-  )
-  process.exit(1)
-}
-
-// `sql` s'utilise en gabarit : sql`SELECT ... WHERE id = ${valeur}`.
-// Les valeurs interpolees sont transmises comme parametres, jamais
-// concatenees : c'est ce qui ecarte les injections SQL.
-export const sql = neon(chaine)
+// Sans chaine de connexion, on ne quitte pas le processus : en
+// hebergement sans serveur, le module est charge a l'ouverture de la
+// fonction, et en sortir ne rend qu'une panne opaque. On laisse donc
+// `sql` lever a l'usage, avec un message qui dit quoi faire.
+export const sql = chaine
+  ? neon(chaine)
+  : (() => {
+      const absente = () => {
+        throw new Error(
+          'DATABASE_URL manquant : renseignez la variable d\'environnement '
+          + 'avec la chaine de connexion du projet Neon, puis redeployez.',
+        )
+      }
+      absente.query = absente
+      return absente
+    })()
