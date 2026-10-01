@@ -106,7 +106,7 @@ export default function EnvoyerA({
 
   const partager = async () => {
     try {
-      await Share.share({ message: `${legende}\n\nRegarde cette vidéo sur Vidéo Bénin` })
+      await Share.share({ message: `${legende}\n\nRegarde cette vidéo sur Tok 229` })
     } catch { /* Partage annule. */ }
   }
 

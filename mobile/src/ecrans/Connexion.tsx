@@ -127,7 +127,7 @@ function Inscription({ visible, onFermer, onConnexion, onSucces }: {
               keyboardShouldPersistTaps="handled">
               <Text style={s.grandTitre}>
                 {etape === 'telephone'
-                  ? 'Inscription à Vidéo Bénin'
+                  ? 'Inscription à Tok 229'
                   : 'Choisis ton pseudo'}
               </Text>
 

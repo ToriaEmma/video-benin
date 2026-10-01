@@ -25,7 +25,7 @@ import {
 const FILTRES: { nom: string; canal: CanalNotification | null }[] = [
   { nom: 'Tous', canal: null },
   { nom: 'LIVE', canal: 'live' },
-  { nom: 'Vidéo Bénin', canal: 'application' },
+  { nom: 'Tok 229', canal: 'application' },
   { nom: 'Assistant promotion', canal: 'promotion' },
 ]
 
@@ -104,7 +104,7 @@ const CANAUX: {
   { nom: 'Creator Marketplace', Icone: CanalMarketplace },
   { nom: 'LIVE', Icone: CanalLive },
   { nom: 'Mini-série', Icone: CanalMiniSerie },
-  { nom: 'Vidéo Bénin', Icone: CanalApplication },
+  { nom: 'Tok 229', Icone: CanalApplication },
 ]
 
 export function ParametresNotifications({ onRetour }: { onRetour: () => void }) {

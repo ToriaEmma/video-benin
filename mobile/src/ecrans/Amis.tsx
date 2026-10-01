@@ -223,7 +223,7 @@ function Carte({
   const partager = async () => {
     try {
       await Share.share({
-        message: `${item.legende}\n\nRegarde cette vidéo sur Vidéo Bénin`,
+        message: `${item.legende}\n\nRegarde cette vidéo sur Tok 229`,
       })
     } catch { /* annule */ }
   }
