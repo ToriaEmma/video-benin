@@ -12,3 +12,4 @@ api/node_modules/
 api/.env
 # Application mobile
 mobile/node_modules/
+.neon
