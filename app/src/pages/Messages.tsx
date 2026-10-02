@@ -9,12 +9,12 @@ import Notifications from './Notifications'
 import { useAuth } from '../lib/auth'
 import {
   Loupe, Chevron, EnvoiMessage, Messages as IconeMessages,
-  NouveauGroupe, Eclair, BulleDemande, Flamme, ChevronDroit,
+  NouveauGroupe, Eclair, ChevronDroit,
 } from '../components/Icones'
+import { etatDemo, dateRelative } from '../lib/demo'
 import {
-  etatDemo, dateRelative, dernierMessage, conversationsTriees,
-  demandesMessages, type Conversation, type Message,
-} from '../lib/demo'
+  apiMessagerie, type ApercuConversation, type MessageApi,
+} from '../lib/api'
 import './messages.css'
 
 // Teintes des avatars, piochees d'apres le pseudo : deux comptes differents
@@ -38,33 +38,27 @@ function Avatar({ pseudo, taille }: { pseudo: string; taille: number }) {
   )
 }
 
-// Apercu d'une conversation, partage par la boite et par les demandes.
+// Apercu d'une conversation de la boite de reception.
 function Ligne({ conversation, onOuvrir }: {
-  conversation: Conversation
+  conversation: ApercuConversation
   onOuvrir: () => void
 }) {
-  const dernier = dernierMessage(conversation)
+  const dernier = conversation.dernierMessage
+  // Une conversation ouverte depuis un profil n'a pas encore de pseudo si
+  // l'autre participant a supprime son compte.
+  const pseudo = conversation.pseudo ?? 'compte supprimé'
 
   return (
     <button className="msg-ligne" onClick={onOuvrir}>
-      {conversation.systeme
-        ? <span className="msg-service"><Eclair taille={24} /></span>
-        : <Avatar pseudo={conversation.pseudo} taille={52} />}
+      <Avatar pseudo={pseudo} taille={52} />
 
       <span className="msg-ligne-corps">
-        <span className="msg-ligne-pseudo">
-          {conversation.pseudo}
-          {!!conversation.flamme && (
-            <span className="msg-flamme">
-              <Flamme taille={12} />{conversation.flamme}
-            </span>
-          )}
-        </span>
+        <span className="msg-ligne-pseudo">{pseudo}</span>
         <span className={dernier && conversation.nonLus > 0
           ? 'msg-apercu msg-apercu-nonlu' : 'msg-apercu'}>
           {dernier
             ? `${dernier.moi ? 'Vous : ' : ''}${dernier.texte}`
-            : conversation.invite ?? 'Nouvelle conversation'}
+            : `Dis bonjour à ${pseudo}`}
         </span>
       </span>
 
@@ -81,14 +75,35 @@ function Ligne({ conversation, onOuvrir }: {
 // ------------------------------------------------------------
 
 function Fil({ conversation, onRetour }: {
-  conversation: Conversation
+  conversation: ApercuConversation
   onRetour: () => void
 }) {
   const [texte, setTexte] = useState('')
-  // Copie locale, du plus ancien au plus recent. L'etat partage reste la
-  // source : cette copie ne sert qu'a redessiner le fil apres un envoi.
-  const [messages, setMessages] = useState<Message[]>(() => [...conversation.messages])
+  const [messages, setMessages] = useState<MessageApi[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
+  const [envoi, setEnvoi] = useState(false)
+  const [reprise, setReprise] = useState(0)
   const bas = useRef<HTMLDivElement>(null)
+  const pseudo = conversation.pseudo ?? 'compte supprimé'
+
+  useEffect(() => {
+    let valable = true
+    setChargement(true)
+    setErreur('')
+    apiMessagerie.messages(conversation.id)
+      .then(m => { if (valable) setMessages(m) })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [conversation.id, reprise])
+
+  // Ouvrir le fil vaut lecture : la pastille de non-lus disparait cote
+  // serveur. L'echec est sans consequence visible, on l'ignore.
+  useEffect(() => {
+    apiMessagerie.marquerLu(conversation.id)
+      .catch(() => { /* La pastille se rattrapera au prochain chargement. */ })
+  }, [conversation.id])
 
   // Le fil s'ouvre et reste cale sur son dernier message, comme la liste
   // renversee de la version mobile.
@@ -96,27 +111,41 @@ function Fil({ conversation, onRetour }: {
     bas.current?.scrollIntoView({ block: 'end' })
   }, [messages.length])
 
-  const envoyer = () => {
+  const envoyer = async () => {
     const contenu = texte.trim()
-    if (!contenu) return
-    const message: Message = {
-      id: `m${Date.now()}`, texte: contenu, moi: true, date: Date.now(),
+    if (!contenu || envoi) return
+    setEnvoi(true)
+    setErreur('')
+    try {
+      const cree = await apiMessagerie.envoyer(conversation.id, contenu)
+      setMessages(l => [...l, cree])
+      setTexte('')
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : 'Envoi impossible')
+    } finally {
+      setEnvoi(false)
     }
-    conversation.messages.push(message)
-    setMessages(l => [...l, message])
-    setTexte('')
   }
 
   return (
     <section className="msg-page msg-fil-page">
       <header className="msg-barre-fil">
         <button aria-label="Retour" onClick={onRetour}><Chevron taille={24} /></button>
-        <Avatar pseudo={conversation.pseudo} taille={34} />
-        <h1>{conversation.pseudo}</h1>
+        <Avatar pseudo={pseudo} taille={34} />
+        <h1>{pseudo}</h1>
       </header>
 
       <div className="msg-fil">
-        {messages.map(m => (
+        {chargement ? (
+          <p className="msg-vide-texte">Chargement…</p>
+        ) : erreur && messages.length === 0 ? (
+          <div className="msg-echec">
+            <p role="alert">{erreur}</p>
+            <button onClick={() => setReprise(n => n + 1)}>Réessayer</button>
+          </div>
+        ) : messages.length === 0 ? (
+          <p className="msg-vide-texte">Dis bonjour à {pseudo}</p>
+        ) : messages.map(m => (
           <div key={m.id} className={m.moi ? 'msg-rang msg-rang-moi' : 'msg-rang'}>
             <p className={m.moi ? 'msg-bulle msg-bulle-moi' : 'msg-bulle'}>
               {m.texte}
@@ -126,6 +155,12 @@ function Fil({ conversation, onRetour }: {
         <div ref={bas} />
       </div>
 
+      {/* Un envoi refuse se signale sans effacer la saisie : le texte
+          reste dans le champ pour etre retente. */}
+      {!!erreur && messages.length > 0 && (
+        <p className="msg-erreur-envoi" role="alert">{erreur}</p>
+      )}
+
       <form className="msg-redaction" onSubmit={e => { e.preventDefault(); envoyer() }}>
         <textarea rows={1} maxLength={1000} placeholder="Envoyer un message…"
           value={texte} aria-label="Message"
@@ -133,38 +168,10 @@ function Fil({ conversation, onRetour }: {
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); envoyer() }
           }} />
-        <button type="submit" aria-label="Envoyer" disabled={!texte.trim()}>
+        <button type="submit" aria-label="Envoyer" disabled={!texte.trim() || envoi}>
           <EnvoiMessage taille={20} />
         </button>
       </form>
-    </section>
-  )
-}
-
-// ------------------------------------------------------------
-// Demandes de messages
-// ------------------------------------------------------------
-
-function Demandes({ onRetour, onOuvrir }: {
-  onRetour: () => void
-  onOuvrir: (c: Conversation) => void
-}) {
-  const liste = demandesMessages()
-
-  return (
-    <section className="msg-page">
-      <header className="msg-barre-fil">
-        <button aria-label="Retour" onClick={onRetour}><Chevron taille={24} /></button>
-        <h1>Demandes de messages</h1>
-      </header>
-
-      <div className="msg-liste">
-        {liste.length === 0
-          ? <p className="msg-vide-texte">Aucune demande en attente.</p>
-          : liste.map(c => (
-            <Ligne key={c.id} conversation={c} onOuvrir={() => onOuvrir(c)} />
-          ))}
-      </div>
     </section>
   )
 }
@@ -176,40 +183,42 @@ function Demandes({ onRetour, onOuvrir }: {
 export default function Messages() {
   const { profil } = useAuth()
   // Conversation ouverte. Null = on est sur la boite de reception.
-  const [ouverte, setOuverte] = useState<Conversation | null>(null)
-  // Un compte de service mene a « Notifications système » plutot qu'a
-  // un fil de discussion, comme sur mobile.
+  const [ouverte, setOuverte] = useState<ApercuConversation | null>(null)
+  // Les notifications systeme restent un ecran local : l'API n'en diffuse
+  // de notifications, la rangee de service y mene quand meme.
   const [notifications, setNotifications] = useState(false)
-  const [demandes, setDemandes] = useState(false)
   const [recherche, setRecherche] = useState('')
   const [chercher, setChercher] = useState(false)
+  const [liste, setListe] = useState<ApercuConversation[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
   // Incremente au retour d'un fil : la liste reprend alors le dernier
   // message et la pastille de non-lus a jour.
-  const [, setRevision] = useState(0)
+  const [reprise, setReprise] = useState(0)
+
+  useEffect(() => {
+    let valable = true
+    setChargement(true)
+    setErreur('')
+    apiMessagerie.conversations()
+      .then(c => { if (valable) setListe(c) })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [reprise])
 
   const terme = recherche.trim().toLowerCase()
-  const conversations = conversationsTriees().filter(c => !terme
-    || c.pseudo.toLowerCase().includes(terme)
-    || (dernierMessage(c)?.texte.toLowerCase().includes(terme) ?? false))
-
-  const enAttente = demandesMessages()
-  const nonLusDemandes = enAttente.reduce((t, c) => t + c.nonLus, 0)
-
-  const ouvrir = (c: Conversation) => {
-    // Ouvrir la conversation vaut lecture : la pastille disparait.
-    c.nonLus = 0
-    if (c.systeme) { setNotifications(true); setRevision(n => n + 1); return }
-    setOuverte(c)
-  }
+  const conversations = liste.filter(c => !terme
+    || (c.pseudo?.toLowerCase().includes(terme) ?? false)
+    || (c.dernierMessage?.texte.toLowerCase().includes(terme) ?? false))
 
   const revenir = () => {
-    setOuverte(null); setNotifications(false); setDemandes(false)
-    setRevision(n => n + 1)
+    setOuverte(null); setNotifications(false)
+    setReprise(n => n + 1)
   }
 
   if (notifications) return <Notifications onRetour={revenir} />
   if (ouverte) return <Fil conversation={ouverte} onRetour={revenir} />
-  if (demandes) return <Demandes onRetour={revenir} onOuvrir={ouvrir} />
 
   return (
     <section className="msg-page">
@@ -234,23 +243,27 @@ export default function Messages() {
       <BandeStories pseudo={profil?.pseudo ?? 'moi'} stories={etatDemo.stories} clair />
 
       <div className="msg-liste">
-        {enAttente.length > 0 && !terme && (
-          <button className="msg-ligne" onClick={() => setDemandes(true)}>
-            <span className="msg-service msg-service-bleu"><BulleDemande taille={24} /></span>
+        {/* Rangee de service : elle ouvre les notifications de
+            l'application, qui restent locales a l'ecran. */}
+        {!terme && (
+          <button className="msg-ligne" onClick={() => setNotifications(true)}>
+            <span className="msg-service"><Eclair taille={24} /></span>
             <span className="msg-ligne-corps">
-              <span className="msg-ligne-pseudo">Demandes de messages</span>
-              <span className="msg-apercu">
-                {enAttente.length} compte{enAttente.length > 1 ? 's' : ''} en attente
-              </span>
+              <span className="msg-ligne-pseudo">Notifications système</span>
+              <span className="msg-apercu">Activités et mises à jour de Tok 229</span>
             </span>
-            <span className="msg-ligne-fin">
-              {nonLusDemandes > 0 && <i className="msg-nonlu" />}
-              <ChevronDroit taille={18} />
-            </span>
+            <span className="msg-ligne-fin"><ChevronDroit taille={18} /></span>
           </button>
         )}
 
-        {conversations.length === 0 ? (
+        {chargement ? (
+          <p className="msg-vide-texte">Chargement…</p>
+        ) : erreur ? (
+          <div className="msg-echec">
+            <p role="alert">{erreur}</p>
+            <button onClick={() => setReprise(n => n + 1)}>Réessayer</button>
+          </div>
+        ) : conversations.length === 0 ? (
           <div className="msg-vide">
             <IconeMessages taille={44} />
             <h2>{terme ? 'Aucun résultat' : 'Aucun message'}</h2>
@@ -259,7 +272,7 @@ export default function Messages() {
               : 'Vos conversations apparaîtront ici.'}</p>
           </div>
         ) : conversations.map(c => (
-          <Ligne key={c.id} conversation={c} onOuvrir={() => ouvrir(c)} />
+          <Ligne key={c.id} conversation={c} onOuvrir={() => setOuverte(c)} />
         ))}
       </div>
     </section>

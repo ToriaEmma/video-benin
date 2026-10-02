@@ -26,5 +26,10 @@
 .fil-progression::-moz-range-track{height:2px;border-radius:2px;background:#ffffff30;}.fil-progression::-moz-range-progress{height:2px;background:#fff9;}.fil-progression::-moz-range-thumb{width:5px;height:5px;border:0;border-radius:50%;background:#aaa;}
 .fil-progression:focus-visible{outline:1px solid white;outline-offset:2px;}
 @media(prefers-reduced-motion:reduce){.fil-disque{animation:none;}}
-.fil-attente{height:100%;display:grid;place-items:center;padding:40px;text-align:center;color:#bbb;}
+.fil-attente{height:100%;display:grid;place-items:center;align-content:center;gap:14px;padding:40px;text-align:center;color:#bbb;}
+.fil-attente p{font-size:15px;margin:0;}
+/* Bouton de reprise apres un echec reseau : il doit rester atteignable au pouce. */
+.fil-reessayer{min-height:40px;padding:0 22px;border:1px solid #ffffff59;border-radius:20px;background:none;color:#fff;font-size:15px;font-weight:600;}
+/* Un j'aime refuse par le serveur s'annonce ici, sans interrompre la lecture. */
+.fil-bandeau{position:absolute;left:16px;right:16px;bottom:16px;z-index:4;border:0;border-radius:10px;padding:12px 16px;background:#5a5a5aeb;color:#fff;font-size:14px;text-align:center;}
 @media(max-width:380px){.fil-entete{gap:8px;padding-left:8px;padding-right:8px;}.fil-entete>div{gap:12px;}.fil-entete button{font-size:14px;}.fil-ecran .actions{gap:10px;}}

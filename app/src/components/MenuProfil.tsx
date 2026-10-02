@@ -1,17 +1,34 @@
 import { useEffect, useRef, useState } from 'react'
 import { Chevron, Studio } from './Icones'
 
-const groupes = [
+// `motif` dit pourquoi la rangee n'ouvre rien : chaque fonction attend une
+// brique que l'API ne fournit pas, et le dire vaut mieux qu'un « bientot »
+// qui n'engage personne.
+const groupes: {
+  titre: string
+  lignes: { nom: string; icone: string; motif?: string }[]
+}[] = [
   { titre: 'Ressources', lignes: [{ nom: 'Solde', icone: 'solde' }] },
   { titre: 'Outils personnels', lignes: [
-    { nom: 'Centre des activités', icone: 'activite' },
-    { nom: 'Vidéos hors ligne', icone: 'telecharger' },
-    { nom: 'Ton code QR', icone: 'qr' },
-    { nom: 'Ta musique', icone: 'musique' },
+    { nom: 'Centre des activités', icone: 'activite',
+      motif: 'Tok 229 ne tient pas encore de journal d’activité : il n’y a rien à afficher ici.' },
+    { nom: 'Vidéos hors ligne', icone: 'telecharger',
+      motif: 'Les vidéos ne sont pas hébergées par Tok 229 : elles ne peuvent pas être téléchargées.' },
+    { nom: 'Ton code QR', icone: 'qr',
+      motif: 'Un code QR demande une adresse publique de profil, que Tok 229 n’expose pas encore.' },
+    { nom: 'Ta musique', icone: 'musique',
+      motif: 'Aucune bibliothèque musicale n’est rattachée aux comptes pour l’instant.' },
   ] },
-  { titre: 'Outils de création et professionnels', lignes: [{ nom: 'Studio créateur', icone: 'studio' }] },
+  { titre: 'Outils de création et professionnels', lignes: [
+    { nom: 'Studio créateur', icone: 'studio',
+      motif: 'Le studio attend les statistiques d’audience, que l’API ne calcule pas encore.' },
+  ] },
   { titre: '', lignes: [{ nom: 'Paramètres et confidentialité', icone: 'parametres' }] },
 ]
+
+// Motif de la rangee retenue, pour l'ecran de detail.
+const motifDe = (nom: string) =>
+  groupes.flatMap(g => g.lignes).find(l => l.nom === nom)?.motif
 
 function Icone({ type }: { type: string }) {
   if (type === 'studio') return <Studio taille={23} />
@@ -42,7 +59,7 @@ export default function MenuProfil({ onFermer, onDeconnecter, onSolde, onParamet
         <h2 className="menu-profil-titre">{selection}</h2>
         {selection === 'Paramètres et confidentialité'
           ? <button className="menu-profil-deconnexion" onClick={onDeconnecter}>Se déconnecter</button>
-          : <p className="menu-profil-indisponible" role="status">Cette fonctionnalité sera disponible prochainement.</p>}
+          : <p className="menu-profil-indisponible" role="status">{motifDe(selection)}</p>}
       </> : groupes.map((groupe, i) => <div className="menu-profil-groupe" key={i}>
         {groupe.titre && <h2>{groupe.titre}</h2>}
         {groupe.lignes.map(ligne => <button className="menu-profil-ligne" key={ligne.nom} onClick={() => ligne.nom === 'Solde' ? onSolde() : ligne.nom === 'Paramètres et confidentialité' ? onParametres() : setSelection(ligne.nom)}>

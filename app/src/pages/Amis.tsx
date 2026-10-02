@@ -312,7 +312,7 @@ export default function Amis({ onVisiter }: { onVisiter: (pseudo: string) => voi
         : <div className="ami-rangee"><BandeStories pseudo={pseudo} stories={stories} onOuvrir={onVisiter} /></div>}
 
       {videoCom && (
-        <Commentaires videoId={videoCom.id} onFermer={() => setVideoCom(null)} onAjout={() => undefined} />
+        <Commentaires videoId={videoCom.id} onFermer={() => setVideoCom(null)} onVariation={() => undefined} />
       )}
     </div>
   )

@@ -1,8 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { Session } from '@supabase/supabase-js'
-import { supabase, emailDepuisTelephone, MODE_DEMO } from './supabase'
+import { apiComptes, lireJeton, poserJeton, type ProfilApi } from './api'
 import { etatDemo } from './demo'
 
+// Meme forme que le profil de la version mobile (mobile/src/lib/auth.tsx) :
+// les deux plateformes lisent la meme table `profils`.
 export type Profil = {
   id: string
   pseudo: string
@@ -12,8 +13,13 @@ export type Profil = {
   avatar_url: string | null
 }
 
+// L'API identifie l'appelant par son jeton : il n'y a plus de session a
+// porter. Cette forme reduite est conservee parce que les ecrans s'en
+// servent comme temoin de connexion, et pour l'identifiant de l'auteur.
+export type SessionLocale = { user: { id: string } }
+
 type AuthContexte = {
-  session: Session | null
+  session: SessionLocale | null
   profil: Profil | null
   chargement: boolean
   inscrire: (telephone: string, motDePasse: string, pseudo: string) => Promise<void>
@@ -24,126 +30,71 @@ type AuthContexte = {
 }
 
 const Contexte = createContext<AuthContexte | null>(null)
-const CLE_SESSION_DEMO = 'tiktik-session-demo-v1'
-function conserverDemo(profil: Profil | null) {
-  try {
-    if (profil) localStorage.setItem(CLE_SESSION_DEMO, JSON.stringify(profil))
-    else localStorage.removeItem(CLE_SESSION_DEMO)
-  } catch { /* La session courante reste utilisable si le stockage est bloqué. */ }
-}
+
+// Postgres rend NULL la ou les ecrans attendent une chaine : la conversion
+// est faite ici une fois pour toutes.
+const versProfil = (p: ProfilApi): Profil => ({
+  id: p.id,
+  pseudo: p.pseudo,
+  nom: p.nom ?? undefined,
+  telephone: p.telephone,
+  bio: p.bio ?? '',
+  avatar_url: p.avatar_url,
+})
 
 export const FournisseurAuth = ({ children }: { children: ReactNode }) => {
-  const [session, setSession] = useState<Session | null>(null)
+  const [session, setSession] = useState<SessionLocale | null>(null)
   const [profil, setProfil] = useState<Profil | null>(null)
   const [chargement, setChargement] = useState(true)
 
-  const chargerProfil = async (id: string) => {
-    const { data } = await supabase.from('profils').select('*').eq('id', id).single()
-    setProfil(data as Profil | null)
+  // Les ecrans encore decores par demo.ts lisent `etatDemo.pseudo` : il
+  // doit suivre le profil reel tant qu'ils n'ont pas bascule sur l'API.
+  const appliquer = (suivant: Profil | null) => {
+    etatDemo.connecte = Boolean(suivant)
+    etatDemo.pseudo = suivant?.pseudo ?? ''
+    setProfil(suivant)
+    setSession(suivant ? { user: { id: suivant.id } } : null)
   }
 
   useEffect(() => {
-    if (MODE_DEMO) {
-      try {
-        const sauvegarde = JSON.parse(localStorage.getItem(CLE_SESSION_DEMO) || 'null')
-        if (sauvegarde?.id === 'demo' && typeof sauvegarde.pseudo === 'string') {
-          etatDemo.connecte = true
-          etatDemo.pseudo = sauvegarde.pseudo
-          setProfil(sauvegarde)
-          setSession({ user: { id: 'demo' } } as unknown as Session)
-        }
-      } catch { /* Données absentes ou invalides : afficher la connexion. */ }
-      setChargement(false)
-      return
-    }
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      if (data.session) chargerProfil(data.session.user.id).finally(() => setChargement(false))
-      else setChargement(false)
-    })
-
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      setSession(s)
-      if (s) chargerProfil(s.user.id)
-      else setProfil(null)
-    })
-    return () => sub.subscription.unsubscribe()
+    // Un jeton conserve est suppose valable : seul /moi peut le confirmer.
+    // S'il a expire, on le jette sans bruit et l'ecran de connexion s'ouvre.
+    const jeton = lireJeton()
+    if (!jeton) { setChargement(false); return }
+    apiComptes.moi()
+      .then(p => appliquer(versProfil(p)))
+      .catch(() => poserJeton(null))
+      .finally(() => setChargement(false))
   }, [])
 
+  const ouvrirSession = (session: { jeton: string; profil: ProfilApi }) => {
+    poserJeton(session.jeton)
+    appliquer(versProfil(session.profil))
+  }
+
   const inscrire = async (telephone: string, motDePasse: string, pseudo: string) => {
-    if (MODE_DEMO) {
-      etatDemo.connecte = true
-      etatDemo.pseudo = pseudo
-      setSession({ user: { id: 'demo' } } as unknown as Session)
-      setProfil({ id: 'demo', pseudo, telephone, bio: '', avatar_url: null })
-      conserverDemo({ id: 'demo', pseudo, telephone, bio: '', avatar_url: null })
-      return
-    }
-    // Le pseudo est verifie AVANT la creation du compte : sans ce controle, un
-    // compte auth serait cree puis l'insertion du profil echouerait sur la
-    // contrainte d'unicite, laissant un compte orphelin impossible a reutiliser.
-    const { data: existant } = await supabase
-      .from('profils').select('id').eq('pseudo', pseudo).maybeSingle()
-    if (existant) throw new Error('Ce pseudo est déjà pris')
-
-    const { data, error } = await supabase.auth.signUp({
-      email: emailDepuisTelephone(telephone),
-      password: motDePasse,
-    })
-    if (error) throw error
-    if (!data.user) throw new Error("Le compte n'a pas pu être créé")
-
-    const { error: erreurProfil } = await supabase.from('profils').insert({
-      id: data.user.id,
-      pseudo,
-      telephone,
-    })
-    if (erreurProfil) throw erreurProfil
-    await chargerProfil(data.user.id)
+    ouvrirSession(await apiComptes.inscription(telephone, motDePasse, pseudo))
   }
 
   const connecter = async (telephone: string, motDePasse: string) => {
-    if (MODE_DEMO) {
-      const pseudo = etatDemo.pseudo || 'visiteur'
-      etatDemo.connecte = true
-      etatDemo.pseudo = pseudo
-      setSession({ user: { id: 'demo' } } as unknown as Session)
-      setProfil({ id: 'demo', pseudo, telephone, bio: '', avatar_url: null })
-      conserverDemo({ id: 'demo', pseudo, telephone, bio: '', avatar_url: null })
-      return
-    }
-    const { error } = await supabase.auth.signInWithPassword({
-      email: emailDepuisTelephone(telephone),
-      password: motDePasse,
-    })
-    if (error) throw new Error('Numéro ou mot de passe incorrect')
+    ouvrirSession(await apiComptes.connexion(telephone, motDePasse))
   }
 
   const deconnecter = async () => {
-    if (MODE_DEMO) {
-      etatDemo.connecte = false
-      conserverDemo(null)
-      setSession(null)
-      setProfil(null)
-      return
-    }
-    await supabase.auth.signOut()
-    setProfil(null)
+    poserJeton(null)
+    appliquer(null)
   }
 
   const rafraichirProfil = async () => {
-    if (MODE_DEMO) return
-    if (session) await chargerProfil(session.user.id)
+    if (!profil) return
+    appliquer(versProfil(await apiComptes.moi()))
   }
 
-  const modifierProfil = async (valeurs: Partial<Pick<Profil, 'nom' | 'pseudo' | 'bio' | 'avatar_url'>>) => {
+  const modifierProfil = async (
+    valeurs: Partial<Pick<Profil, 'nom' | 'pseudo' | 'bio' | 'avatar_url'>>,
+  ) => {
     if (!profil) return
-    if (!MODE_DEMO) {
-      const { error } = await supabase.from('profils').update(valeurs).eq('id', profil.id)
-      if (error) throw error
-    } else if (valeurs.pseudo) etatDemo.pseudo = valeurs.pseudo
-    setProfil({ ...profil, ...valeurs })
-    if (MODE_DEMO) conserverDemo({ ...profil, ...valeurs })
+    appliquer(versProfil(await apiComptes.modifierProfil(valeurs)))
   }
 
   return (

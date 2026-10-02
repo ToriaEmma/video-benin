@@ -41,7 +41,9 @@ export default function CreationCamera({ onChoisir, onFermer }: { onChoisir: (f:
   const glisserFin = () => { depart.current = null }
   const outil = (nom: string) => {
     if (nom === 'Filtres' || nom === 'Effets') {setFiltre(v => (v + 1) % filtres.length);setMessage('');return}
-    setMessage(`${nom} : disponible prochainement.`)
+    // Ces outils relevent de la capture et du montage : ni l'API Tok 229
+    // ni la camera du navigateur ne les portent.
+    setMessage(`${nom} : non pris en charge par la caméra du navigateur.`)
   }
   useEffect(() => {
     let annule = false

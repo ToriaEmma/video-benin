@@ -1,10 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { supabase, MODE_DEMO } from '../lib/supabase'
-import { etatDemo, comptesDemo } from '../lib/demo'
+import { apiInteractions, apiVideos, type VideoApi } from '../lib/api'
 import { Lecture, Loupe, Chevron } from '../components/Icones'
 
 type Compte = { id: string; pseudo: string; bio: string }
-type VideoResultat = { id: string; url: string; legende: string; vues: number }
+type VideoResultat = VideoApi
 
 export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => void }) {
   const [terme, setTerme] = useState('')
@@ -12,44 +11,45 @@ export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => voi
   const [videos, setVideos] = useState<VideoResultat[]>([])
   const [recherche, setRecherche] = useState(false)
   const [populaires, setPopulaires] = useState<VideoResultat[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
+  const [reprise, setReprise] = useState(0)
 
+  // L'API n'expose pas de classement : le fil public est trie par vues
+  // ici meme, ce qui suffit au volume d'une page.
   useEffect(() => {
-    if (MODE_DEMO) {
-      setPopulaires(
-        [...etatDemo.videos].sort((a, b) => b.vues - a.vues) as unknown as VideoResultat[],
-      )
-      return
-    }
-    supabase
-      .from('videos').select('id, url, legende, vues')
-      .order('vues', { ascending: false }).limit(12)
-      .then(({ data }) => setPopulaires((data ?? []) as VideoResultat[]))
-  }, [])
+    let valable = true
+    setChargement(true)
+    setErreur('')
+    apiVideos.liste({ limite: 50 })
+      .then(v => {
+        if (valable) setPopulaires([...v].sort((a, b) => b.vues - a.vues))
+      })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [reprise])
 
+  // Faute de route de recherche, les legendes sont filtrees sur le fil
+  // deja charge, et le pseudo est cherche a l'exact : /profils/:pseudo ne
+  // repond pas aux fragments.
   const chercher = async (e: FormEvent) => {
     e.preventDefault()
     const q = terme.trim()
     if (!q) return
     setRecherche(true)
+    setErreur('')
 
-    if (MODE_DEMO) {
-      const q2 = q.toLowerCase()
-      setComptes(comptesDemo.filter((c) => c.pseudo.includes(q2)))
-      setVideos(
-        etatDemo.videos.filter((v) =>
-          v.legende.toLowerCase().includes(q2),
-        ) as unknown as VideoResultat[],
-      )
-      return
+    const q2 = q.toLowerCase()
+    setVideos(populaires.filter(v => v.legende.toLowerCase().includes(q2)))
+
+    try {
+      const p = await apiInteractions.profil(q)
+      setComptes([{ id: p.id, pseudo: p.pseudo, bio: p.bio ?? '' }])
+    } catch {
+      // Aucun compte ne porte exactement ce pseudo : la section reste vide.
+      setComptes([])
     }
-
-    const [{ data: c }, { data: v }] = await Promise.all([
-      supabase.from('profils').select('id, pseudo, bio').ilike('pseudo', `%${q}%`).limit(20),
-      supabase.from('videos').select('id, url, legende, vues').ilike('legende', `%${q}%`).limit(20),
-    ])
-
-    setComptes((c ?? []) as Compte[])
-    setVideos((v ?? []) as VideoResultat[])
   }
 
   const reinitialiser = () => {
@@ -85,7 +85,10 @@ export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => voi
 
           <h2 style={{ fontSize: 15, marginBottom: 10 }}>Comptes</h2>
           {comptes.length === 0 ? (
-            <p style={{ color: 'var(--texte-attenue)', fontSize: 14 }}>Aucun compte trouvé</p>
+            <p style={{ color: 'var(--texte-attenue)', fontSize: 14 }}>
+              Aucun compte à ce pseudo. La recherche de comptes demande le
+              pseudo exact.
+            </p>
           ) : (
             comptes.map((c) => (
               <div className="resultat" key={c.id} onClick={() => onVisiter(c.pseudo)} style={{ cursor: 'pointer' }}>
@@ -117,7 +120,18 @@ export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => voi
       ) : (
         <>
           <h2 style={{ fontSize: 15, marginBottom: 12 }}>Vidéos populaires</h2>
-          {populaires.length === 0 ? (
+          {chargement ? (
+            <p style={{ color: 'var(--texte-attenue)', fontSize: 14 }}>Chargement…</p>
+          ) : erreur ? (
+            <div style={{ display: 'grid', justifyItems: 'start', gap: 12 }}>
+              <p role="alert" style={{ color: 'var(--texte-attenue)', fontSize: 14, margin: 0 }}>
+                {erreur}
+              </p>
+              <button className="lien" onClick={() => setReprise(n => n + 1)}>
+                Réessayer
+              </button>
+            </div>
+          ) : populaires.length === 0 ? (
             <p style={{ color: 'var(--texte-attenue)', fontSize: 14 }}>
               Aucune vidéo pour le moment
             </p>

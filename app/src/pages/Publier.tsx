@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
-import { supabase, MODE_DEMO } from '../lib/supabase'
-import { etatDemo, type BrouillonDemo } from '../lib/demo'
+import { apiBrouillons, apiVideos, type BrouillonApi } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { Camera } from '../components/Icones'
 import CreationCamera from '../components/CreationCamera'
@@ -70,56 +69,18 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
     if ((!fichier && !urlInitiale) || !session) return
     setEnvoi(true)
     setErreur('')
-    setProgression(10)
+    setProgression(30)
 
     try {
-      if (MODE_DEMO) {
-        // En demonstration la video reste locale (blob) : rien n'est televerse,
-        // mais elle apparait dans le fil comme une vraie publication.
-        setProgression(60)
-        const nouvelle = {
-          id: `v${Date.now()}`,
-          url: apercu,
-          legende: legende.trim(),
-          vues: 0,
-          auteur_id: 'demo',
-          profils: { pseudo: 'vous' },
-          aime: false,
-          nbAime: 0,
-          departement,
-        }
-        etatDemo.videos.unshift(nouvelle)
-        etatDemo.mesVideos.unshift(nouvelle)
-        setProgression(100)
-        setFichier(null)
-        setLegende('')
-        onPublie()
-        return
-      }
-
-      // Une video venue du montage n'existe que comme blob : on la relit pour
-      // obtenir le corps a televerser et son type reel.
-      const corps = fichier ?? await (await fetch(apercu)).blob()
-      const extension = fichier?.name.split('.').pop() ?? (corps.type.includes('mp4') ? 'mp4' : 'webm')
-      const chemin = `${session.user.id}/${Date.now()}.${extension}`
-
-      const { error: erreurEnvoi } = await supabase.storage
-        .from('videos')
-        .upload(chemin, corps, { contentType: corps.type })
-      if (erreurEnvoi) throw erreurEnvoi
-
-      setProgression(70)
-
-      const { data: pub } = supabase.storage.from('videos').getPublicUrl(chemin)
-
-      const { error: erreurBase } = await supabase.from('videos').insert({
-        auteur_id: session.user.id,
-        url: pub.publicUrl,
+      // L'API n'heberge pas de fichier : elle n'enregistre qu'une adresse.
+      // Celle-ci reste donc celle du blob local, lisible dans cet onglet
+      // seulement, exactement comme la version mobile qui envoie l'URI de
+      // l'appareil. Le televersement attend un service de stockage.
+      await apiVideos.creer({
+        url: apercu,
         legende: legende.trim(),
         departement,
       })
-      if (erreurBase) throw erreurBase
-
       setProgression(100)
       setFichier(null)
       setApercu('')
@@ -133,7 +94,26 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
     }
   }
 
-  const reprendre = (b: BrouillonDemo) => {
+  // Mise de cote : la video rejoint les brouillons du compte, avec son
+  // poids quand le fichier est connu.
+  const enregistrerBrouillon = async () => {
+    if (!apercu || envoi) return
+    setEnvoi(true)
+    setErreur('')
+    try {
+      await apiBrouillons.creer(apercu, legende.trim(), fichier?.size ?? 0)
+      setFichier(null)
+      setApercu('')
+      setLegende('')
+      setBrouillons(true)
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : "L'enregistrement a échoué")
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
+  const reprendre = (b: BrouillonApi) => {
     setApercu(b.url)
     setLegende(b.legende)
     setBrouillons(false)
@@ -144,7 +124,9 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
   if (couverture) return <Couverture url={apercu}
     onAnnuler={() => setCouverture(false)}
     onEnregistrer={() => setCouverture(false)} />
-  if (!fichier && !urlInitiale && !apercu) return <><CreationCamera onChoisir={choisir} onFermer={onFermer}/><button className="pub-brouillons" onClick={() => setBrouillons(true)}>Brouillons ({etatDemo.brouillons.length})</button>{erreur && <p role="alert" style={{position:'absolute',bottom:100,left:20,right:20,background:'#111',color:'white',padding:12,zIndex:5}}>{erreur}</p>}</>
+  // Le nombre de brouillons n'est plus affiche ici : il faudrait une
+  // requete pour un simple libelle, la grille le compte elle-meme.
+  if (!fichier && !urlInitiale && !apercu) return <><CreationCamera onChoisir={choisir} onFermer={onFermer}/><button className="pub-brouillons" onClick={() => setBrouillons(true)}>Brouillons</button>{erreur && <p role="alert" style={{position:'absolute',bottom:100,left:20,right:20,background:'#111',color:'white',padding:12,zIndex:5}}>{erreur}</p>}</>
   return (
     <div className="page">
       <h1 className="titre">Publier une vidéo</h1>
@@ -219,6 +201,11 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
 
           <button className="bouton" onClick={publier} disabled={envoi}>
             {envoi ? `Envoi… ${progression}%` : 'Publier'}
+          </button>
+
+          <button className="bouton secondaire" style={{ marginTop: 10 }}
+            disabled={envoi} onClick={enregistrerBrouillon}>
+            Enregistrer en brouillon
           </button>
 
           <button

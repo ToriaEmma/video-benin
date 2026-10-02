@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
-import { supabase, MODE_DEMO } from '../lib/supabase'
-import { etatDemo, comptesDemo } from '../lib/demo'
+import { useCallback, useEffect, useState } from 'react'
+import {
+  apiInteractions, apiMessagerie, apiVideos,
+  type ProfilDetaille, type VideoApi,
+} from '../lib/api'
 import { useAuth } from '../lib/auth'
 import {
   Chevron, Cloche, Fleche, Crayon, Menu, AjoutPersonne,
@@ -13,8 +15,6 @@ import Parametres from './Parametres'
 import ComptesProfil from '../components/ComptesProfil'
 import ModifierProfil from './ModifierProfil'
 import Solde from './Solde'
-
-type VideoProfil = { id: string; url: string; vues: number }
 
 type Props = {
   // Sans pseudoVisite, on affiche le profil du compte connecte. Avec, on
@@ -30,94 +30,143 @@ const abreger = (n: number) =>
   : String(n)
 
 export default function Profil({ pseudoVisite, onRetour }: Props) {
-  const { profil, deconnecter, session } = useAuth()
+  const { profil, deconnecter } = useAuth()
   const monProfil = !pseudoVisite || pseudoVisite === profil?.pseudo
 
-  const [videos, setVideos] = useState<VideoProfil[]>([])
-  const [nbSuivis, setNbSuivis] = useState(0)
-  const [nbAbonnes, setNbAbonnes] = useState(0)
-  const [nbAime, setNbAime] = useState(0)
+  const [videos, setVideos] = useState<VideoApi[]>([])
+  const [entete, setEntete] = useState<ProfilDetaille | null>(null)
   const [suivi, setSuivi] = useState(false)
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
+  // Incremente par le bouton de reprise : relance le chargement de l'entete et
+  // de la grille.
+  const [reprise, setReprise] = useState(0)
   const [menuOuvert, setMenuOuvert] = useState(false)
   const [edition, setEdition] = useState(false)
   const [soldeOuvert, setSoldeOuvert] = useState(false)
   const [parametresOuverts, setParametresOuverts] = useState(false)
   const [comptesOuverts, setComptesOuverts] = useState(false)
   const [onglet, setOnglet] = useState<'videos' | 'privees' | 'repartages' | 'favoris' | 'aimees'>('videos')
-  useEffect(() => { setOnglet('videos'); setSuivi(false) }, [pseudoVisite])
-
-  const compteVisite = pseudoVisite
-    ? comptesDemo.find((c) => c.pseudo === pseudoVisite)
-    : null
+  useEffect(() => { setOnglet('videos') }, [pseudoVisite])
 
   const pseudo = monProfil ? profil?.pseudo ?? '' : pseudoVisite ?? ''
-  const bio = monProfil
-    ? profil?.bio ?? ''
-    : compteVisite?.bio ?? ''
+  // La bio de l'entete fait foi : c'est celle que le serveur renvoie, pour
+  // son propre compte comme pour celui qu'on visite.
+  const bio = entete?.bio ?? (monProfil ? profil?.bio ?? '' : '')
+  const nbSuivis = entete?.nbSuivis ?? 0
+  const nbAbonnes = entete?.nbAbonnes ?? 0
+
+  // Les compteurs et la relation d'abonnement viennent de la meme route :
+  // un seul aller-retour sert l'entete entiere.
+  useEffect(() => {
+    if (!pseudo) return
+    let valable = true
+    setChargement(true)
+    setErreur('')
+    Promise.all([apiInteractions.profil(pseudo), apiVideos.duProfil(pseudo)])
+      .then(([p, v]) => {
+        if (!valable) return
+        setEntete(p)
+        setSuivi(p.suivi)
+        setVideos(v)
+      })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [pseudo, reprise])
+
+  // Favoris et « J'aime » ne concernent que son propre compte : ce sont des
+  // listes personnelles, le serveur les refuse pour un autre profil.
+  const [listeOnglet, setListeOnglet] = useState<VideoApi[]>([])
+  const [chargementOnglet, setChargementOnglet] = useState(false)
+  const [erreurOnglet, setErreurOnglet] = useState('')
+  const [repriseOnglet, setRepriseOnglet] = useState(0)
 
   useEffect(() => {
-    if (!session) return
+    if (!monProfil || (onglet !== 'favoris' && onglet !== 'aimees')) return
+    let valable = true
+    setChargementOnglet(true)
+    setErreurOnglet('')
+    const demande = onglet === 'favoris'
+      ? apiInteractions.favoris()
+      : apiInteractions.jaimees()
+    demande
+      .then(v => { if (valable) setListeOnglet(v) })
+      .catch((e: Error) => { if (valable) setErreurOnglet(e.message) })
+      .finally(() => { if (valable) setChargementOnglet(false) })
+    return () => { valable = false }
+  }, [monProfil, onglet, repriseOnglet])
 
-    if (MODE_DEMO) {
-      if (monProfil) {
-        setVideos(etatDemo.mesVideos as unknown as VideoProfil[])
-        setNbSuivis(0)
-        setNbAbonnes(0)
-        setNbAime(etatDemo.mesVideos.reduce((t, v) => t + v.nbAime, 0))
-      } else {
-        const siennes = etatDemo.videos.filter((v) => v.profils?.pseudo === pseudoVisite)
-        setVideos(siennes as unknown as VideoProfil[])
-        setNbSuivis(23)
-        setNbAbonnes(3418)
-        setNbAime(siennes.reduce((t, v) => t + v.nbAime, 0))
-      }
-      return
-    }
+  // Le total des j'aime recus se somme sur les publications affichees : le
+  // serveur ne renvoie pas d'agregat par compte.
+  const nbAime = videos.reduce((t, v) => t + v.nbAime, 0)
 
-    const id = session.user.id
+  // Contenu de la grille selon l'onglet. L'onglet prive filtre la liste deja
+  // chargee, les deux listes personnelles ont leur propre route.
+  const grille = onglet === 'privees'
+    ? videos.filter(v => v.visibilite === 'moi')
+    : onglet === 'favoris' || onglet === 'aimees' ? listeOnglet
+    : onglet === 'repartages' ? []
+    : videos
 
-    supabase
-      .from('videos').select('id, url, vues')
-      .eq('auteur_id', id).order('publiee_le', { ascending: false })
-      .then(({ data }) => setVideos((data ?? []) as VideoProfil[]))
+  const videsOnglet = onglet === 'privees' ? 'Aucune vidéo privée'
+    : onglet === 'favoris' ? 'Aucune vidéo enregistrée'
+    : onglet === 'aimees' ? 'Aucune vidéo aimée'
+    : monProfil ? "Vous n'avez pas encore publié de vidéo"
+    : 'Aucune vidéo publiée'
 
-    supabase
-      .from('abonnements').select('*', { count: 'exact', head: true })
-      .eq('createur_id', id)
-      .then(({ count }) => setNbAbonnes(count ?? 0))
-
-    supabase
-      .from('abonnements').select('*', { count: 'exact', head: true })
-      .eq('abonne_id', id)
-      .then(({ count }) => setNbSuivis(count ?? 0))
-
-    supabase
-      .from('videos').select('id').eq('auteur_id', id)
-      .then(async ({ data }) => {
-        const ids = (data ?? []).map((v) => v.id)
-        if (ids.length === 0) return setNbAime(0)
-        const { count } = await supabase
-          .from('jaime').select('*', { count: 'exact', head: true }).in('video_id', ids)
-        setNbAime(count ?? 0)
-      })
-  }, [session, monProfil, pseudoVisite])
+  // L'appui long supprime, mais seulement ses propres publications : le
+  // serveur refuserait les favoris d'un autre compte.
+  const supprimable = monProfil && (onglet === 'videos' || onglet === 'privees')
 
   const supprimer = async (id: string) => {
     if (!monProfil) return
     if (!confirm('Supprimer cette vidéo ?')) return
-    if (MODE_DEMO) {
-      etatDemo.videos = etatDemo.videos.filter((v) => v.id !== id)
-      etatDemo.mesVideos = etatDemo.mesVideos.filter((v) => v.id !== id)
-      setVideos((l) => l.filter((v) => v.id !== id))
-      return
+    const avant = videos
+    setVideos(l => l.filter(v => v.id !== id))
+    try {
+      await apiVideos.supprimer(id)
+    } catch (err) {
+      setVideos(avant)
+      setErreur(err instanceof Error ? err.message : 'Suppression impossible')
     }
-    await supabase.from('videos').delete().eq('id', id)
-    setVideos((l) => l.filter((v) => v.id !== id))
   }
 
-  const basculerSuivi = () => {
-    setSuivi((s) => !s)
-    setNbAbonnes((n) => n + (suivi ? -1 : 1))
+  // Abonnement optimiste : le bouton change tout de suite, et revient en
+  // arriere si le serveur refuse.
+  const basculerSuivi = useCallback(() => {
+    const vise = !suivi
+    setSuivi(vise)
+    setEntete(e => e && { ...e, nbAbonnes: e.nbAbonnes + (vise ? 1 : -1) })
+    const envoi = vise
+      ? apiInteractions.suivre(pseudo)
+      : apiInteractions.nePlusSuivre(pseudo)
+    envoi
+      .then(r => setSuivi(r.suivi))
+      .catch((e: Error) => {
+        setSuivi(!vise)
+        setEntete(p => p && { ...p, nbAbonnes: p.nbAbonnes + (vise ? -1 : 1) })
+        setErreur(e.message)
+      })
+  }, [pseudo, suivi])
+
+  // La conversation est bien creee cote serveur ; l'ecran des messages
+  // n'etant pas atteignable d'ici, on indique ou la retrouver plutot que
+  // de pretendre l'ouvrir.
+  const [ouvertureMessage, setOuvertureMessage] = useState(false)
+  const [avisMessage, setAvisMessage] = useState('')
+
+  const ouvrirMessage = async () => {
+    setOuvertureMessage(true)
+    setAvisMessage('')
+    try {
+      await apiMessagerie.ouvrirConversation(pseudo)
+      setAvisMessage(`Conversation avec @${pseudo} ouverte : retrouve-la dans l’onglet Messages.`)
+    } catch (err) {
+      setAvisMessage(err instanceof Error ? err.message : 'Ouverture impossible')
+    } finally {
+      setOuvertureMessage(false)
+    }
   }
 
   if (monProfil && !profil) return <div className="chargement">Chargement…</div>
@@ -184,16 +233,22 @@ export default function Profil({ pseudoVisite, onRetour }: Props) {
           >
             {suivi ? 'Abonné' : 'Suivre'}
           </button>
-          <button className="secondaire" disabled title="Disponible prochainement">
-            Message
+          <button className="secondaire" disabled={ouvertureMessage}
+            onClick={ouvrirMessage}>
+            {ouvertureMessage ? 'Ouverture…' : 'Message'}
           </button>
           <button className="carre" aria-label="Suggestions"><AjoutPersonne taille={20} plein /></button>
         </div>
       )}
 
+      {avisMessage && <p className="profil-avis" role="status">{avisMessage}</p>}
+
       {/* Bio */}
       {bio && <div className="profil-bio">{bio}</div>}
-      {monProfil && <button className="profil-studio" disabled title="Disponible prochainement">
+      {/* Le studio reposerait sur des statistiques d'audience que l'API ne
+          produit pas : le bouton reste inerte et le dit. */}
+      {monProfil && <button className="profil-studio" disabled
+        title="Le studio attend les statistiques d’audience, que l’API ne calcule pas encore">
         <Studio taille={18} /> Studio créateur
       </button>}
 
@@ -237,19 +292,34 @@ export default function Profil({ pseudoVisite, onRetour }: Props) {
         {!monProfil && <button className={onglet === 'repartages' ? 'actif' : ''} onClick={() => setOnglet('repartages')} aria-label="Repartages"><Repartage taille={22} /></button>}
       </div>
 
-      {/* Grille */}
-      {onglet !== 'videos' ? (
-        <div style={{ textAlign: 'center', color: 'var(--texte-attenue)', padding: '40px 20px', fontSize: 14 }}>
-          {onglet === 'privees' ? 'Aucune vidéo privée' : onglet === 'repartages' ? 'Aucune vidéo repartagée' : onglet === 'favoris' ? 'Aucune vidéo enregistrée' : 'Aucune vidéo aimée'}
+      {/* Grille. Les publications privees se deduisent de la visibilite
+          « moi » : elles sont deja dans la liste du profil. Les repartages
+          n'existent pas dans le schema, d'ou le message explicite. */}
+      {chargement ? (
+        <p className="profil-etat">Chargement…</p>
+      ) : erreur ? (
+        <div className="profil-echec">
+          <p role="alert">{erreur}</p>
+          <button onClick={() => setReprise(n => n + 1)}>Réessayer</button>
         </div>
-      ) : videos.length === 0 ? (
-        <div style={{ textAlign: 'center', color: 'var(--texte-attenue)', padding: '40px 20px', fontSize: 14 }}>
-          {monProfil ? "Vous n'avez pas encore publié de vidéo" : 'Aucune vidéo publiée'}
+      ) : onglet === 'repartages' ? (
+        <p className="profil-etat">
+          Tok 229 n’enregistre pas encore les repartages : rien à lister ici.
+        </p>
+      ) : (onglet === 'favoris' || onglet === 'aimees') && chargementOnglet ? (
+        <p className="profil-etat">Chargement…</p>
+      ) : (onglet === 'favoris' || onglet === 'aimees') && erreurOnglet ? (
+        <div className="profil-echec">
+          <p role="alert">{erreurOnglet}</p>
+          <button onClick={() => setRepriseOnglet(n => n + 1)}>Réessayer</button>
         </div>
+      ) : grille.length === 0 ? (
+        <p className="profil-etat">{videsOnglet}</p>
       ) : (
         <div className="grille">
-          {videos.map((v) => (
-            <div className="case" key={v.id} onClick={() => supprimer(v.id)}>
+          {grille.map((v) => (
+            <div className="case" key={v.id}
+              onClick={() => { if (supprimable) supprimer(v.id) }}>
               <video src={v.url} preload="metadata" muted playsInline />
               <span className="vues"><Lecture taille={11} /> {abreger(v.vues)}</span>
             </div>
@@ -257,7 +327,7 @@ export default function Profil({ pseudoVisite, onRetour }: Props) {
         </div>
       )}
 
-      {monProfil && videos.length > 0 && (
+      {supprimable && grille.length > 0 && (
         <p style={{ fontSize: 12, color: 'var(--texte-attenue)', marginTop: 12, textAlign: 'center' }}>
           Appuyez sur une vidéo pour la supprimer
         </p>

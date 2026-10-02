@@ -16,6 +16,10 @@
 .commentaires-feuille .feuille-pied input{background:transparent;min-width:0;width:100%;padding:12px;font-size:14px;color:#111;outline:none;}
 .commentaires-feuille .feuille-pied button{color:#111;padding:0 5px;display:grid;place-items:center;}
 .commentaire-mention{font-size:26px;}.commentaires-message{color:#888;font-size:12px;padding:0 16px 12px;}
+/* Echec de chargement du fil : le message du serveur et sa reprise. */
+.commentaires-echec{display:grid;justify-items:center;gap:12px;padding:28px 16px;text-align:center;}
+.commentaires-echec p{margin:0;font-size:14px;color:#888;}
+.commentaires-echec button{min-height:38px;padding:0 20px;border:1px solid #ddd;border-radius:19px;font-size:14px;font-weight:600;color:#111;}
 .app:has(.commentaires-feuille)>.nav{display:none;}
 .fil-ecran:has(.commentaires-feuille) .fil-entete{display:none;}
 .fil-ecran:has(.commentaires-feuille) .fil{overflow:hidden;}

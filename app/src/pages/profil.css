@@ -115,3 +115,10 @@
 .app:has(.page-profil)>.nav{background:white;color:#111;border-top-color:#e8e8e8;--texte:#111;--texte-attenue:#777;}
 .page-profil button:focus-visible{outline:2px solid #ff2856;outline-offset:3px;}
 @media(max-width:350px){.profil-avatar-zone,.page-profil .profil-avatar{width:82px;height:82px}.profil-personnel .profil-avatar{width:74px;height:74px}.page-profil .profil-stats .bloc span{font-size:11px}.page-profil .profil-stats .bloc b{font-size:15px}.profil-note{font-size:9px;left:0;right:0}}
+/* Attente et echec du chargement du profil. */
+.profil-etat{text-align:center;color:var(--texte-attenue);padding:40px 20px;font-size:14px;margin:0;}
+.profil-echec{display:grid;justify-items:center;gap:12px;padding:40px 20px;text-align:center;}
+.profil-echec p{margin:0;font-size:14px;color:var(--texte-attenue);}
+.profil-echec button{min-height:40px;padding:0 22px;border:1px solid var(--bordure);border-radius:20px;color:var(--texte);font-size:14px;font-weight:600;}
+/* Confirmation d'ouverture d'une conversation. */
+.profil-avis{margin:8px 16px 0;font-size:13px;color:var(--texte-attenue);text-align:center;}

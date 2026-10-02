@@ -14,7 +14,7 @@ import { Accueil, Amis, Messages as IconeMessages, Plus, Personne } from './comp
 type Onglet = 'fil' | 'decouvrir' | 'publier' | 'profil' | 'messages'
 
 function Application() {
-  const { session, chargement } = useAuth()
+  const { session, profil, chargement } = useAuth()
   const [onglet, setOnglet] = useState<Onglet>('fil')
   // Remonter cette cle force le fil a se reconstruire apres une publication,
   // pour que la nouvelle video apparaisse sans rechargement de la page.
@@ -52,7 +52,7 @@ function Application() {
             ? montage
               ? <Montage
                   url={videoChoisie}
-                  pseudo={session.user.email?.split('@')[0] ?? 'vous'}
+                  pseudo={profil?.pseudo ?? 'vous'}
                   onRetour={() => { setMontage(false); setVideoChoisie(null) }}
                   onSuivant={() => setMontage(false)}
                 />

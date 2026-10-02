@@ -175,8 +175,11 @@ export default function Parametres({
         <h1>{selection}</h1>
         <span />
       </header>
+      {/* Dernier filet : toutes les sections listees ont leur ecran ou
+          leur fiche. Celle-ci n'en a pas, le dire vaut mieux que de
+          promettre une date. */}
       <p className="param-indisponible" role="status">
-        Cette section sera disponible prochainement.
+        Cette section n’a pas encore de réglage à proposer.
       </p>
     </div>
   }

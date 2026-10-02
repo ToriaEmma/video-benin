@@ -50,3 +50,8 @@
 .msg-redaction button{width:38px;height:38px;border-radius:50%;background:#ff2856;color:#fff;display:grid;place-items:center;flex-shrink:0;}
 .msg-redaction button:disabled{background:#f7adbf;cursor:default;}
 .msg-page button:focus-visible{outline:2px solid #555;outline-offset:2px;}
+/* Echec de chargement de la boite ou d'un fil, et refus d'un envoi. */
+.msg-echec{display:grid;justify-items:center;gap:12px;padding:30px 20px;text-align:center;}
+.msg-echec p{margin:0;font-size:14px;color:#999;}
+.msg-echec button{min-height:40px;padding:0 22px;border:1px solid var(--bordure);border-radius:20px;color:var(--texte);font-size:14px;font-weight:600;}
+.msg-erreur-envoi{margin:0 14px 6px;font-size:13px;color:#d33;text-align:center;}

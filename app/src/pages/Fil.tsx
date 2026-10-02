@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
-import { supabase, MODE_DEMO } from '../lib/supabase'
-import { etatDemo, type VideoDemo } from '../lib/demo'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { apiInteractions, apiVideos, type VideoApi } from '../lib/api'
+import { type VideoDemo } from '../lib/demo'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../components/Commentaires'
 import EnvoyerA from '../components/EnvoyerA'
@@ -11,63 +11,35 @@ import { Film } from '../components/Icones'
 import { Loupe } from '../components/Icones'
 import './fil.css'
 
-export type Video = {
-  id: string
-  url: string
-  legende: string
-  vues: number
-  auteur_id: string
-  profils: { pseudo: string; avatar_url?: string | null } | null
-}
+export type Video = VideoApi
 
 const abreger = (n: number) =>
   n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)} M`
   : n >= 1_000 ? `${(n / 1_000).toFixed(1)} K`
   : String(n)
 
-function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVisiter: (p: string) => void }) {
-  const { session, profil } = useAuth()
+function Carte({ video, actif, onVisiter, onErreur }: {
+  video: Video
+  actif: boolean
+  onVisiter: (p: string) => void
+  // Un j'aime ou un favori refuse remonte a l'ecran, qui l'affiche en
+  // bandeau : la carte continue de se lire.
+  onErreur: (message: string) => void
+}) {
+  const { profil } = useAuth()
   const ref = useRef<HTMLVideoElement>(null)
-  const [aime, setAime] = useState(false)
-  const [nbAime, setNbAime] = useState(0)
-  const [nbCom, setNbCom] = useState(0)
+  // Les compteurs arrivent deja dans la video : aucune requete de plus a
+  // l'affichage d'une carte.
+  const [aime, setAime] = useState(video.aime)
+  const [nbAime, setNbAime] = useState(video.nbAime)
+  const [nbCom, setNbCom] = useState(video.nbCommentaires)
+  const [favori, setFavori] = useState(video.favori)
   const [ouvrirCom, setOuvrirCom] = useState(false)
   const [envoyer, setEnvoyer] = useState(false)
-  const [vueComptee, setVueComptee] = useState(false)
   const [pause, setPause] = useState(true)
   const [progression, setProgression] = useState(0)
-  const [favori, setFavori] = useState(false)
   const [developpe, setDeveloppe] = useState(false)
   const [analyse, setAnalyse] = useState(false)
-
-  useEffect(() => {
-    if (MODE_DEMO) {
-      const d = etatDemo.videos.find((v) => v.id === video.id)
-      setNbAime(d?.nbAime ?? 0)
-      setAime(d?.aime ?? false)
-      setNbCom(etatDemo.commentaires.filter((c) => c.video_id === video.id).length)
-      return
-    }
-    let annule = false
-    const charger = async () => {
-      const [{ count: likes }, { count: coms }] = await Promise.all([
-        supabase.from('jaime').select('*', { count: 'exact', head: true }).eq('video_id', video.id),
-        supabase.from('commentaires').select('*', { count: 'exact', head: true }).eq('video_id', video.id),
-      ])
-      if (annule) return
-      setNbAime(likes ?? 0)
-      setNbCom(coms ?? 0)
-
-      if (session) {
-        const { data } = await supabase
-          .from('jaime').select('video_id')
-          .eq('video_id', video.id).eq('profil_id', session.user.id).maybeSingle()
-        if (!annule) setAime(Boolean(data))
-      }
-    }
-    charger()
-    return () => { annule = true }
-  }, [video.id, session])
 
   // La lecture ne demarre que sur la carte visible : lire les autres en fond
   // consommerait des donnees pour rien, ce qui est le premier critere produit
@@ -77,44 +49,71 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
     if (!el) return
     if (actif) {
       el.play().catch(() => undefined)
-      if (!vueComptee) {
-        if (!MODE_DEMO) supabase.rpc('incrementer_vues', { id_video: video.id })
-        setVueComptee(true)
-      }
     } else {
       el.pause()
       el.currentTime = 0
     }
-  }, [actif, video.id, vueComptee])
+  }, [actif])
 
-  const basculerAime = async () => {
-    if (!session) return
-    if (MODE_DEMO) {
-      const d = etatDemo.videos.find((v) => v.id === video.id)
-      if (d) { d.aime = !aime; d.nbAime += aime ? -1 : 1 }
-      setAime(!aime)
-      setNbAime((n) => n + (aime ? -1 : 1))
-      return
-    }
-    if (aime) {
-      setAime(false); setNbAime((n) => n - 1)
-      await supabase.from('jaime').delete()
-        .eq('video_id', video.id).eq('profil_id', session.user.id)
-    } else {
-      setAime(true); setNbAime((n) => n + 1)
-      await supabase.from('jaime').insert({ video_id: video.id, profil_id: session.user.id })
-    }
+  // La vue part quand la carte devient celle qu'on regarde, et non a chaque
+  // rendu. L'echec est silencieux : rater un comptage ne doit pas
+  // interrompre le visionnage.
+  useEffect(() => {
+    if (!actif) return
+    apiVideos.vue(video.id).catch(() => { /* Compteur de vues indisponible. */ })
+  }, [actif, video.id])
+
+  // Le serveur renvoie le decompte reel : on l'affiche d'abord de maniere
+  // optimiste, puis on se recale dessus, et on revient en arriere si la
+  // requete echoue.
+  const basculerAime = () => {
+    const vise = !aime
+    setAime(vise)
+    setNbAime(n => n + (vise ? 1 : -1))
+    const envoi = vise
+      ? apiInteractions.aimer(video.id)
+      : apiInteractions.retirerJaime(video.id)
+    envoi
+      .then(r => { setAime(r.aime); setNbAime(r.nbAime) })
+      .catch((e: Error) => {
+        setAime(!vise)
+        setNbAime(n => n + (vise ? -1 : 1))
+        onErreur(e.message)
+      })
   }
 
-  const pseudo = video.profils?.pseudo ?? 'inconnu'
+  const basculerFavori = () => {
+    const vise = !favori
+    setFavori(vise)
+    const envoi = vise
+      ? apiInteractions.mettreEnFavori(video.id)
+      : apiInteractions.retirerFavori(video.id)
+    envoi
+      .then(r => setFavori(r.favori))
+      .catch((e: Error) => { setFavori(!vise); onErreur(e.message) })
+  }
 
-  // L'analyse attend la forme de demonstration : hors mode demo, les
-  // compteurs deja charges la completent.
+  const pseudo = video.pseudo
+
+  // L'analyse attend la forme de demonstration : la video de l'API la
+  // remplit, `publieeLe` passant de l'ISO au « mois-jour » qu'elle lit.
   if (analyse) {
-    const demo = etatDemo.videos.find(v => v.id === video.id)
-    const sujet: VideoDemo = demo ?? {
-      ...video, aime, nbAime, nbCommentaires: nbCom,
-      departement: '', profils: video.profils,
+    const date = new Date(video.publieeLe)
+    const sujet: VideoDemo = {
+      id: video.id,
+      url: video.url,
+      legende: video.legende,
+      vues: video.vues,
+      auteur_id: video.auteurId,
+      profils: { pseudo },
+      aime,
+      nbAime,
+      nbCommentaires: nbCom,
+      departement: video.departement ?? '',
+      visibilite: video.visibilite,
+      commentairesAutorises: video.commentairesAutorises,
+      reutilisationAutorisee: video.reutilisationAutorisee,
+      publieeLe: `${date.getMonth() + 1}-${date.getDate()}`,
     }
     return <AnalyseVideo video={sujet} onRetour={() => setAnalyse(false)} />
   }
@@ -158,8 +157,8 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
           <span className="glyphe"><svg width="34" height="34" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M19 2a1 1 0 0 1 1.7-.7l11 11a2 2 0 0 1 0 2.8l-11 11A1 1 0 0 1 19 25.4V19C10 18 5 21 1.8 25.5c-.7 1-1.8.5-1.7-.6C.8 14 7.1 8.5 19 8V2Z"/></svg></span>
           <span>Partager</span>
         </button>
-        <button className="action fil-favori" aria-label={favori ? 'Retirer des favoris' : 'Enregistrer en favori'} aria-pressed={favori} onClick={() => setFavori(!favori)}><svg width="27" height="32" viewBox="0 0 24 28" fill={favori ? '#ffd15b' : 'white'} aria-hidden="true"><path d="M5 2h14a2 2 0 0 1 2 2v22l-9-6-9 6V4a2 2 0 0 1 2-2Z"/></svg><span>{favori ? 'Enregistré' : 'Favoris'}</span></button>
-        <span className={`fil-disque${actif && !pause ? ' tourne' : ''}`} role="img" aria-label={`Son de ${pseudo}`}>{video.profils?.avatar_url ? <img src={video.profils.avatar_url} alt=""/> : <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2" fill="currentColor"/><ellipse cx="17" cy="16" rx="3" ry="2" fill="currentColor"/></svg>}</span>
+        <button className="action fil-favori" aria-label={favori ? 'Retirer des favoris' : 'Enregistrer en favori'} aria-pressed={favori} onClick={basculerFavori}><svg width="27" height="32" viewBox="0 0 24 28" fill={favori ? '#ffd15b' : 'white'} aria-hidden="true"><path d="M5 2h14a2 2 0 0 1 2 2v22l-9-6-9 6V4a2 2 0 0 1 2-2Z"/></svg><span>{favori ? 'Enregistré' : 'Favoris'}</span></button>
+        <span className={`fil-disque${actif && !pause ? ' tourne' : ''}`} role="img" aria-label={`Son de ${pseudo}`}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2" fill="currentColor"/><ellipse cx="17" cy="16" rx="3" ry="2" fill="currentColor"/></svg></span>
       </div>
 
       <div className="infos">
@@ -172,7 +171,7 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
         <Commentaires
           videoId={video.id}
           onFermer={() => setOuvrirCom(false)}
-          onAjout={() => setNbCom((n) => n + 1)}
+          onVariation={(n) => setNbCom((c) => Math.max(0, c + n))}
         />
       )}
 
@@ -195,25 +194,36 @@ export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string
   const [categorie, setCategorie] = useState('Pour toi')
   const [videos, setVideos] = useState<Video[]>([])
   const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
+  // Erreur d'une interaction, distincte de celle du chargement : elle
+  // s'affiche en bandeau sans vider le fil.
+  const [erreurAction, setErreurAction] = useState('')
   const [indexActif, setIndexActif] = useState(0)
   const filRef = useRef<HTMLDivElement>(null)
 
+  // « Suivis » et « Pour toi » lisent deux routes distinctes : le
+  // chargement se relance donc au changement d'onglet.
+  const suivis = categorie === 'Suivis'
+
+  // Compteur de rechargement : l'incrementer relance l'effet, ce qui evite
+  // de dupliquer la requete entre le montage et le bouton de reprise.
+  const [reprise, setReprise] = useState(0)
+  const charger = useCallback(() => setReprise(n => n + 1), [])
+
   useEffect(() => {
-    if (MODE_DEMO) {
-      setVideos(etatDemo.videos as unknown as Video[])
-      setChargement(false)
-      return
-    }
-    supabase
-      .from('videos')
-      .select('id, url, legende, vues, auteur_id, profils(pseudo, avatar_url)')
-      .order('publiee_le', { ascending: false })
-      .limit(30)
-      .then(({ data }) => {
-        setVideos((data ?? []) as unknown as Video[])
-        setChargement(false)
-      })
-  }, [])
+    // Seuls les deux onglets de fil interrogent l'API : Communaute et
+    // le LIVE portent leurs propres contenus.
+    if (!suivis && categorie !== 'Pour toi') return
+    let valable = true
+    setChargement(true)
+    setErreur('')
+    const demande = suivis ? apiVideos.suivis() : apiVideos.liste()
+    demande
+      .then(v => { if (valable) { setVideos(v); setIndexActif(0) } })
+      .catch((e: Error) => { if (valable) { setErreur(e.message); setVideos([]) } })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [categorie, suivis, reprise])
 
   // Carte de la mosaique « Communauté » : le fil bascule sur « Pour toi » et
   // s'ouvre sur la video touchee. Le defilement attend le rendu du fil, qui
@@ -239,29 +249,48 @@ export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string
     if (i !== indexActif) setIndexActif(i)
   }
 
-  if (chargement) return <div className="chargement">Chargement…</div>
-
-  if (videos.length === 0)
-    return (
-      <div className="vide">
-        <span className="glyphe"><Film taille={46} /></span>
-        <b>Aucune vidéo pour le moment</b>
-        <span>Soyez le premier à publier</span>
-      </div>
-    )
-
   // Le LIVE porte sa propre entete et sa croix de sortie : il prend tout
   // l'ecran, la barre des categories ne se superpose pas.
   if (categorie === 'LIVE')
     return <DirectLive onFermer={() => setCategorie('Pour toi')} />
 
+  // Un fil vide et un fil en panne se ressemblent a l'ecran : le message du
+  // serveur distingue les deux, et le bouton permet de retenter sans
+  // quitter l'onglet.
+  const corps = chargement ? (
+    <div className="fil-attente"><p>Chargement…</p></div>
+  ) : erreur ? (
+    <div className="fil-attente">
+      <p role="alert">{erreur}</p>
+      <button className="fil-reessayer" onClick={charger}>Réessayer</button>
+    </div>
+  ) : videos.length === 0 ? (
+    <div className="vide">
+      <span className="glyphe"><Film taille={46} /></span>
+      <b>{suivis ? 'Aucune vidéo de tes abonnements' : 'Aucune vidéo pour le moment'}</b>
+      <span>{suivis
+        ? 'Abonne-toi à des comptes pour remplir ce fil'
+        : 'Soyez le premier à publier'}</span>
+    </div>
+  ) : (
+    <div className="fil" ref={filRef} onScroll={auDefilement}>
+      {videos.map((v, i) => (
+        <Carte key={v.id} video={v} actif={i === indexActif}
+          onVisiter={onVisiter} onErreur={setErreurAction} />
+      ))}
+    </div>
+  )
+
   return (
     <div className="fil-ecran"><header className="fil-entete"><button aria-label="Vidéos LIVE" onClick={() => setCategorie('LIVE')}><svg width="27" height="27" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 2 5 5 5-5M3 12V8h22v4M3 23v3h22v-3"/><text x="14" y="20" textAnchor="middle" fill="currentColor" stroke="none" fontSize="10" fontWeight="700">LIVE</text></svg></button><div>{['Communauté','Suivis','Pour toi'].map(c => <button key={c} className={categorie===c?'actif':''} onClick={() => setCategorie(c)}>{c}</button>)}</div><button aria-label="Rechercher" onClick={onRechercher}><Loupe taille={25}/></button></header>
-    {categorie === 'Communauté' ? <Communaute onOuvrir={ouvrirDepuisMosaique} />
-    : categorie !== 'Pour toi' ? <div className="fil-attente"><p>Le fil de tes abonnements sera disponible prochainement.</p></div> : <div className="fil" ref={filRef} onScroll={auDefilement}>
-      {videos.map((v, i) => (
-        <Carte key={v.id} video={v} actif={i === indexActif} onVisiter={onVisiter} />
-      ))}
-    </div>}</div>
+    {categorie === 'Communauté' ? <Communaute onOuvrir={ouvrirDepuisMosaique} /> : corps}
+
+    {/* Un j'aime ou un favori refuse par le serveur se signale ici : la
+        video continue de se lire, seul le bandeau apparait. */}
+    {erreurAction && (
+      <button className="fil-bandeau" onClick={() => setErreurAction('')}>
+        {erreurAction}
+      </button>
+    )}</div>
   )
 }

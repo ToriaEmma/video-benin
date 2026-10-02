@@ -81,7 +81,7 @@ const ACTIONS: Action[] = [
 ]
 
 // Cles qui passent par le partage du navigateur plutot que par un
-// message « disponible prochainement ».
+// message d'indisponibilite.
 const PARTAGEABLES = ['lien', 'whatsapp', 'status', 'telegram', 'ephemere', 'republier']
 
 export default function EnvoyerA({
@@ -135,7 +135,9 @@ export default function EnvoyerA({
     if (PARTAGEABLES.includes(cle)) { void partager(); return }
     if (cle === 'supprimer') { onFermer(); onSupprimer?.(); return }
     if (cle === 'stats' && onAnalytiques) { onFermer(); onAnalytiques(); return }
-    annoncer(`${nom} : disponible prochainement.`)
+    // Duo, collage, stickers, promotion : autant de traitements video et
+    // de regies publicitaires que l'API Tok 229 ne couvre pas.
+    annoncer(`${nom} : cette fonction n’existe pas dans Tok 229.`)
   }
 
   return (
