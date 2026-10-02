@@ -585,3 +585,101 @@ etatDemo.brouillons = [
     date: LANCEMENT - MINUTE * 60 * 24 * 9,
   },
 ]
+
+// ============================================================
+// Reglages de « Parametres et confidentialite »
+//
+// Ils sont ranges a part des donnees de demonstration : ce sont des
+// choix de l'utilisateur, pas du contenu, et ils doivent survivre a un
+// rechargement de la page.
+// ============================================================
+
+export type Reglages = {
+  // --- Notifications ---
+  notifJaime: boolean
+  notifCommentaires: boolean
+  notifAbonnes: boolean
+  notifMentions: boolean
+  notifSuggestions: boolean
+  notifLive: boolean
+  notifMessages: boolean
+  notifRappels: boolean
+  // --- Visibilite ---
+  comptePrive: boolean
+  // --- Securite ---
+  doubleFacteur: boolean
+  alertesConnexion: boolean
+  // --- Preferences ---
+  langue: 'fr' | 'fon' | 'yo' | 'en'
+  theme: 'clair' | 'sombre' | 'systeme'
+  tailleTexte: 'petit' | 'normal' | 'grand'
+  economieDonnees: boolean
+  // --- Reglages des sections encore informatives ---
+  lectureAuto: boolean
+  boucle: boolean
+  sonDemarrage: boolean
+  animationsReduites: boolean
+  sousTitresAuto: boolean
+  pubPersonnalisees: boolean
+  rappelPause: boolean
+  syncContacts: boolean
+  localisation: boolean
+  telechargementWifi: boolean
+  filtreCommentaires: boolean
+}
+
+export const reglagesDefaut: Reglages = {
+  notifJaime: true,
+  notifCommentaires: true,
+  notifAbonnes: true,
+  notifMentions: true,
+  notifSuggestions: true,
+  notifLive: true,
+  notifMessages: true,
+  notifRappels: false,
+  comptePrive: false,
+  doubleFacteur: false,
+  alertesConnexion: true,
+  langue: 'fr',
+  theme: 'systeme',
+  tailleTexte: 'normal',
+  economieDonnees: false,
+  lectureAuto: true,
+  boucle: true,
+  sonDemarrage: true,
+  animationsReduites: false,
+  sousTitresAuto: false,
+  pubPersonnalisees: true,
+  rappelPause: false,
+  syncContacts: false,
+  localisation: false,
+  telechargementWifi: true,
+  filtreCommentaires: true,
+}
+
+const CLE_REGLAGES = 'tok229-reglages'
+
+// On repart toujours des valeurs par defaut et on ne reprend que les
+// cles connues : un reglage ajoute depuis la derniere visite serait
+// sinon absent de l'objet relu.
+const reglagesLus = (): Reglages => {
+  const fusion = { ...reglagesDefaut } as Record<string, unknown>
+  try {
+    const brut = localStorage.getItem(CLE_REGLAGES)
+    if (brut) {
+      const lus = JSON.parse(brut) as Record<string, unknown>
+      for (const cle of Object.keys(reglagesDefaut)) {
+        if (cle in lus) fusion[cle] = lus[cle]
+      }
+    }
+  } catch { /* stockage indisponible : les valeurs par defaut suffisent */ }
+  return fusion as unknown as Reglages
+}
+
+export const reglages: Reglages = reglagesLus()
+
+export function enregistrerReglages() {
+  try {
+    localStorage.setItem(CLE_REGLAGES, JSON.stringify(reglages))
+  } catch { /* stockage indisponible : le choix ne vaut que pour la session */ }
+}

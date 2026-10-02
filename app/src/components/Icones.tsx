@@ -847,3 +847,43 @@ export const NoteEtiquette = ({ taille = 13 }: Props) => (
     <circle cx="17" cy="16" r="3" fill="currentColor" />
   </svg>
 )
+
+/* ---------- Direct LIVE ---------- */
+
+// Fleche de partage du fil, reprise dans la barre basse du direct :
+// l'icone « Partage » (televersement) ne dit pas la meme chose.
+export const PartageLive = ({ taille = 23 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <path d="M14 2.6a.8.8 0 0 1 1.3-.5l8.2 8.2a1.5 1.5 0 0 1 0 2.1l-8.2 8.2a.8.8 0 0 1-1.3-.5v-4.8c-6.7.7-10.4 2.9-12.8 6.3-.5.7-1.4.4-1.3-.5C.6 10.5 5.3 6.4 14 6v-3.4Z" />
+  </svg>
+)
+
+/* ---------- Sous-ecrans des parametres ---------- */
+
+// Combine telephonique : la ligne « Numéro de téléphone » du compte.
+export const Telephone = ({ taille = 21 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M7 3.5h3l1.6 4-2 1.5a10.5 10.5 0 0 0 5.4 5.4l1.5-2 4 1.6v3a1.9 1.9 0 0 1-2.1 1.9A16.4 16.4 0 0 1 5.1 5.6 1.9 1.9 0 0 1 7 3.5Z" />
+  </svg>
+)
+
+// Cle : la ligne « Mot de passe ».
+export const Cle = ({ taille = 21 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="8.4" cy="15.6" r="4.1" />
+    <path d="m11.3 12.7 7.4-7.4M16.3 7.7l2.2 2.2M18.7 5.3l2.1 2.1" />
+  </svg>
+)
+
+// Telephone mobile : la liste des appareils connectes.
+export const Appareil = ({ taille = 21 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="6.3" y="2.6" width="11.4" height="18.8" rx="2.4" />
+    <path d="M10.6 18.4h2.8" />
+  </svg>
+)
+
+// Coche seule : le choix retenu dans une liste a selection unique.
+export const CocheChoix = ({ taille = 20 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2.2}><path d="m4.5 12.6 4.8 5L19.5 6.6" /></svg>
+)

@@ -1,0 +1,43 @@
+/* Analyse video : vignette, mesures, onglets et indicateurs cles. */
+.ana-page{position:absolute;inset:0;z-index:72;background:#f5f5f5;color:#111;color-scheme:light;display:flex;flex-direction:column;}
+
+.ana-barre{display:flex;align-items:center;gap:4px;min-height:52px;padding:0 8px;flex-shrink:0;}
+.ana-barre>button:first-child{display:grid;place-items:center;width:40px;min-height:44px;color:#111;}
+.ana-barre h1{flex:1;min-width:0;font-size:16.5px;font-weight:700;text-align:center;margin:0;}
+.ana-studio{display:inline-flex;align-items:center;gap:5px;background:#ececec;border-radius:16px;min-height:32px;padding:0 11px;margin-right:4px;color:#111;font-size:12.5px;font-weight:600;white-space:nowrap;}
+
+.ana-corps{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:32px;}
+
+/* Vignette centree, avec la duree posee en bas. */
+.ana-apercu{position:relative;width:115px;height:155px;border-radius:8px;margin:12px auto 0;background:#e3e3e5;overflow:hidden;display:flex;align-items:flex-end;justify-content:center;}
+.ana-apercu video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.ana-duree{position:relative;color:#fff;font-size:12.5px;font-weight:600;padding-bottom:7px;text-shadow:0 1px 4px rgba(0,0,0,.55);}
+
+.ana-date{color:#8e8e93;font-size:12.5px;text-align:center;margin:10px 0 0;}
+
+/* Rangee des cinq mesures, separees par de fins traits verticaux. */
+.ana-mesures{display:flex;align-items:center;padding:18px 12px;}
+.ana-mesure{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;}
+.ana-mesure b{font-size:18px;font-weight:700;}
+.ana-regle{width:1px;height:30px;background:#d9d9dc;flex-shrink:0;}
+
+/* Barre d'onglets. */
+.ana-onglets{display:flex;padding:0 6px;}
+.ana-onglet{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:8px;color:#8e8e93;font-size:13.5px;font-weight:500;}
+.ana-onglet span{padding-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+.ana-onglet i{width:58%;height:2.5px;border-radius:2px;background:transparent;}
+.ana-actif{color:#111;font-weight:700;}
+.ana-actif i{background:#111;}
+
+/* Carte « Indicateurs clés ». */
+.ana-carte{background:#fff;border-radius:12px;margin:16px 12px 0;padding:16px;}
+.ana-carte h2{font-size:16px;font-weight:700;margin:0;}
+.ana-carte>p{color:#8e8e93;font-size:13px;margin:4px 0 0;}
+.ana-grille{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;}
+.ana-tuile{flex:1 1 46%;min-width:0;display:flex;flex-direction:column;gap:8px;background:#fff;border:1px solid #e5e5e7;border-radius:10px;padding:16px;}
+.ana-tuile-avant{border-color:#3b82f6;background:#eaf2fe;}
+.ana-tuile span{color:#8e8e93;font-size:13.5px;line-height:1.33;}
+.ana-tuile b{font-size:21px;font-weight:800;}
+
+.ana-bientot{color:#8e8e93;font-size:14px;text-align:center;padding-top:70px;margin:0;}
+.ana-page button:focus-visible{outline:2px solid #555;outline-offset:2px;}

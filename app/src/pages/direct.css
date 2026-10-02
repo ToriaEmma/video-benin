@@ -1,0 +1,75 @@
+/* Pseudo-categorie « LIVE » : feuille « Découvrir » puis direct en plein ecran. */
+.dir-page{position:relative;height:100%;background:#000;color:#fff;color-scheme:dark;overflow:hidden;}
+.dir-sombre{display:flex;flex-direction:column;}
+.dir-hote{position:absolute;inset:0;display:block;}
+.dir-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+
+/* Avatars : une initiale dans un rond gris. */
+.dir-avatar{display:grid;place-items:center;border-radius:50%;background:#6d6d75;color:#fff;font-weight:700;flex-shrink:0;}
+.dir-avatar-bordure{border:1.5px solid rgba(255,255,255,.85);}
+
+/* ---------- Etat A : feuille « Découvrir » ---------- */
+.dir-entete{display:flex;align-items:center;justify-content:space-between;padding:14px;flex-shrink:0;}
+.dir-entete h1{font-size:16.5px;font-weight:700;margin:0;}
+.dir-entete button{display:grid;place-items:center;min-height:40px;min-width:36px;color:#fff;}
+
+.dir-rangee-ronds{display:flex;gap:14px;padding:0 12px 16px;overflow-x:auto;overflow-y:hidden;flex-shrink:0;scrollbar-width:none;}
+.dir-rangee-ronds::-webkit-scrollbar{display:none;}
+.dir-entree{width:64px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:6px;color:#fff;}
+.dir-entree-rond{position:relative;display:block;width:58px;height:58px;}
+/* Pastille rose de la camera, au coin bas droit de son propre avatar. */
+.dir-badge-camera{position:absolute;right:-2px;bottom:-2px;width:22px;height:22px;border-radius:50%;background:#ff2856;border:2px solid #000;display:grid;place-items:center;}
+/* Etiquette « LIVE » sous l'avatar d'un compte en direct. */
+.dir-badge-direct{position:absolute;bottom:-5px;left:50%;transform:translateX(-50%);background:#ff2856;border-radius:4px;padding:1.5px 5px;font-size:9px;font-weight:800;font-style:normal;letter-spacing:.3px;}
+.dir-entree-libelle{color:rgba(255,255,255,.82);font-size:11.5px;max-width:64px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* Panneau d'apercu : coins hauts arrondis, teinte claire en attendant
+   la video, et la poignee de depliement en son sommet. */
+.dir-panneau{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;align-items:stretch;background:#d8d2d4;border-radius:18px 18px 0 0;padding-top:8px;overflow:hidden;color:#fff;}
+.dir-poignee{align-self:center;width:42px;height:4px;border-radius:2px;background:rgba(0,0,0,.28);}
+.dir-chevron{display:grid;place-items:center;padding:2px 0;color:rgba(255,255,255,.9);}
+.dir-apercu{position:relative;flex:1;min-height:0;display:block;background:#1b1b1d;overflow:hidden;}
+.dir-apercu-pille{position:absolute;left:12px;top:12px;max-width:70%;background:rgba(0,0,0,.45);border-radius:12px;padding:5px 10px;font-size:11.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* ---------- Etat B : plein ecran ---------- */
+.dir-voile-haut{position:absolute;left:0;right:0;top:0;height:200px;pointer-events:none;background:linear-gradient(rgba(0,0,0,.45),transparent);}
+.dir-voile-bas{position:absolute;left:0;right:0;bottom:0;height:300px;pointer-events:none;background:linear-gradient(transparent,rgba(0,0,0,.55));}
+
+.dir-rangee-haute{position:absolute;left:8px;right:8px;top:14px;z-index:3;display:flex;align-items:center;gap:6px;}
+.dir-pille-diffuseur{display:flex;align-items:center;gap:7px;max-width:196px;background:rgba(0,0,0,.38);border-radius:19px;padding:3px 4px 3px 3px;}
+.dir-diffuseur-textes{min-width:0;max-width:82px;display:flex;flex-direction:column;}
+.dir-diffuseur-textes b{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dir-diffuseur-abonnes{display:inline-flex;align-items:center;gap:3px;color:rgba(255,255,255,.85);font-size:11px;}
+.dir-diffuseur-abonnes svg{color:#ff6b86;}
+.dir-suivre{background:#ff2856;border-radius:13px;padding:4px 9px;color:#fff;font-size:11.5px;font-weight:700;flex-shrink:0;}
+.dir-suivi{background:rgba(255,255,255,.22);}
+
+.dir-pille{display:inline-flex;align-items:center;gap:4px;background:rgba(0,0,0,.38);border-radius:14px;padding:5px 9px;font-size:11.5px;font-weight:600;white-space:nowrap;}
+.dir-rond{width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.38);display:grid;place-items:center;color:#fff;flex-shrink:0;}
+
+.dir-rangee-rang{position:absolute;left:8px;right:8px;top:56px;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.dir-pille-ligue{color:rgba(255,255,255,.9);font-size:11px;font-weight:400;border-radius:12px;padding:4px 9px;}
+.dir-pille-places{font-size:11px;border-radius:12px;padding:4px 9px;}
+.dir-pille-places svg{color:#fcd116;}
+
+/* Tchat : ancre en bas a gauche, au-dessus de la barre d'actions. */
+.dir-tchat{position:absolute;left:10px;right:92px;bottom:70px;z-index:2;display:flex;flex-direction:column;gap:7px;pointer-events:none;}
+.dir-message{display:flex;align-items:flex-start;gap:6px;}
+.dir-message-texte,.dir-message-systeme{flex:1;min-width:0;margin:0;font-size:12.5px;line-height:17px;text-shadow:0 1px 3px rgba(0,0,0,.45);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.dir-message-texte{color:#fff;font-weight:700;}
+.dir-message-texte b{color:rgba(255,255,255,.62);font-weight:400;}
+.dir-message-systeme{color:rgba(255,255,255,.72);font-size:12px;}
+.dir-message-systeme b{font-weight:400;}
+
+/* Coeur qui monte le long du bord droit. */
+.dir-coeur{position:absolute;bottom:80px;z-index:2;color:#ff2856;pointer-events:none;animation:dir-vol 2.6s cubic-bezier(.2,.6,.3,1) forwards;}
+@keyframes dir-vol{from{transform:translateY(0);opacity:.9;}70%{opacity:.6;}to{transform:translateY(-190px);opacity:0;}}
+
+.dir-barre-basse{position:absolute;left:8px;right:8px;bottom:14px;z-index:4;display:flex;align-items:center;gap:6px;}
+.dir-bouton-couleur{width:30px;height:30px;border-radius:8px;background:#00a550;color:#fff;font-size:11px;font-weight:800;flex-shrink:0;display:grid;place-items:center;}
+.dir-champ{flex:1;min-width:0;height:32px;border:0;border-radius:16px;background:rgba(255,255,255,.16);padding:0 12px;color:#fff;font-size:12.5px;font-family:inherit;outline:none;}
+.dir-champ::placeholder{color:rgba(255,255,255,.65);}
+.dir-action{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:26px;color:#fff;flex-shrink:0;}
+.dir-action span{font-size:10.5px;margin-top:-2px;}
+.dir-page button:focus-visible,.dir-champ:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+@media(prefers-reduced-motion:reduce){.dir-coeur{animation-duration:.01s;}}

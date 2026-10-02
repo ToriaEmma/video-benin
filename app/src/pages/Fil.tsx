@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { supabase, MODE_DEMO } from '../lib/supabase'
-import { etatDemo } from '../lib/demo'
+import { etatDemo, type VideoDemo } from '../lib/demo'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../components/Commentaires'
 import EnvoyerA from '../components/EnvoyerA'
+import Communaute from './Communaute'
+import DirectLive from './DirectLive'
+import AnalyseVideo from './AnalyseVideo'
 import { Film } from '../components/Icones'
 import { Loupe } from '../components/Icones'
 import './fil.css'
@@ -35,6 +38,7 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
   const [progression, setProgression] = useState(0)
   const [favori, setFavori] = useState(false)
   const [developpe, setDeveloppe] = useState(false)
+  const [analyse, setAnalyse] = useState(false)
 
   useEffect(() => {
     if (MODE_DEMO) {
@@ -104,6 +108,17 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
 
   const pseudo = video.profils?.pseudo ?? 'inconnu'
 
+  // L'analyse attend la forme de demonstration : hors mode demo, les
+  // compteurs deja charges la completent.
+  if (analyse) {
+    const demo = etatDemo.videos.find(v => v.id === video.id)
+    const sujet: VideoDemo = demo ?? {
+      ...video, aime, nbAime, nbCommentaires: nbCom,
+      departement: '', profils: video.profils,
+    }
+    return <AnalyseVideo video={sujet} onRetour={() => setAnalyse(false)} />
+  }
+
   return (
     <div className="video-carte">
       <video
@@ -169,6 +184,7 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
           sienne={!!profil && profil.pseudo === pseudo}
           auteur={pseudo}
           onFermer={() => setEnvoyer(false)}
+          onAnalytiques={() => setAnalyse(true)}
         />
       )}
     </div>
@@ -199,6 +215,20 @@ export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string
       })
   }, [])
 
+  // Carte de la mosaique « Communauté » : le fil bascule sur « Pour toi » et
+  // s'ouvre sur la video touchee. Le defilement attend le rendu du fil, qui
+  // n'est monte qu'apres le changement de categorie.
+  const ouvrirDepuisMosaique = (videoId: string) => {
+    const i = videos.findIndex(v => v.id === videoId)
+    setCategorie('Pour toi')
+    if (i < 0) return
+    setIndexActif(i)
+    requestAnimationFrame(() => {
+      const el = filRef.current
+      if (el) el.scrollTo({ top: i * el.clientHeight })
+    })
+  }
+
   // Determine la carte visible d'apres la position de defilement plutot que par
   // un IntersectionObserver : le scroll-snap garantit qu'une carte occupe
   // toujours exactement la hauteur du conteneur.
@@ -220,9 +250,15 @@ export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string
       </div>
     )
 
+  // Le LIVE porte sa propre entete et sa croix de sortie : il prend tout
+  // l'ecran, la barre des categories ne se superpose pas.
+  if (categorie === 'LIVE')
+    return <DirectLive onFermer={() => setCategorie('Pour toi')} />
+
   return (
     <div className="fil-ecran"><header className="fil-entete"><button aria-label="Vidéos LIVE" onClick={() => setCategorie('LIVE')}><svg width="27" height="27" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m9 2 5 5 5-5M3 12V8h22v4M3 23v3h22v-3"/><text x="14" y="20" textAnchor="middle" fill="currentColor" stroke="none" fontSize="10" fontWeight="700">LIVE</text></svg></button><div>{['Communauté','Suivis','Pour toi'].map(c => <button key={c} className={categorie===c?'actif':''} onClick={() => setCategorie(c)}>{c}</button>)}</div><button aria-label="Rechercher" onClick={onRechercher}><Loupe taille={25}/></button></header>
-    {categorie !== 'Pour toi' ? <div className="fil-attente"><p>{categorie === 'LIVE' ? 'Aucun LIVE pour le moment' : categorie === 'Suivis' ? 'Le fil de tes abonnements sera disponible prochainement.' : 'Le fil Communauté sera disponible prochainement.'}</p></div> : <div className="fil" ref={filRef} onScroll={auDefilement}>
+    {categorie === 'Communauté' ? <Communaute onOuvrir={ouvrirDepuisMosaique} />
+    : categorie !== 'Pour toi' ? <div className="fil-attente"><p>Le fil de tes abonnements sera disponible prochainement.</p></div> : <div className="fil" ref={filRef} onScroll={auDefilement}>
       {videos.map((v, i) => (
         <Carte key={v.id} video={v} actif={i === indexActif} onVisiter={onVisiter} />
       ))}

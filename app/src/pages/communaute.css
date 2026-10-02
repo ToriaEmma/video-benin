@@ -1,0 +1,20 @@
+/* Mosaique « Communauté » : deux colonnes decalees sur fond blanc. */
+.com-page{height:100%;background:#fff;color:#111;color-scheme:light;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;display:flex;gap:3px;padding:108px 2px 24px;}
+.com-colonne{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;}
+
+.com-carte{display:block;width:100%;background:#fff;border-radius:10px;text-align:left;color:#111;}
+.com-vignette{position:relative;display:block;width:100%;border-radius:10px 10px 0 0;background:#e9e9ec;overflow:hidden;}
+.com-vignette video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.com-vignette-vide{position:absolute;inset:0;background:#dcdce0;}
+
+/* Pastille du coin haut droit de la vignette. */
+.com-pastille{position:absolute;top:7px;right:7px;display:inline-flex;align-items:center;gap:3px;padding:3px 5px;border-radius:9px;background:rgba(0,0,0,.35);color:#fff;}
+.com-pastille b{font-size:11px;font-weight:600;}
+
+.com-corps{display:block;padding:7px 6px 4px;}
+.com-legende{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:13.5px;line-height:1.32;color:#111;}
+.com-auteur{display:flex;align-items:center;gap:5px;margin-top:7px;}
+.com-avatar{width:18px;height:18px;border-radius:50%;background:#b9b9c0;color:#fff;font-size:10px;font-weight:700;font-style:normal;display:grid;place-items:center;flex-shrink:0;}
+.com-pseudo{flex:1;min-width:0;color:#444;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.com-aime{display:inline-flex;align-items:center;gap:3px;color:#444;font-size:12.5px;flex-shrink:0;}
+.com-page button:focus-visible{outline:2px solid #555;outline-offset:2px;}

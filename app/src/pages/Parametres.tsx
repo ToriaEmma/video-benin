@@ -3,6 +3,13 @@ import { Chevron, ChevronDroit } from '../components/Icones'
 import GererPublications from './GererPublications'
 import PreferencesContenu from './PreferencesContenu'
 import Live from './Live'
+import Interrupteur from '../components/Interrupteur'
+import { reglages, enregistrerReglages } from '../lib/demo'
+import {
+  Notifications, Compte, Securite, Langues, Affichage, LibererEspace,
+  EconomiseurDonnees, SectionInformative, PartagerProfil,
+} from './ParametresDetail'
+import { SECTIONS_INFO } from './sections-info'
 import './parametres.css'
 
 /* ------------------------------------------------------------------
@@ -59,7 +66,7 @@ function Icone({ nom }: { nom: string }) {
 /* ------------------------------------------------------------------
    Structure de la page, reprise des captures de reference.
    ------------------------------------------------------------------ */
-type Ligne = { nom: string; icone: string; pastille?: boolean }
+type Ligne = { nom: string; icone: string; pastille?: boolean; bascule?: boolean }
 
 const SECTIONS: { titre: string; lignes: Ligne[] }[] = [
   { titre: 'Activité', lignes: [
@@ -76,7 +83,7 @@ const SECTIONS: { titre: string; lignes: Ligne[] }[] = [
     { nom: 'Partager le profil', icone: 'partage' },
   ] },
   { titre: 'Visibilité', lignes: [
-    { nom: 'Compte privé', icone: 'cadenas' },
+    { nom: 'Compte privé', icone: 'cadenas', bascule: true },
   ] },
   { titre: 'Préférences', lignes: [
     { nom: 'Musique', icone: 'musique' },
@@ -115,6 +122,7 @@ export default function Parametres({
   const [choix, setChoix] = useState<'oui' | 'non' | null>(null)
   const [selection, setSelection] = useState<string | null>(null)
   const [compact, setCompact] = useState(false)
+  const [prive, setPrive] = useState(reglages.comptePrive)
   const corps = useRef<HTMLDivElement>(null)
 
   // Le grand titre se replie dans la barre des qu'on defile, comme sur les
@@ -142,10 +150,28 @@ export default function Parametres({
     return <PreferencesContenu onRetour={() => setSelection(null)} />
   }
 
+  // Sous-ecrans qui agissent vraiment.
+  const fermer = () => setSelection(null)
+  if (selection === 'Notifications') return <Notifications onRetour={fermer} />
+  if (selection === 'Compte') return <Compte onRetour={fermer} />
+  if (selection === 'Sécurité et autorisations') return <Securite onRetour={fermer} />
+  if (selection === 'Langues') return <Langues onRetour={fermer} />
+  if (selection === 'Affichage') return <Affichage onRetour={fermer} />
+  if (selection === "Libérer de l'espace") return <LibererEspace onRetour={fermer} />
+  if (selection === 'Économiseur de données')
+    return <EconomiseurDonnees onRetour={fermer} />
+  if (selection === 'Partager le profil')
+    return <PartagerProfil pseudo={pseudo} onRetour={fermer} />
+
+  // Sections encore informatives : titre, explication, et les
+  // interrupteurs qui existent deja.
+  const info = selection ? SECTIONS_INFO[selection] : undefined
+  if (info) return <SectionInformative info={info} onRetour={fermer} />
+
   if (selection) {
     return <div className="param-page">
       <header className="param-barre">
-        <button aria-label="Retour" onClick={() => setSelection(null)}><Chevron taille={24} /></button>
+        <button aria-label="Retour" onClick={fermer}><Chevron taille={24} /></button>
         <h1>{selection}</h1>
         <span />
       </header>
@@ -168,7 +194,24 @@ export default function Parametres({
       {SECTIONS.map(section => <section className="param-section" key={section.titre}>
         <h3>{section.titre}</h3>
         <div className="param-carte">
-          {section.lignes.map(ligne => <button
+          {section.lignes.map(ligne => ligne.bascule ? <div key={ligne.nom}>
+            <div className="param-ligne">
+              <Icone nom={ligne.icone} />
+              <span className="param-nom">{ligne.nom}</span>
+              <Interrupteur actif={reglages.comptePrive} libelle={ligne.nom}
+                onChange={v => {
+                  reglages.comptePrive = v
+                  enregistrerReglages()
+                  setPrive(v)
+                }} />
+            </div>
+            {prive && <p className="param-explication">
+              Lorsque ton compte est privé, seules les personnes que tu
+              approuves peuvent voir tes vidéos, tes j'aime et tes
+              abonnements. Les demandes d'abonnement arrivent dans
+              « Messages ». Ton pseudo et ta photo restent visibles de tous.
+            </p>}
+          </div> : <button
             className="param-ligne"
             key={ligne.nom}
             onClick={() => setSelection(ligne.nom)}
