@@ -18,6 +18,14 @@ import {
   exigerSession,
   sessionFacultative,
 } from './auth.js'
+import {
+  stockageConfigure,
+  TYPES_VIDEO,
+  TAILLE_MAX,
+  construireCle,
+  urlPubliqueDe,
+  signerDepot,
+} from './stockage.js'
 
 const app = express()
 app.use(cors())
@@ -206,6 +214,49 @@ app.patch('/moi', exigerSession, route(async (req, res) => {
   `
   if (!profil) throw new Refus(404, 'Compte introuvable')
   res.json(profilPublic(profil))
+}))
+
+// ------------------------------------------------------------
+// Televersements
+//
+// Le client demande une autorisation d'envoi, televerse le fichier
+// directement vers le stockage, puis publie l'adresse obtenue. L'API
+// ne voit jamais les octets.
+// ------------------------------------------------------------
+
+app.post('/televersements', exigerSession, route(async (req, res) => {
+  const type = texteRequis(req.body?.type, 'type')
+  if (!TYPES_VIDEO.includes(type)) {
+    throw new Refus(400, 'Format non accepté : MP4, MOV ou WebM uniquement')
+  }
+
+  const taille = Number(req.body?.taille)
+  if (!Number.isFinite(taille) || taille <= 0) {
+    throw new Refus(400, 'La taille du fichier est requise')
+  }
+  if (taille > TAILLE_MAX) {
+    const mo = Math.round(taille / 1024 / 1024)
+    throw new Refus(
+      413,
+      `Vidéo trop lourde (${mo} Mo). Maximum ${TAILLE_MAX / 1024 / 1024} Mo.`,
+    )
+  }
+
+  // Verifie apres la validation du corps : une requete mal formee reste
+  // une erreur du client, que le stockage soit configure ou non.
+  if (!stockageConfigure) {
+    throw new Refus(
+      503,
+      'Le stockage des vidéos n’est pas configuré sur le serveur',
+    )
+  }
+
+  const cle = construireCle(req.profilId, type)
+  res.status(201).json({
+    url: await signerDepot(cle, type),
+    cle,
+    urlPublique: urlPubliqueDe(cle),
+  })
 }))
 
 // ------------------------------------------------------------

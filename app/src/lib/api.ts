@@ -215,6 +215,62 @@ const parametres = (p: Pagination = {}) => {
 const pseudoUrl = (pseudo: string) => encodeURIComponent(pseudo)
 
 // ------------------------------------------------------------
+// Televersements
+// ------------------------------------------------------------
+
+export type AutorisationDepot = {
+  url: string
+  cle: string
+  urlPublique: string
+}
+
+// Types acceptes par l'API : un autre format est refuse avant l'envoi,
+// plutot qu'apres avoir consomme le forfait de l'utilisateur.
+const TYPES_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm']
+
+// Televerse le fichier vers le stockage et rend l'adresse durable a
+// enregistrer. Les octets ne passent pas par l'API : elle ne delivre que
+// l'autorisation d'envoi.
+export async function televerser(
+  fichier: Blob,
+  surProgression?: (centiemes: number) => void,
+): Promise<string> {
+  const type = TYPES_VIDEO.includes(fichier.type) ? fichier.type : 'video/mp4'
+
+  const depot = await requete<AutorisationDepot>('/televersements', {
+    methode: 'POST',
+    corps: { type, taille: fichier.size },
+  })
+
+  // XMLHttpRequest et non fetch : lui seul rapporte l'avancement de
+  // l'envoi, qu'une video sur reseau mobile rend necessaire.
+  await new Promise<void>((resoudre, rejeter) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', depot.url)
+    xhr.setRequestHeader('Content-Type', type)
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) surProgression?.(Math.round((e.loaded / e.total) * 100))
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resoudre()
+      else rejeter(new Error(`Le stockage a refusé la vidéo (erreur ${xhr.status})`))
+    }
+    xhr.onerror = () => rejeter(new Error("L'envoi de la vidéo a échoué"))
+    xhr.onabort = () => rejeter(new Error ('Envoi de la vidéo interrompu'))
+    xhr.send(fichier)
+  })
+
+  return depot.urlPublique
+}
+
+// Recupere un blob: ou une URL locale pour en faire un fichier envoyable.
+export async function fichierDepuisUrl(url: string): Promise<Blob> {
+  const r = await fetch(url)
+  if (!r.ok) throw new Error('Vidéo locale illisible')
+  return r.blob()
+}
+
+// ------------------------------------------------------------
 // Comptes
 // ------------------------------------------------------------
 

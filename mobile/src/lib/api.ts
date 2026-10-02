@@ -183,6 +183,72 @@ const parametres = (p: Pagination = {}) => {
 const pseudoUrl = (pseudo: string) => encodeURIComponent(pseudo)
 
 // ------------------------------------------------------------
+// Televersements
+// ------------------------------------------------------------
+
+export type AutorisationDepot = {
+  url: string
+  cle: string
+  urlPublique: string
+}
+
+const TYPES_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm']
+
+// Le selecteur de medias rend un chemin local : l'extension sert a
+// deviner le type, le fichier ne portant pas cette information.
+const typeDepuisUri = (uri: string) => {
+  const bout = uri.split('?')[0].split('.').pop()?.toLowerCase()
+  if (bout === 'mov') return 'video/quicktime'
+  if (bout === 'webm') return 'video/webm'
+  return 'video/mp4'
+}
+
+// Televerse la video designee par son URI locale et rend l'adresse
+// durable. Les octets vont directement au stockage : l'API ne delivre
+// que l'autorisation d'envoi.
+export async function televerser(
+  uri: string,
+  surEtape?: (etape: 'preparation' | 'envoi' | 'fini') => void,
+): Promise<string> {
+  surEtape?.('preparation')
+
+  // Le fichier est relu depuis le disque de l'appareil pour connaitre sa
+  // taille reelle, que l'API exige avant de signer l'autorisation.
+  let blob: Blob
+  try {
+    const r = await fetch(uri)
+    blob = await r.blob()
+  } catch {
+    throw new Error('Vidéo introuvable sur l’appareil')
+  }
+
+  const type = TYPES_VIDEO.includes(blob.type) ? blob.type : typeDepuisUri(uri)
+
+  const depot = await requete<AutorisationDepot>('/televersements', {
+    methode: 'POST',
+    corps: { type, taille: blob.size },
+  })
+
+  surEtape?.('envoi')
+  let reponse: Response
+  try {
+    reponse = await fetch(depot.url, {
+      method: 'PUT',
+      headers: { 'Content-Type': type },
+      body: blob,
+    })
+  } catch {
+    throw new Error('L’envoi de la vidéo a échoué : vérifiez votre connexion')
+  }
+  if (!reponse.ok) {
+    throw new Error(`Le stockage a refusé la vidéo (erreur ${reponse.status})`)
+  }
+
+  surEtape?.('fini')
+  return depot.urlPublique
+}
+
+// ------------------------------------------------------------
 // Comptes
 // ------------------------------------------------------------
 

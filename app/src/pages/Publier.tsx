@@ -1,5 +1,8 @@
 import { useRef, useState } from 'react'
-import { apiBrouillons, apiVideos, type BrouillonApi } from '../lib/api'
+import {
+  apiBrouillons, apiVideos, televerser, fichierDepuisUrl,
+  type BrouillonApi,
+} from '../lib/api'
 import { useAuth } from '../lib/auth'
 import { Camera } from '../components/Icones'
 import CreationCamera from '../components/CreationCamera'
@@ -35,6 +38,9 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
   const [progression, setProgression] = useState(0)
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState('')
+  // Etape en cours, affichee pendant l'envoi : un ecran figé pendant le
+  // televersement d'une video laisse croire a une panne.
+  const [etape, setEtape] = useState('')
 
   const choisir = (f: File | null) => {
     setErreur('')
@@ -65,19 +71,23 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
     v.src = url
   }
 
+  // Le fichier part vers le stockage avant l'enregistrement : une video
+  // ne doit jamais etre publiee sur une adresse locale, illisible
+  // ailleurs que dans cet onglet.
   const publier = async () => {
-    if ((!fichier && !urlInitiale) || !session) return
+    if ((!fichier && !apercu) || !session) return
     setEnvoi(true)
     setErreur('')
-    setProgression(30)
+    setProgression(0)
+    setEtape('Envoi de la vidéo…')
 
     try {
-      // L'API n'heberge pas de fichier : elle n'enregistre qu'une adresse.
-      // Celle-ci reste donc celle du blob local, lisible dans cet onglet
-      // seulement, exactement comme la version mobile qui envoie l'URI de
-      // l'appareil. Le televersement attend un service de stockage.
+      const aEnvoyer = fichier ?? await fichierDepuisUrl(apercu)
+      const url = await televerser(aEnvoyer, setProgression)
+
+      setEtape('Publication…')
       await apiVideos.creer({
-        url: apercu,
+        url,
         legende: legende.trim(),
         departement,
       })
@@ -87,10 +97,13 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
       setLegende('')
       onPublie()
     } catch (e) {
+      // L'echec est annonce tel quel et aucune video n'est creee : mieux
+      // vaut pas de publication qu'une publication illisible.
       setErreur(e instanceof Error ? e.message : "L'envoi a échoué")
       setProgression(0)
     } finally {
       setEnvoi(false)
+      setEtape('')
     }
   }
 
@@ -100,8 +113,13 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
     if (!apercu || envoi) return
     setEnvoi(true)
     setErreur('')
+    setEtape('Envoi de la vidéo…')
     try {
-      await apiBrouillons.creer(apercu, legende.trim(), fichier?.size ?? 0)
+      // Un brouillon porte aussi un fichier : il doit survivre a la
+      // fermeture de l'onglet pour etre repris plus tard.
+      const aEnvoyer = fichier ?? await fichierDepuisUrl(apercu)
+      const url = await televerser(aEnvoyer, setProgression)
+      await apiBrouillons.creer(url, legende.trim(), aEnvoyer.size)
       setFichier(null)
       setApercu('')
       setLegende('')
@@ -110,6 +128,8 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
       setErreur(e instanceof Error ? e.message : "L'enregistrement a échoué")
     } finally {
       setEnvoi(false)
+      setProgression(0)
+      setEtape('')
     }
   }
 
@@ -200,7 +220,7 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
           )}
 
           <button className="bouton" onClick={publier} disabled={envoi}>
-            {envoi ? `Envoi… ${progression}%` : 'Publier'}
+            {envoi ? `${etape} ${progression}%` : 'Publier'}
           </button>
 
           <button className="bouton secondaire" style={{ marginTop: 10 }}

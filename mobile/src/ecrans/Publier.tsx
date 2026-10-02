@@ -14,7 +14,7 @@ import {
   AUDIENCES, OPTIONS_PAR_DEFAUT,
   type Audience, type Options, type Application, type Departement,
 } from './FeuillesPublication'
-import { apiBrouillons, apiVideos, type NouvelleVideo } from '../lib/api'
+import { apiBrouillons, apiVideos, televerser, type NouvelleVideo } from '../lib/api'
 import {
   Camera, Chevron, ChevronDroit, Brouillon,
   PubLien, PubMonde, PubOptions, PubPublier, MontagePartage, PubLieu,
@@ -43,6 +43,9 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
   }, [uri, lecteur])
   const [legende, setLegende] = useState('')
   const [envoi, setEnvoi] = useState(false)
+  // Libelle de l'etape en cours : le televersement d'une video peut durer
+  // sur un reseau mobile, et un bouton muet laisse croire a un blocage.
+  const [etape, setEtape] = useState('')
   const [couverture, setCouverture] = useState(false)
   // Feuille ouverte depuis la liste d'options, s'il y en a une.
   const [feuille, setFeuille] =
@@ -93,27 +96,42 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
     }
   }
 
-  const publier = () => {
+  // La video est televersee avant l'enregistrement : publier l'URI locale
+  // ne donnerait une video lisible que sur cet appareil.
+  const publier = async () => {
     if (!uri || envoi) return
     setEnvoi(true)
-    apiVideos.creer({
-      url: uri,
-      legende: legende.trim(),
-      departement,
-      visibilite: VISIBILITES[audience],
-      // Les deux premiers interrupteurs de « Plus d'options » sont les
-      // seuls que l'API connaisse ; les autres restent locaux a l'ecran.
-      commentaires_autorises: options.commentaires,
-      reutilisation_autorisee: options.reutilisation,
-    })
-      .then(() => { setUri(null); setLegende(''); onPublie() })
-      .catch((e: Error) => Alert.alert('Publication impossible', e.message))
-      .finally(() => setEnvoi(false))
+    try {
+      const url = await televerser(uri, (e) =>
+        setEtape(e === 'preparation' ? 'Préparation…' : 'Envoi de la vidéo…'))
+
+      setEtape('Publication…')
+      await apiVideos.creer({
+        url,
+        legende: legende.trim(),
+        departement,
+        visibilite: VISIBILITES[audience],
+        // Les deux premiers interrupteurs de « Plus d'options » sont les
+        // seuls que l'API connaisse ; les autres restent locaux a l'ecran.
+        commentaires_autorises: options.commentaires,
+        reutilisation_autorisee: options.reutilisation,
+      })
+      setUri(null)
+      setLegende('')
+      onPublie()
+    } catch (e) {
+      // Aucune video n'est creee si l'envoi echoue : la raison reelle est
+      // montree telle quelle.
+      Alert.alert('Publication impossible', (e as Error).message)
+    } finally {
+      setEnvoi(false)
+      setEtape('')
+    }
   }
 
   // « Brouillons » : la video est mise de cote avec sa description, puis
   // on repart sur le profil ou la tuile des brouillons l'affiche.
-  const enregistrerBrouillon = () => {
+  const enregistrerBrouillon = async () => {
     if (!uri) { onAnnuler?.(); return }
     if (envoi) return
     let octets = 0
@@ -123,14 +141,22 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
     } catch { /* Poids illisible : la tuile n'affichera pas de taille. */ }
 
     setEnvoi(true)
-    apiBrouillons.creer(uri, legende.trim(), octets)
-      .then(() => {
-        setUri(null); setLegende('')
-        if (onBrouillon) onBrouillon()
-        else onAnnuler?.()
-      })
-      .catch((e: Error) => Alert.alert('Enregistrement impossible', e.message))
-      .finally(() => setEnvoi(false))
+    try {
+      // Un brouillon porte lui aussi un fichier : sans televersement il
+      // serait perdu des la reinstallation de l'application.
+      const url = await televerser(uri, (e) =>
+        setEtape(e === 'preparation' ? 'Préparation…' : 'Envoi de la vidéo…'))
+      await apiBrouillons.creer(url, legende.trim(), octets)
+      setUri(null)
+      setLegende('')
+      if (onBrouillon) onBrouillon()
+      else onAnnuler?.()
+    } catch (e) {
+      Alert.alert('Enregistrement impossible', (e as Error).message)
+    } finally {
+      setEnvoi(false)
+      setEtape('')
+    }
   }
 
   // Sans video choisie : l'ecran d'import.
@@ -233,7 +259,10 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
           <Text style={s.brouillonsTexte}>Brouillons</Text>
         </Pressable>
         <Pressable style={s.publier} onPress={publier} disabled={envoi}>
-          {envoi ? <ActivityIndicator color="#fff" /> : <>
+          {envoi ? <>
+            <ActivityIndicator color="#fff" />
+            <Text style={s.publierTexte}>{etape || 'Envoi…'}</Text>
+          </> : <>
             <PubPublier taille={20} couleur="#fff" />
             <Text style={s.publierTexte}>Publier</Text>
           </>}
