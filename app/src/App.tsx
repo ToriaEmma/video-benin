@@ -8,7 +8,8 @@ import Camera from './pages/Camera'
 import Montage from './pages/Montage'
 import Profil from './pages/Profil'
 import Decouvrir from './pages/Decouvrir'
-import { Accueil, Amis, Messages, Plus, Personne } from './components/Icones'
+import Messages from './pages/Messages'
+import { Accueil, Amis, Messages as IconeMessages, Plus, Personne } from './components/Icones'
 
 type Onglet = 'fil' | 'decouvrir' | 'publier' | 'profil' | 'messages'
 
@@ -45,7 +46,7 @@ function Application() {
       <div className="contenu">
         {onglet === 'fil' && <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('decouvrir')} />}
         {onglet === 'decouvrir' && <Decouvrir onVisiter={visiter} />}
-        {onglet === 'messages' && <section className="page page-messages"><h1>Messages</h1><div><Messages taille={48}/><h2>Aucun message pour le moment</h2><p>La messagerie sera disponible prochainement.</p></div></section>}
+        {onglet === 'messages' && <Messages />}
         {onglet === 'publier' && (
           videoChoisie
             ? montage
@@ -95,7 +96,7 @@ function Application() {
           <span className="pastille"><Plus taille={24} /></span>
         </button>
 
-        <button className={onglet === 'messages' ? 'actif' : ''} onClick={() => setOnglet('messages')}><Messages taille={26}/><span>Messages</span></button>
+        <button className={onglet === 'messages' ? 'actif' : ''} onClick={() => setOnglet('messages')}><IconeMessages taille={26}/><span>Messages</span></button>
 
         <button
           className={onglet === 'profil' ? 'actif' : ''}

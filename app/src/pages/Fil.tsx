@@ -2,8 +2,8 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { supabase, MODE_DEMO } from '../lib/supabase'
 import { etatDemo } from '../lib/demo'
 import { useAuth } from '../lib/auth'
-import { partager as partagerNatif } from '../lib/natif'
 import Commentaires from '../components/Commentaires'
+import EnvoyerA from '../components/EnvoyerA'
 import { Film } from '../components/Icones'
 import { Loupe } from '../components/Icones'
 import './fil.css'
@@ -23,12 +23,13 @@ const abreger = (n: number) =>
   : String(n)
 
 function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVisiter: (p: string) => void }) {
-  const { session } = useAuth()
+  const { session, profil } = useAuth()
   const ref = useRef<HTMLVideoElement>(null)
   const [aime, setAime] = useState(false)
   const [nbAime, setNbAime] = useState(0)
   const [nbCom, setNbCom] = useState(0)
   const [ouvrirCom, setOuvrirCom] = useState(false)
+  const [envoyer, setEnvoyer] = useState(false)
   const [vueComptee, setVueComptee] = useState(false)
   const [pause, setPause] = useState(true)
   const [progression, setProgression] = useState(0)
@@ -101,16 +102,6 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
     }
   }
 
-  const partager = async () => {
-    const lien = `${window.location.origin}/?v=${video.id}`
-    const resultat = await partagerNatif(
-      video.profils?.pseudo ? `@${video.profils.pseudo}` : 'Vidéo',
-      video.legende || 'Regarde cette vidéo',
-      lien,
-    )
-    if (resultat === 'copie') alert('Lien copié')
-  }
-
   const pseudo = video.profils?.pseudo ?? 'inconnu'
 
   return (
@@ -148,7 +139,7 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
           <span>{abreger(nbCom)}</span>
         </button>
 
-        <button className="action" onClick={partager}>
+        <button className="action" onClick={() => setEnvoyer(true)}>
           <span className="glyphe"><svg width="34" height="34" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M19 2a1 1 0 0 1 1.7-.7l11 11a2 2 0 0 1 0 2.8l-11 11A1 1 0 0 1 19 25.4V19C10 18 5 21 1.8 25.5c-.7 1-1.8.5-1.7-.6C.8 14 7.1 8.5 19 8V2Z"/></svg></span>
           <span>Partager</span>
         </button>
@@ -167,6 +158,17 @@ function Carte({ video, actif, onVisiter }: { video: Video; actif: boolean; onVi
           videoId={video.id}
           onFermer={() => setOuvrirCom(false)}
           onAjout={() => setNbCom((n) => n + 1)}
+        />
+      )}
+
+      {/* La feuille change de rangees selon que la publication est la
+          notre ou celle d'un autre compte. */}
+      {envoyer && (
+        <EnvoyerA
+          legende={video.legende || `@${pseudo}`}
+          sienne={!!profil && profil.pseudo === pseudo}
+          auteur={pseudo}
+          onFermer={() => setEnvoyer(false)}
         />
       )}
     </div>

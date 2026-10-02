@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react'
 import { supabase, MODE_DEMO } from '../lib/supabase'
-import { etatDemo } from '../lib/demo'
+import { etatDemo, type BrouillonDemo } from '../lib/demo'
 import { useAuth } from '../lib/auth'
 import { Camera } from '../components/Icones'
 import CreationCamera from '../components/CreationCamera'
 import Couverture from './Couverture'
+import Brouillons from './Brouillons'
 
 const TAILLE_MAX = 50 * 1024 * 1024 // 50 Mo
 const DUREE_MAX = 90 // secondes
@@ -27,6 +28,9 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
   const [apercu, setApercu] = useState(urlInitiale ?? '')
   // Editeur de couverture, ouvert depuis l'apercu.
   const [couverture, setCouverture] = useState(false)
+  // Grille des brouillons, atteinte depuis l'ecran de tournage : le profil
+  // ne propose pas encore de tuile.
+  const [brouillons, setBrouillons] = useState(false)
   const [legende, setLegende] = useState('')
   const [departement, setDepartement] = useState('Littoral')
   const [progression, setProgression] = useState(0)
@@ -129,10 +133,18 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
     }
   }
 
+  const reprendre = (b: BrouillonDemo) => {
+    setApercu(b.url)
+    setLegende(b.legende)
+    setBrouillons(false)
+  }
+
+  if (brouillons) return <Brouillons onRetour={() => setBrouillons(false)}
+    onPublier={reprendre} />
   if (couverture) return <Couverture url={apercu}
     onAnnuler={() => setCouverture(false)}
     onEnregistrer={() => setCouverture(false)} />
-  if (!fichier && !urlInitiale) return <><CreationCamera onChoisir={choisir} onFermer={onFermer}/>{erreur && <p role="alert" style={{position:'absolute',bottom:100,left:20,right:20,background:'#111',color:'white',padding:12,zIndex:5}}>{erreur}</p>}</>
+  if (!fichier && !urlInitiale && !apercu) return <><CreationCamera onChoisir={choisir} onFermer={onFermer}/><button className="pub-brouillons" onClick={() => setBrouillons(true)}>Brouillons ({etatDemo.brouillons.length})</button>{erreur && <p role="alert" style={{position:'absolute',bottom:100,left:20,right:20,background:'#111',color:'white',padding:12,zIndex:5}}>{erreur}</p>}</>
   return (
     <div className="page">
       <h1 className="titre">Publier une vidéo</h1>

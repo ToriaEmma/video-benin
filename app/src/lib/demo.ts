@@ -106,6 +106,9 @@ export type BrouillonDemo = {
   date: number
   // Son ou effet retenu, affiche sous la vignette.
   etiquette?: { type: 'son' | 'effet'; nom: string }
+  // Nombre de clips : au-dela de un, la grille pose une pile de calques
+  // sur la vignette.
+  clips?: number
 }
 
 // Etat mutable de la session de demonstration.
@@ -121,6 +124,9 @@ export const etatDemo = {
   // est declaree apres cet objet.
   stories: [] as Story[],
   conversations: [] as Conversation[],
+  // Cartes de l'ecran « Notifications système », remplies plus bas : la
+  // graine est declaree apres cet objet.
+  notifications: [] as Notification[],
 }
 
 // ============================================================
@@ -543,3 +549,39 @@ export const conversationsTriees = () =>
 // Messages recus de comptes auxquels on n'est pas abonne.
 export const demandesMessages = () =>
   etatDemo.conversations.filter(c => c.demande)
+
+etatDemo.notifications = [...notificationsDemo]
+
+// « 86.0MB » : le poids affiche sur la grille des brouillons.
+export const poidsLisible = (octets: number) =>
+  octets >= 1 << 30 ? `${(octets / (1 << 30)).toFixed(1)}GB`
+  : octets >= 1 << 20 ? `${(octets / (1 << 20)).toFixed(1)}MB`
+  : `${Math.max(1, Math.round(octets / 1024))}KB`
+
+// Brouillons de demonstration : la grille serait vide sans eux, puisque
+// rien n'a encore ete mis de cote depuis le montage.
+etatDemo.brouillons = [
+  {
+    id: 'b1', url: SOURCES[0], legende: 'Coucher de soleil à Fidjrossè',
+    octets: 42 * (1 << 20), date: LANCEMENT - MINUTE * 60 * 5,
+    etiquette: { type: 'son', nom: 'Afrobeat 229' }, clips: 3,
+  },
+  {
+    id: 'b2', url: SOURCES[1], legende: '', octets: 18 * (1 << 20),
+    date: LANCEMENT - MINUTE * 60 * 30,
+    etiquette: { type: 'effet', nom: 'Lueur douce' },
+  },
+  {
+    id: 'b3', url: SOURCES[2], legende: 'Essai de montage',
+    octets: 9 * (1 << 20), date: LANCEMENT - MINUTE * 60 * 24 * 2, clips: 2,
+  },
+  {
+    id: 'b4', url: SOURCES[3], legende: 'Parakou, marché du matin',
+    octets: 26 * (1 << 20), date: LANCEMENT - MINUTE * 60 * 24 * 4,
+    etiquette: { type: 'son', nom: 'Son original' },
+  },
+  {
+    id: 'b5', url: SOURCES[1], legende: '', octets: 1_400_000,
+    date: LANCEMENT - MINUTE * 60 * 24 * 9,
+  },
+]

@@ -505,3 +505,345 @@ export const StudioPastille = ({ taille = 18 }: Props) => (
     <path d="m18 11.4 1.5 3.3 3.3 1.5-3.3 1.5L18 21l-1.5-3.3-3.3-1.5 3.3-1.5L18 11.4Z" />
   </svg>
 )
+
+/* ---------- Boite de reception ---------- */
+
+// Silhouette avec un plus : creer un groupe, en tete de la boite.
+export const NouveauGroupe = ({ taille = 26 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <circle cx="10" cy="7.4" r="3.4" />
+    <path d="M3.4 20.2v-.8c0-3 2.9-4.8 6.6-4.8 1 0 2 .1 2.9.4" />
+    <path d="M17.6 14.6v5.6m-2.8-2.8h5.6" />
+  </svg>
+)
+
+// Avion en papier du bouton d'envoi, dans le champ de saisie.
+export const EnvoiMessage = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M3.4 11.3 20 4.2a.6.6 0 0 1 .8.8l-7.1 16.6a.6.6 0 0 1-1.1 0l-2.5-6.4-6.4-2.5a.6.6 0 0 1 0-1.1Z" />
+    <path d="m10.6 15.2 10.1-11" />
+  </svg>
+)
+
+// Eclair de la pastille « Activité et nouveaux abonnés ».
+export const Eclair = ({ taille = 26 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <path d="M13.6 2.2 5.4 13.1h5.3l-1.3 8.7 8.4-11.1h-5.4Z" />
+  </svg>
+)
+
+// Bulle de dialogue pleine : pastille des demandes de messages.
+export const BulleDemande = ({ taille = 26 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <path d="M12 3.4c-5 0-9 3.3-9 7.4 0 2.2 1.1 4.1 2.9 5.5l-1 3.9 4.2-2.1c.9.2 1.9.3 2.9.3 5 0 9-3.3 9-7.6S17 3.4 12 3.4Z" />
+  </svg>
+)
+
+// Flamme des conversations entretenues jour apres jour.
+export const Flamme = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <path d="M12 2.4C8.4 7 5.4 9.6 5.4 13.6a6.6 6.6 0 0 0 13.2 0c0-4-3-6.6-6.6-11.2Z" />
+  </svg>
+)
+
+/* ---------- Notifications systeme ---------- */
+
+// Roue dentee : ouvre « Paramètres des notifications ».
+export const Engrenage = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="12" cy="12" r="3.2" />
+    <path d="M12 2.4h0l.5 2.3a7.6 7.6 0 0 1 2.3 1l2-1.3 1.8 1.8-1.3 2a7.6 7.6 0 0 1 1 2.3l2.3.5v2.4l-2.3.5a7.6 7.6 0 0 1-1 2.3l1.3 2-1.8 1.8-2-1.3a7.6 7.6 0 0 1-2.3 1l-.5 2.3H9.6l-.5-2.3a7.6 7.6 0 0 1-2.3-1l-2 1.3-1.8-1.8 1.3-2a7.6 7.6 0 0 1-1-2.3l-2.3-.5v-2.4l2.3-.5a7.6 7.6 0 0 1 1-2.3l-1.3-2L5 4.4l2 1.3a7.6 7.6 0 0 1 2.3-1l.5-2.3Z" />
+  </svg>
+)
+
+export const TroisPoints = ({ taille = 18 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <circle cx="5" cy="12" r="2" />
+    <circle cx="12" cy="12" r="2" />
+    <circle cx="19" cy="12" r="2" />
+  </svg>
+)
+
+export const Epingle = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M8.4 2.8h7.2l-1.1 5.4 3.4 3.3v1.9H6.1v-1.9l3.4-3.3Z"
+      fill="currentColor" stroke="none" />
+    <path d="M12 13.4v7.8" />
+  </svg>
+)
+
+// Cloche barree : la ligne « Mettre en sourdine » des reglages.
+export const ClocheBarree = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M8.4 4.9A5.6 5.6 0 0 1 17.6 9v3.4l1.6 3.1H8.2" />
+    <path d="M6.4 9v3.4L4.8 15.5h6.6" />
+    <path d="M10.2 18.4a2 2 0 0 0 3.6 0" />
+    <path d="m3.6 3.4 16.8 17.2" />
+  </svg>
+)
+
+// Megaphone : canal « Assistance publicités ».
+export const CanalPublicite = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M3.4 10.2v3.6a1.4 1.4 0 0 0 1.4 1.4h2.4l6.8 4V4.8l-6.8 4H4.8a1.4 1.4 0 0 0-1.4 1.4Z" />
+    <path d="M7.2 15.2v4.4h2.6l-.4-4.4" />
+    <path d="M17.4 9.4a4.2 4.2 0 0 1 0 5.2M19.8 7a7.4 7.4 0 0 1 0 10" />
+  </svg>
+)
+
+// Fusee : canal « Assistant promotion ».
+export const CanalPromotion = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M11 15.4 8.6 13a11.4 11.4 0 0 1 3.2-6.6C14 4.2 17.4 3 20.4 3.2c.3 3-.9 6.4-3.2 8.6a11.4 11.4 0 0 1-6.2 3.6Z" />
+    <circle cx="15.2" cy="8.8" r="1.7" />
+    <path d="M8.6 13H5.4l1.4-3.2h3.2M11 15.4v3.2l3.2-1.4v-3.2" />
+    <path d="M6.6 17.4 4.2 19.8" />
+  </svg>
+)
+
+// Etal de marche : canal « Creator Marketplace ».
+export const CanalMarketplace = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M3.2 7.4h17.6l-1.4 3.2H4.6Z" />
+    <path d="M5 10.6v8.2a1.4 1.4 0 0 0 1.4 1.4h11.2a1.4 1.4 0 0 0 1.4-1.4v-8.2" />
+    <path d="M9.4 7.4 10.4 3.6h3.2l1 3.8" />
+    <path d="M9.8 14.6h4.4" />
+  </svg>
+)
+
+// Antenne de diffusion : canal « LIVE ».
+export const CanalLive = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="12" cy="12" r="2.4" />
+    <path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 16.2a6 6 0 0 0 0-8.4" />
+    <path d="M5 5a9.8 9.8 0 0 0 0 14M19 19a9.8 9.8 0 0 0 0-14" />
+  </svg>
+)
+
+// Pile d'episodes : canal « Mini-série ».
+export const CanalMiniSerie = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="2.8" y="7" width="13.4" height="13.2" rx="2.4" />
+    <path d="M6.4 4.4h10a3.4 3.4 0 0 1 3.4 3.4v9" />
+    <path d="m8.4 11.4 4.2 2.4-4.2 2.4Z" />
+  </svg>
+)
+
+// Pastille generique de l'application : le logo de la marque n'est
+// pas reproduit, seulement un cadre et un triangle de lecture.
+export const CanalApplication = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3.4" y="3.4" width="17.2" height="17.2" rx="5" />
+    <path d="m9.8 8.6 6 3.4-6 3.4Z" />
+  </svg>
+)
+
+/* ---------- Feuille « Envoyer à » ---------- */
+
+export const FeuilleCroix = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2.2}>
+    <path d="M6 6 18 18M18 6 6 18" />
+  </svg>
+)
+
+export const Maillon = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2}>
+    <path d="M10 13.5a4 4 0 0 0 5.7 0l2.8-2.8a4 4 0 0 0-5.7-5.7l-1.5 1.5" />
+    <path d="M14 10.5a4 4 0 0 0-5.7 0l-2.8 2.8a4 4 0 0 0 5.7 5.7l1.5-1.5" />
+  </svg>
+)
+
+export const Telecharger = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2}>
+    <path d="M12 3.2v11.6m-4.3-4.3L12 14.8l4.3-4.3" />
+    <path d="M4.4 16.6v2.2a2 2 0 0 0 2 2h11.2a2 2 0 0 0 2-2v-2.2" />
+  </svg>
+)
+
+export const Statistiques = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <rect x="3" y="3" width="18" height="18" rx="4.5" />
+    <path d="m7.3 14.8 3.1-3.4 2.3 2.2 4-4.3" />
+    <path d="M13.6 9.3h3.1v3.1" />
+  </svg>
+)
+
+export const Diffuser = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M3.2 8.4V6.2a2.2 2.2 0 0 1 2.2-2.2h13.2a2.2 2.2 0 0 1 2.2 2.2v11.6a2.2 2.2 0 0 1-2.2 2.2h-6.2" />
+    <path d="M3.2 12.6a7.4 7.4 0 0 1 7.4 7.4" />
+    <path d="M3.2 16.6a3.4 3.4 0 0 1 3.4 3.4" />
+    <circle cx="3.6" cy="20" r="1.3" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+export const Groupe = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <circle cx="8.5" cy="8" r="3.2" />
+    <circle cx="16.5" cy="9" r="2.6" />
+    <path d="M2.5 19.5c0-3.4 2.6-5.5 6-5.5s6 2.1 6 5.5" />
+    <path d="M16.2 14c2.6 0 4.3 1.8 4.3 4.4" />
+  </svg>
+)
+
+export const Duo = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <path d="M11 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 1 0-17Z" />
+    <circle cx="16" cy="12" r="8.5" opacity=".45" />
+  </svg>
+)
+
+export const Collage = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M8.5 3.5H5a1.5 1.5 0 0 0-1.5 1.5v14a1.5 1.5 0 0 0 1.5 1.5h3.5" />
+    <path d="M15.5 3.5H19a1.5 1.5 0 0 1 1.5 1.5v14a1.5 1.5 0 0 1-1.5 1.5h-3.5" />
+    <path d="M12 2.5v19" strokeDasharray="2.5 2.5" />
+  </svg>
+)
+
+export const StickerPlus = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M3.6 6A2.4 2.4 0 0 1 6 3.6h12A2.4 2.4 0 0 1 20.4 6v7.8L13.8 20.4H6A2.4 2.4 0 0 1 3.6 18Z" />
+    <path d="M20.4 13.8h-4.2a2.4 2.4 0 0 0-2.4 2.4v4.2" />
+    <path d="M8.6 8.4v4.4m-2.2-2.2h4.4" />
+  </svg>
+)
+
+export const SousTitres = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M3.5 8.2A1.7 1.7 0 0 1 5.2 6.5h13.6a1.7 1.7 0 0 1 1.7 1.7v7.6a1.7 1.7 0 0 1-1.7 1.7H5.2a1.7 1.7 0 0 1-1.7-1.7Z" />
+    <path d="M9 10.6a2 2 0 1 0 0 2.8M15.5 10.6a2 2 0 1 0 0 2.8" />
+  </svg>
+)
+
+export const Crayon2 = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M16.5 3.6a2.3 2.3 0 0 1 3.3 3.3L8 18.7l-4.3 1 1-4.3Z" />
+  </svg>
+)
+
+export const CadenasPlein = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <rect x="4.5" y="10" width="15" height="11" rx="2.5" fill="currentColor" stroke="none" />
+    <path d="M8 10V6.9a4 4 0 0 1 8 0V10" />
+  </svg>
+)
+
+export const PhotoAnimee = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="6.4" strokeDasharray="1.5 3" />
+    <circle cx="12" cy="12" r="9.6" strokeDasharray="1.5 3.5" />
+  </svg>
+)
+
+export const EtiquetteGif = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="2.5" y="5.5" width="19" height="13" rx="3" />
+    <text x="12" y="15.4" fontSize="7.6" fontWeight="700" fill="currentColor"
+      stroke="none" textAnchor="middle">GIF</text>
+  </svg>
+)
+
+export const Portefeuille = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h13a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" />
+    <path d="m9 9.4 1 2.2 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3L5.7 12l2.3-.3Z"
+      fill="currentColor" stroke="none" />
+  </svg>
+)
+
+export const MotsCles = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="m4 17 4.5-11L13 17M5.7 13.6h5.6" />
+    <circle cx="17.5" cy="15.5" r="3.2" />
+    <path d="m19.9 17.9 2 2" />
+  </svg>
+)
+
+export const AjoutStory = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="12" cy="12" r="9.2" strokeDasharray="2.6 2.6" />
+    <path d="M12 8.4v7.2M8.4 12h7.2" />
+  </svg>
+)
+
+// Deux fleches en boucle : republier la video sur son profil.
+export const Republier = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2.1}>
+    <path d="M4 9.2V8a2.6 2.6 0 0 1 2.6-2.6h9.8" />
+    <path d="m13.6 2.6 3 2.8-3 2.8" />
+    <path d="M20 14.8V16a2.6 2.6 0 0 1-2.6 2.6H7.6" />
+    <path d="m10.4 21.4-3-2.8 3-2.8" />
+  </svg>
+)
+
+// Drapeau : signaler une publication.
+export const Drapeau = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M5.4 21V3.6" />
+    <path d="M5.4 4.4h12.4l-2.2 4.4 2.2 4.4H5.4Z" fill="currentColor" stroke="none" />
+    <path d="M5.4 4.4h12.4l-2.2 4.4 2.2 4.4H5.4Z" />
+  </svg>
+)
+
+// Megaphone : promouvoir la publication.
+export const Megaphone = ({ taille = 24 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M3.4 9.6v4.8a1.2 1.2 0 0 0 1.2 1.2h2.6L14 19.8V4.2L7.2 8.4H4.6a1.2 1.2 0 0 0-1.2 1.2Z"
+      fill="currentColor" stroke="none" />
+    <path d="M17.4 8.8a4.6 4.6 0 0 1 0 6.4M19.8 6a8.2 8.2 0 0 1 0 12" />
+  </svg>
+)
+
+// Pastilles de marque : elles gardent leurs couleurs propres et ne
+// suivent donc pas currentColor.
+export const LogoWhatsApp = ({ taille = 52 }: Props) => (
+  <svg width={taille} height={taille} viewBox="0 0 48 48" aria-hidden>
+    <circle cx="24" cy="24" r="24" fill="#25d366" />
+    <path fill="#fff" d="M33.1 14.8A12.8 12.8 0 0 0 13 30.3l-1.8 6.6 6.8-1.8a12.8 12.8 0 0 0 6.1 1.6h.1a12.8 12.8 0 0 0 8.9-21.9Zm-8.9 19.7a10.6 10.6 0 0 1-5.4-1.5l-.4-.2-4 1 1.1-3.9-.3-.4a10.6 10.6 0 1 1 9 5Z" />
+    <path fill="#fff" d="M30 27.1c-.3-.2-1.8-.9-2.1-1s-.5-.1-.7.2-.8 1-.9 1.2-.3.2-.6.1a8.6 8.6 0 0 1-2.5-1.6 9.6 9.6 0 0 1-1.8-2.2c-.2-.3 0-.5.1-.6l.5-.6a2.2 2.2 0 0 0 .3-.5.6.6 0 0 0 0-.6c0-.2-.7-1.7-1-2.3s-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.9.4 3.6 3.6 0 0 0-1.1 2.7 6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9 18.6 18.6 0 0 0 1.9.7 4.4 4.4 0 0 0 2 .1 3.3 3.3 0 0 0 2.2-1.5 2.7 2.7 0 0 0 .2-1.5c-.1-.2-.3-.3-.6-.4Z" />
+  </svg>
+)
+
+export const LogoSMS = ({ taille = 52 }: Props) => (
+  <svg width={taille} height={taille} viewBox="0 0 48 48" aria-hidden>
+    <circle cx="24" cy="24" r="24" fill="#4bd964" />
+    <path fill="#fff" d="M24 11.5c-7.5 0-13.5 4.9-13.5 11s6 11 13.5 11a16 16 0 0 0 3-.3 12 12 0 0 0 5.4 3.2.6.6 0 0 0 .7-.9 8.4 8.4 0 0 1-1.6-3.6c2.4-2 3.9-4.8 3.9-7.9 0-6.1-6-11-13.4-11Z" />
+  </svg>
+)
+
+export const LogoTelegram = ({ taille = 52 }: Props) => (
+  <svg width={taille} height={taille} viewBox="0 0 48 48" aria-hidden>
+    <circle cx="24" cy="24" r="24" fill="#2aabee" />
+    <path fill="#fff" d="M35.6 14.2 31.3 34.5c-.3 1.4-1.2 1.8-2.4 1.1l-6.6-4.9-3.2 3.1c-.4.4-.7.6-1.3.6l.5-6.8 12.3-11.1c.5-.5-.1-.7-.8-.3l-15.2 9.6-6.5-2c-1.4-.5-1.5-1.4.3-2.1l25.4-9.8c1.2-.4 2.2.3 1.8 2.3Z" />
+  </svg>
+)
+
+// Glyphe de bulle generique, et non le logo de la marque.
+export const AppliEphemere = ({ taille = 52 }: Props) => (
+  <svg width={taille} height={taille} viewBox="0 0 48 48" aria-hidden>
+    <circle cx="24" cy="24" r="24" fill="#f7e03c" />
+    <path fill="#111" d="M24 13.5c-6 0-10.8 4-10.8 8.9 0 2.6 1.3 4.9 3.5 6.5l-1.2 4.7 5-2.5c1.1.3 2.3.4 3.5.4 6 0 10.8-4 10.8-8.9s-4.8-9.1-10.8-9.1Z" />
+  </svg>
+)
+
+/* ---------- Page des brouillons ---------- */
+
+// Deux feuillets superposes : le brouillon contient plusieurs clips.
+export const Calques = ({ taille = 18 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <rect x="8" y="3" width="13" height="13" rx="3" />
+    <rect x="3" y="8" width="13" height="13" rx="3" stroke="#000"
+      strokeWidth={1.4} strokeOpacity={.18} />
+  </svg>
+)
+
+// Petite note de musique des etiquettes de son, sur la vignette.
+export const NoteEtiquette = ({ taille = 13 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2}>
+    <path d="M9 18V5l11-2v13" />
+    <circle cx="6" cy="18" r="3" fill="currentColor" />
+    <circle cx="17" cy="16" r="3" fill="currentColor" />
+  </svg>
+)

@@ -59,13 +59,9 @@ input, textarea { font: inherit; color: inherit; }
   width: 36px; height: 27px; border-radius: 9px; background: #fff;
   color: #000; display: grid; place-items: center; box-shadow:-5px 0 #16cce0,5px 0 #ff2856;
 }
-.app:has(.page-profil) .nav button,.app:has(.page-messages) .nav button{color:#111;}
-.app:has(.page-profil) .nav-creer .pastille,.app:has(.page-messages) .nav-creer .pastille{background:#000;color:#fff;}
-.page-messages{background:#fff;color:#111;}
-.page-messages h1{font-size:22px;text-align:center;}
-.page-messages>div{display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;padding-top:25vh;}
-.page-messages h2{font-size:17px;}.page-messages p{font-size:14px;color:#888;}
-.app:has(.page-messages)>.nav{background:white;border-color:#e8e8e8;}
+.app:has(.page-profil) .nav button,.app:has(.msg-page) .nav button{color:#111;}
+.app:has(.page-profil) .nav-creer .pastille,.app:has(.msg-page) .nav-creer .pastille{background:#000;color:#fff;}
+.app:has(.msg-page)>.nav{background:white;border-color:#e8e8e8;}
 
 /* ---------- Fil vertical ---------- */
 .fil { height: 100%; overflow-y: scroll; scroll-snap-type: y mandatory; scrollbar-width: none; }

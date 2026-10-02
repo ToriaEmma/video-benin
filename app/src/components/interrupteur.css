@@ -1,0 +1,6 @@
+/* Interrupteur partage par les pages de reglages. */
+.itr-piste{width:48px;height:28px;border-radius:14px;padding:2.5px;background:#e3e3e5;flex-shrink:0;display:flex;align-items:center;transition:background .18s;}
+.itr-piste.itr-actif{background:#5ad2ec;}
+.itr-pastille{display:block;width:23px;height:23px;border-radius:50%;background:#fff;transition:transform .18s;}
+.itr-piste.itr-actif .itr-pastille{transform:translateX(20px);}
+@media(prefers-reduced-motion:reduce){.itr-piste,.itr-pastille{transition:none;}}

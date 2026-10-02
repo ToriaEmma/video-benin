@@ -1,0 +1,52 @@
+/* Boite de reception, demandes de messages et fil d'une conversation. */
+.msg-page{color-scheme:light;background:#fff;color:#111;height:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+.msg-page>*{flex-shrink:0;}
+.app:has(.msg-fil-page)>.nav{display:none;}
+
+.msg-barre{display:flex;align-items:center;justify-content:space-between;min-height:50px;padding:0 16px;}
+.msg-barre h1{font-size:16.5px;font-weight:700;margin:0;}
+.msg-barre button{display:grid;place-items:center;min-height:42px;min-width:30px;color:#111;}
+
+.msg-recherche{display:flex;align-items:center;gap:8px;margin:0 16px 6px;background:#f1f1f2;border-radius:10px;padding:0 11px;min-height:38px;color:#8e8e93;}
+.msg-recherche input{flex:1;min-width:0;border:0;background:transparent;color:#111;font-size:14px;outline:none;}
+.msg-recherche input::placeholder{color:#8e8e93;}
+
+.msg-liste{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:4px 0 12px;}
+
+/* Une conversation de la liste. */
+.msg-ligne{display:flex;align-items:center;gap:12px;width:100%;padding:9px 16px;text-align:left;color:#111;}
+.msg-avatar,.msg-service{display:grid;place-items:center;border-radius:50%;color:#fff;font-weight:700;flex-shrink:0;}
+.msg-service{width:52px;height:52px;background:#e8820c;}
+.msg-service-bleu{background:#3b4472;}
+.msg-ligne-corps{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.msg-ligne-pseudo{display:flex;align-items:center;gap:6px;font-size:14.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.msg-flamme{display:inline-flex;align-items:center;gap:2px;color:#ff7a18;font-size:11.5px;font-weight:600;flex-shrink:0;}
+.msg-apercu{color:#8e8e93;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.msg-apercu-nonlu{color:#111;font-weight:600;}
+.msg-ligne-fin{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex-shrink:0;color:#c4c4c6;}
+.msg-heure{color:#8e8e93;font-size:11.5px;}
+.msg-nonlu{width:9px;height:9px;border-radius:50%;background:#ff2856;}
+
+.msg-vide{display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;padding:26vh 40px 0;color:#c7c7cc;}
+.msg-vide h2{color:#111;font-size:15px;font-weight:700;margin:0;}
+.msg-vide p{color:#8e8e93;font-size:13px;line-height:1.4;margin:0;}
+.msg-vide-texte{color:#8e8e93;font-size:13.5px;text-align:center;padding:22vh 40px 0;}
+
+/* Barre du haut d'une conversation. */
+.msg-barre-fil{display:flex;align-items:center;gap:10px;min-height:50px;padding:0 16px 0 8px;border-bottom:1px solid #f0f0f1;}
+.msg-barre-fil button{display:grid;place-items:center;min-height:42px;min-width:30px;color:#111;}
+.msg-barre-fil h1{flex:1;min-width:0;font-size:15.5px;font-weight:600;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.msg-fil{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;padding:12px;display:flex;flex-direction:column;gap:7px;}
+.msg-rang{display:flex;justify-content:flex-start;}
+.msg-rang-moi{justify-content:flex-end;}
+.msg-bulle{max-width:76%;border-radius:18px;padding:9px 13px;background:#f1f1f2;color:#111;font-size:14.5px;line-height:1.35;margin:0;overflow-wrap:anywhere;}
+.msg-bulle-moi{background:#ff2856;color:#fff;}
+
+/* Champ de saisie, en pied du fil. */
+.msg-redaction{display:flex;align-items:flex-end;gap:9px;padding:8px 12px 10px;border-top:1px solid #f0f0f1;}
+.msg-redaction textarea{flex:1;min-width:0;background:#f1f1f2;border:0;border-radius:20px;padding:10px 14px;color:#111;font-size:14.5px;font-family:inherit;line-height:1.35;resize:none;outline:none;max-height:110px;}
+.msg-redaction textarea::placeholder{color:#8e8e93;}
+.msg-redaction button{width:38px;height:38px;border-radius:50%;background:#ff2856;color:#fff;display:grid;place-items:center;flex-shrink:0;}
+.msg-redaction button:disabled{background:#f7adbf;cursor:default;}
+.msg-page button:focus-visible{outline:2px solid #555;outline-offset:2px;}
