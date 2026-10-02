@@ -159,7 +159,7 @@ export default function Commentaires({
                 <Pressable hitSlop={6} accessibilityRole="button"
                   accessibilityLabel="Ajouter une image"
                   onPress={() => setMessage(
-                    'Les images dans les commentaires seront disponibles prochainement.')}>
+                    'Un commentaire ne peut contenir que du texte : Tok 229 n’héberge pas d’images de commentaires.')}>
                   <ImageCommentaire taille={23} couleur="rgba(255,255,255,.72)" />
                 </Pressable>
                 <Pressable hitSlop={6} accessibilityRole="button"

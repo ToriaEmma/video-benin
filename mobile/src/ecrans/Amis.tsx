@@ -401,7 +401,9 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
 
   useEffect(() => {
     let valable = true
-    apiVideos.liste()
+    // Fil des abonnements, et non le fil general : l'onglet ne montre que
+    // les comptes que le lecteur suit, sans quoi son nom serait trompeur.
+    apiVideos.suivis()
       .then(v => { if (valable) { setListe(v); setErreur('') } })
       .catch((e: Error) => { if (valable) setErreur(e.message) })
       .finally(() => { if (valable) setChargement(false) })
@@ -464,10 +466,12 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
           </View>
         ) : liste.length === 0 ? (
           // Un fil vide et un fil en panne se ressemblent a l'ecran : le
-          // message du serveur distingue les deux.
+          // message du serveur distingue les deux. Vide sans erreur, la
+          // cause est connue : le lecteur ne suit encore personne.
           <View style={s.attente}>
             <Text style={s.attenteTexte}>
-              {erreur || 'Aucune vidéo pour le moment.'}
+              {erreur
+                || 'Tu ne suis encore personne. Abonne-toi à des comptes pour voir leurs vidéos ici.'}
             </Text>
             {!!erreur && (
               <Pressable style={s.reessayer} onPress={recharger}>

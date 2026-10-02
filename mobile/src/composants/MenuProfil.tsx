@@ -8,6 +8,16 @@ import Svg, { Path, Rect, Circle, Ellipse } from 'react-native-svg'
 import { Text } from './Texte'
 import { Chevron, Studio } from './Icones'
 
+// Pourquoi chaque section reste vide : aucune n'a de route cote serveur.
+// Le menu le dit section par section, plutot que d'annoncer une suite.
+const RAISONS: Record<string, string> = {
+  'Centre des activités': 'Tok 229 ne tient pas encore d’historique d’activité : il n’y a rien à afficher ici.',
+  'Vidéos hors ligne': 'Le téléchargement des vidéos n’est pas encore en place : rien n’est gardé sur l’appareil.',
+  'Ton code QR': 'La génération de code QR n’est pas encore en place.',
+  'Ta musique': 'Tok 229 n’a pas encore de catalogue musical : aucun son ne peut être listé ici.',
+  'Studio créateur': 'Le studio créateur n’est pas encore en place. Tu peux déjà gérer tes publications depuis les paramètres.',
+}
+
 const GROUPES = [
   { titre: 'Ressources', lignes: [{ nom: 'Solde', icone: 'solde' }] },
   { titre: 'Outils personnels', lignes: [
@@ -104,7 +114,7 @@ export default function MenuProfil({ onFermer, onDeconnecter, onSolde, onParamet
               </Pressable>
             ) : (
               <Text style={s.indisponible}>
-                Cette fonctionnalité sera disponible prochainement.
+                {RAISONS[selection] ?? 'Cette section n’est pas encore en place.'}
               </Text>
             )}
           </> : (

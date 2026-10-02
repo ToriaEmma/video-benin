@@ -183,11 +183,18 @@ export default function Solde({ onRetour }: { onRetour: () => void }) {
     `${d} ${NOMS_DEVISES[d] ?? ''}`.toLocaleLowerCase()
       .includes(recherche.toLocaleLowerCase()))
 
+  // Cet ecran est une demonstration : il n'existe ni paiement ni
+  // monetisation cote serveur. Chaque outil le dit a sa facon, plutot que
+  // de laisser croire a une mise en service prochaine.
   const OUTILS = [
-    { nom: 'Récompenses LIVE', icone: 'piece' },
-    { nom: 'Monétisation', icone: 'graphique' },
-    { nom: 'Campagnes', icone: 'etoile' },
-    { nom: 'Gestionnaire d’abonnement', icone: 'etoile' },
+    { nom: 'Récompenses LIVE', icone: 'piece',
+      raison: 'Tok 229 n’a pas encore de diffusion en direct, donc aucune récompense à reverser.' },
+    { nom: 'Monétisation', icone: 'graphique',
+      raison: 'Aucun programme de monétisation n’est ouvert : Tok 229 ne verse pas de revenus.' },
+    { nom: 'Campagnes', icone: 'etoile',
+      raison: 'Tok 229 ne vend pas de publicité : il n’y a aucune campagne à gérer.' },
+    { nom: 'Gestionnaire d’abonnement', icone: 'etoile',
+      raison: 'Tok 229 ne propose aucun abonnement payant.' },
   ]
 
   const FAQ = [
@@ -305,7 +312,7 @@ export default function Solde({ onRetour }: { onRetour: () => void }) {
           <View style={[s.carte, s.outils]}>
             {OUTILS.map(o => (
               <Pressable key={o.nom} style={s.outil}
-                onPress={() => setMessage(`${o.nom} : disponible prochainement.`)}>
+                onPress={() => setMessage(o.raison)}>
                 <View style={s.outilPastille}>
                   <Icone nom={o.icone} />
                 </View>

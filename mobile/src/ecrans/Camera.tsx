@@ -29,6 +29,22 @@ const FILTRES = [
   { nom: 'Noir & blanc', voile: 'rgba(128,128,128,.62)', melange: 'saturation' as const },
 ]
 const DUREES = ['10 min', '60 s', '15 s', 'PHOTO', 'TEXTE']
+// Pourquoi chaque outil reste muet. Filmer, choisir un filtre et allumer
+// la lampe fonctionnent ; le reste demande un vrai moteur de montage, que
+// Tok 229 n'a pas. Chaque bouton le dit plutot que de promettre une suite.
+const RAISONS_OUTILS: Record<string, string> = {
+  Minuteur: 'le déclenchement différé n’est pas encore en place.',
+  Disposition: 'les modèles de disposition demandent un moteur de montage.',
+  Retouche: 'la retouche du visage demande un moteur de montage.',
+  Vitesse: 'le ralenti et l’accéléré demandent un moteur de montage.',
+  "Plus d'outils": 'il n’y a pas d’autre outil pour l’instant.',
+  'Enregistrer l’effet': 'les effets ne sont pas encore enregistrables.',
+  Agrandir: 'l’aperçu agrandi n’est pas encore en place.',
+  'Diffusion LIVE': 'Tok 229 n’a pas encore de diffusion en direct.',
+  'Envoyer à des amis': 'partage ta vidéo une fois publiée.',
+  Créer: 'il n’y a pas d’autre mode de création pour l’instant.',
+}
+
 const OUTILS = [
   { nom: 'Flash', Icone: OutilFlash },
   { nom: 'Minuteur', Icone: OutilMinuteur },
@@ -84,16 +100,18 @@ const Chronometre = React.memo(function Chronometre() {
   )
 })
 
-const Viseur = React.memo(function Viseur({ cameraRef, face, filtre }: {
+const Viseur = React.memo(function Viseur({ cameraRef, face, filtre, torche }: {
   cameraRef: React.RefObject<CameraView | null>; face: CameraType
   // Index du filtre applique : son voile se pose sur l'apercu.
   filtre: number
+  // Lampe allumee : seule la camera arriere en porte une.
+  torche: boolean
 }) {
   const choisi = FILTRES[filtre]
   return (
     <>
       <CameraView ref={cameraRef} style={StyleSheet.absoluteFill}
-        facing={face} mode="video" />
+        facing={face} mode="video" enableTorch={torche} />
       {choisi.voile !== 'transparent' && (
         <View pointerEvents="none" style={[
           StyleSheet.absoluteFill,
@@ -195,6 +213,8 @@ export default function Camera({ onFermer, onChoisir }: {
   // Apercu de la derniere video de la pellicule, pose dans le cadre « galerie ».
   const [apercuGalerie, setApercuGalerie] = useState<string | null>(null)
   const [outilsDeplies, setOutilsDeplies] = useState(false)
+  // Lampe de la camera arriere, commandee par l'outil « Flash ».
+  const [torche, setTorche] = useState(false)
   // Mode « Effets » : s'active des qu'un filtre autre qu'Original est choisi.
   const [modeEffets, setModeEffets] = useState(false)
   // Menu affiche quand on quitte un montage en cours.
@@ -224,8 +244,18 @@ export default function Camera({ onFermer, onChoisir }: {
     if (nom === 'Filtres' || nom === 'Effets') {
       setFiltre(v => (v + 1) % FILTRES.length); setMessage(''); return
     }
-    setMessage(`${nom} : disponible prochainement.`)
-    setTimeout(() => setMessage(''), 2200)
+    // La lampe est une vraie capacite de l'appareil : seule la camera
+    // arriere en porte une, d'ou le refus explicite en facade.
+    if (nom === 'Flash') {
+      if (face === 'front') {
+        setMessage('La caméra avant n’a pas de lampe.')
+        setTimeout(() => setMessage(''), 2600)
+        return
+      }
+      setTorche(v => !v); setMessage(''); return
+    }
+    setMessage(`${nom} : ${RAISONS_OUTILS[nom] ?? 'pas encore en place.'}`)
+    setTimeout(() => setMessage(''), 3200)
   }
 
   const galerie = async () => {
@@ -303,7 +333,8 @@ export default function Camera({ onFermer, onChoisir }: {
   return (
     <View style={[s.page, { paddingTop: marges.top + 40 }]}>
       <View style={s.viseur}>
-        <Viseur cameraRef={camera} face={face} filtre={filtre} />
+        <Viseur cameraRef={camera} face={face} filtre={filtre}
+          torche={torche && face === 'back'} />
 
       {/* Barre du haut : fermer, ajouter un son, retourner */}
       {!enregistrement && <SafeAreaView style={s.hautZone}>
@@ -321,7 +352,12 @@ export default function Camera({ onFermer, onChoisir }: {
             </Text>
           </Pressable>
           <Pressable hitSlop={12} disabled={enregistrement}
-            onPress={() => setFace(f => (f === 'back' ? 'front' : 'back'))}>
+            onPress={() => {
+              // La facade n'a pas de lampe : la torche s'eteint avec le
+              // retournement, pour ne pas rester allumee en apparence.
+              setTorche(false)
+              setFace(f => (f === 'back' ? 'front' : 'back'))
+            }}>
             <Retourner taille={26} couleur="#fff" />
           </Pressable>
         </View>
@@ -380,7 +416,11 @@ export default function Camera({ onFermer, onChoisir }: {
                 <Text style={s.outilNom} numberOfLines={1}>{nom}</Text>
               )}
               <View style={s.outil}>
-                <Icone taille={26} couleur="#fff" />
+                {/* Lampe allumee : l'icone passe au jaune, sans quoi rien
+                    ne distinguerait les deux etats du flash. */}
+                <Icone taille={26}
+                  couleur={nom === 'Flash' && torche && face === 'back'
+                    ? '#fcd116' : '#fff'} />
                 {i === 0 && <View style={s.outilFilet} />}
               </View>
             </Pressable>

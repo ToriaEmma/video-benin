@@ -214,6 +214,10 @@ export const apiComptes = {
 export const apiVideos = {
   liste: (p?: Pagination) => requete<VideoApi[]>(`/videos${parametres(p)}`),
 
+  // Fil des abonnements : exige une session, et renvoie une liste vide
+  // quand le lecteur ne suit encore personne.
+  suivis: (p?: Pagination) => requete<VideoApi[]>(`/videos/suivis${parametres(p)}`),
+
   une: (id: string) => requete<VideoApi>(`/videos/${id}`),
 
   duProfil: (pseudo: string, p?: Pagination) =>

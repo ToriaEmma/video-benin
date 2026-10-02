@@ -84,6 +84,38 @@ const ACTIONS: Action[] = [
   { cle: 'story', nom: 'Ajouter à la Story', Icone: AjoutStory },
 ]
 
+// Pourquoi chaque action reste muette. Tok 229 n'expose ni montage, ni
+// publicite, ni moderation : plutot qu'une promesse vague, chaque bouton
+// dit ce qui lui manque. Ce que l'API sait faire est branche dans `agir`.
+const SANS_ROUTE = 'cette action n’existe pas encore dans Tok 229.'
+const SANS_MONTAGE = 'Tok 229 ne fait pas encore de montage vidéo.'
+const SANS_PUB = 'Tok 229 ne vend pas de publicité.'
+const SANS_STORY = 'Tok 229 n’a pas encore de Stories.'
+
+const RAISONS: Record<string, string> = {
+  telecharger: 'l’enregistrement dans la pellicule n’est pas encore en place.',
+  story: SANS_STORY,
+  promouvoir: SANS_PUB,
+  pub: SANS_PUB,
+  booster: SANS_PUB,
+  signaler: 'la modération n’est pas encore en place.',
+  duo: SANS_MONTAGE,
+  collage: SANS_MONTAGE,
+  animee: SANS_MONTAGE,
+  sticker: SANS_MONTAGE,
+  gif: SANS_MONTAGE,
+  legendes: 'Tok 229 ne génère pas encore de sous-titres.',
+  vitesse: 'la vitesse de lecture n’est pas réglable ici.',
+  groupe: 'les conversations de groupe n’existent pas encore.',
+  diffuser: 'Tok 229 n’a pas encore de diffusion en direct.',
+  epingler: 'épingler une publication n’est pas encore possible.',
+  motscles: 'les mots-clés ne sont pas encore gérés.',
+  // Le serveur sait modifier une publication, mais aucun ecran ne porte
+  // encore le formulaire : la feuille ne peut donc rien proposer ici.
+  modifier: 'l’écran de modification n’est pas encore en place.',
+  confidentialite: 'l’écran de modification n’est pas encore en place.',
+}
+
 export default function EnvoyerA({
   visible, legende, onFermer, onSupprimer, onAnalytiques,
   sienne = true, auteur,
@@ -113,10 +145,22 @@ export default function EnvoyerA({
   const agir = (cle: string, nom: string) => {
     if (['lien', 'whatsapp', 'status', 'telegram', 'ephemere', 'republier']
       .includes(cle)) { partager(); return }
-    if (cle === 'supprimer') { onFermer(); onSupprimer?.(); return }
-    if (cle === 'stats' && onAnalytiques) { onFermer(); onAnalytiques(); return }
-    setMessage(`${nom} : disponible prochainement.`)
-    setTimeout(() => setMessage(''), 2200)
+    if (cle === 'supprimer') {
+      if (onSupprimer) { onFermer(); onSupprimer(); return }
+      // La feuille ouverte depuis le fil n'a pas recu de quoi supprimer :
+      // la publication ne se retire que depuis sa grille de profil.
+      setMessage('Supprimer : va sur ton profil, puis appuie longuement sur la vidéo.')
+      setTimeout(() => setMessage(''), 3200)
+      return
+    }
+    if (cle === 'stats') {
+      if (onAnalytiques) { onFermer(); onAnalytiques(); return }
+      setMessage('Données analytiques : disponibles depuis ta propre publication.')
+      setTimeout(() => setMessage(''), 3200)
+      return
+    }
+    setMessage(`${nom} : ${RAISONS[cle] ?? SANS_ROUTE}`)
+    setTimeout(() => setMessage(''), 3200)
   }
 
   return (

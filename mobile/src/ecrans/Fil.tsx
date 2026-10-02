@@ -219,24 +219,26 @@ export default function Fil({
   const [chargement, setChargement] = useState(!autonome)
   const [erreur, setErreur] = useState('')
   const liste = videos ?? listeApi
+  // « Suivis » et « Pour toi » lisent deux routes distinctes : l'onglet
+  // demande fait donc partie des dependances du chargement.
+  const filApi = categorie === 'Suivis' ? 'Suivis' : 'Pour toi'
+  // Incremente par « Réessayer » : l'effet de chargement repart.
+  const [tentative, setTentative] = useState(0)
 
-  const recharger = () => {
-    setChargement(true)
-    apiVideos.liste()
-      .then(v => { setListeApi(v); setErreur('') })
-      .catch((e: Error) => setErreur(e.message))
-      .finally(() => setChargement(false))
-  }
+  const recharger = () => { setChargement(true); setTentative(n => n + 1) }
 
   useEffect(() => {
     if (autonome) return
     let valable = true
-    apiVideos.liste()
+    const envoi = filApi === 'Suivis' ? apiVideos.suivis() : apiVideos.liste()
+    envoi
       .then(v => { if (valable) { setListeApi(v); setErreur('') } })
-      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      // La liste est videe avec l'erreur : garder celle de l'onglet
+      // precedent ferait passer ses videos pour celles de celui-ci.
+      .catch((e: Error) => { if (valable) { setListeApi([]); setErreur(e.message) } })
       .finally(() => { if (valable) setChargement(false) })
     return () => { valable = false }
-  }, [autonome])
+  }, [autonome, filApi, tentative])
 
   // Les commentaires sont comptes ici : la feuille en ajoute et en retire,
   // et le compteur de la carte doit suivre sans recharger tout le fil.
@@ -254,27 +256,43 @@ export default function Fil({
   // s'y lit en sombre.
   const clair = !autonome && categorie === 'Communauté'
 
+  // Passer d'un fil de l'API a l'autre relance une requete : la liste
+  // precedente est ecartee tout de suite, pour ne pas montrer les videos
+  // de « Pour toi » sous l'onglet « Suivis » le temps du chargement.
+  const changerCategorie = (c: string) => {
+    const apres = c === 'Suivis' ? 'Suivis' : 'Pour toi'
+    if (!autonome && (c === 'Suivis' || c === 'Pour toi') && apres !== filApi) {
+      setListeApi([]); setErreur(''); setChargement(true); setIndex(0)
+    }
+    setCategorie(c)
+  }
+
+  // La mosaique « Communauté » lit le fil deja charge : l'onglet retrouve
+  // donc sa liste telle quelle, positionnee sur la video touchee.
   const ouvrirVideo = (videoId: string) => {
     const rang = liste.findIndex(v => v.id === videoId)
     setIndex(rang < 0 ? 0 : rang)
-    setCategorie('Pour toi')
+    setCategorie(filApi)
   }
 
   return (
     <View style={s.page}
       onLayout={e => setHauteur(e.nativeEvent.layout.height)}>
-      {!autonome && categorie === 'Pour toi' && chargement ? (
+      {!autonome && filApi === categorie && chargement ? (
         <View style={s.attente}>
           <ActivityIndicator color="#fff" />
           <Text style={s.attenteTexte}>Chargement…</Text>
         </View>
-      ) : !autonome && categorie === 'Pour toi' && liste.length === 0 ? (
+      ) : !autonome && filApi === categorie && liste.length === 0 ? (
         // Un fil vide et un fil en panne se ressemblent a l'ecran : le
         // message du serveur distingue les deux, et le bouton permet de
-        // retenter sans quitter l'onglet.
+        // retenter sans quitter l'onglet. Sous « Suivis », le fil vide a
+        // une cause precise : le lecteur ne suit encore personne.
         <View style={s.attente}>
           <Text style={s.attenteTexte}>
-            {erreur || 'Aucune vidéo pour le moment.'}
+            {erreur || (categorie === 'Suivis'
+              ? 'Tu ne suis encore personne. Abonne-toi à des comptes pour voir leurs vidéos ici.'
+              : 'Aucune vidéo pour le moment.')}
           </Text>
           {!!erreur && (
             <Pressable style={s.reessayer} onPress={recharger}>
@@ -282,7 +300,7 @@ export default function Fil({
             </Pressable>
           )}
         </View>
-      ) : autonome || categorie === 'Pour toi' ? (
+      ) : autonome || filApi === categorie ? (
         <FlatList
           data={liste}
           keyExtractor={v => v.id}
@@ -309,15 +327,9 @@ export default function Fil({
       ) : categorie === 'LIVE' ? (
         // Le LIVE se tient sur toute la hauteur, entete comprise : il
         // porte sa propre barre du haut et sa propre croix de sortie.
-        <DirectLive onFermer={() => setCategorie('Pour toi')} />
-      ) : categorie === 'Communauté' ? (
-        <Communaute onOuvrir={ouvrirVideo} />
+        <DirectLive onFermer={() => changerCategorie('Pour toi')} />
       ) : (
-        <View style={s.attente}>
-          <Text style={s.attenteTexte}>
-            Le fil de tes abonnements sera disponible prochainement.
-          </Text>
-        </View>
+        <Communaute onOuvrir={ouvrirVideo} />
       )}
 
       {/* Barre du haut, par-dessus la video. En mode autonome elle porte le
@@ -347,7 +359,7 @@ export default function Fil({
 
           <View style={s.categories}>
             {CATEGORIES.map(c => (
-              <Pressable key={c} onPress={() => setCategorie(c)} hitSlop={8} style={s.categorieBoite}>
+              <Pressable key={c} onPress={() => changerCategorie(c)} hitSlop={8} style={s.categorieBoite}>
                 <Text style={[
                   s.categorie,
                   clair && s.categorieClaire,
