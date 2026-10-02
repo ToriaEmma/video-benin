@@ -16,6 +16,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, FlatList, Pressable, ScrollView, StyleSheet, Share, PanResponder,
+  ActivityIndicator,
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native'
 import { Text } from '../composants/Texte'
@@ -25,6 +26,7 @@ import { useEvent } from 'expo'
 import {
   etat, abreger, type Video as VideoType, type Story,
 } from '../lib/demo'
+import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../composants/Commentaires'
 import Decouvrir from './Decouvrir'
@@ -67,6 +69,10 @@ const LISTES = [
   'Cotonou by night', 'Cuisine du pays', 'Marchés du Bénin',
   'Éclats de rire', 'Savoir-faire',
 ]
+
+// Les videos viennent de l'API, qui porte `favori` ; les listes passees
+// par un autre ecran ne l'ont pas toujours.
+type VideoAmis = VideoType & { favori?: boolean }
 
 // Index stable deduit de l'identifiant : la meme video garde le meme
 // habillage sans qu'il faille le stocker.
@@ -162,8 +168,9 @@ function Grappe({ pseudo, stories }: {
 
 function Carte({
   item, actif, passage, hauteur, arrondi, decalage, onCommenter, onVisiter,
+  onErreur,
 }: {
-  item: VideoType
+  item: VideoAmis
   actif: boolean
   // Numero du passage courant de la carte : il change a chaque fois que
   // la carte redevient visible, ce qui perime la pause demandee avant.
@@ -175,8 +182,9 @@ function Carte({
   // video commence dessous ; repliees, le decalage retombe a zero et la
   // video occupe tout le cadre.
   decalage: number
-  onCommenter: (v: VideoType) => void
+  onCommenter: (v: VideoAmis) => void
   onVisiter?: (pseudo: string) => void
+  onErreur: (message: string) => void
 }) {
   const lecteur = useVideoPlayer(item.url, p => {
     p.loop = true; p.timeUpdateEventInterval = 0.25
@@ -184,7 +192,7 @@ function Carte({
 
   const [aime, setAime] = useState(item.aime)
   const [nbAime, setNbAime] = useState(item.nbAime)
-  const [favori, setFavori] = useState(false)
+  const [favori, setFavori] = useState(Boolean(item.favori))
   const [developpe, setDeveloppe] = useState(false)
   // Pause demandee par l'utilisateur, a distinguer d'un chargement. La
   // demande est rangee avec le passage de la carte auquel elle se
@@ -204,6 +212,14 @@ function Carte({
     else lecteur.pause()
   }, [actif, lecteur])
 
+  // La vue part quand la carte devient celle qu'on regarde, et non a
+  // chaque rendu. L'echec est silencieux : rater un comptage ne doit pas
+  // interrompre le visionnage.
+  useEffect(() => {
+    if (!actif) return
+    apiVideos.vue(item.id).catch(() => { /* Compteur de vues indisponible. */ })
+  }, [actif, item.id])
+
   const [habillage] = useState(() => {
     const n = empreinte(item.id)
     return {
@@ -215,9 +231,32 @@ function Carte({
     }
   })
 
+  // Le serveur renvoie le decompte reel : on l'affiche d'abord de maniere
+  // optimiste, puis on se recale dessus, et on revient en arriere si la
+  // requete echoue.
   const basculerAime = () => {
-    const n = !aime
-    setAime(n); setNbAime(v => v + (n ? 1 : -1))
+    const vise = !aime
+    setAime(vise); setNbAime(v => v + (vise ? 1 : -1))
+    const envoi = vise
+      ? apiInteractions.aimer(item.id)
+      : apiInteractions.retirerJaime(item.id)
+    envoi
+      .then(r => { setAime(r.aime); setNbAime(r.nbAime) })
+      .catch((e: Error) => {
+        setAime(!vise); setNbAime(v => v + (vise ? -1 : 1))
+        onErreur(e.message)
+      })
+  }
+
+  const basculerFavori = () => {
+    const vise = !favori
+    setFavori(vise)
+    const envoi = vise
+      ? apiInteractions.mettreEnFavori(item.id)
+      : apiInteractions.retirerFavori(item.id)
+    envoi
+      .then(r => setFavori(r.favori))
+      .catch((e: Error) => { setFavori(!vise); onErreur(e.message) })
   }
 
   const partager = async () => {
@@ -274,9 +313,9 @@ function Carte({
             <Text style={s.compteur}>{abreger(item.nbCommentaires)}</Text>
           </Pressable>
 
-          <Pressable style={s.action} onPress={() => setFavori(!favori)} hitSlop={6}>
+          <Pressable style={s.action} onPress={basculerFavori} hitSlop={6}>
             <Favori taille={32} plein={favori} couleur={favori ? '#fcd116' : '#fff'} />
-            <Text style={s.compteur}>{abreger(item.vues % 900)}</Text>
+            <Text style={s.compteur}>Favori</Text>
           </Pressable>
 
           <Pressable style={s.action} onPress={partager} hitSlop={6}>
@@ -350,14 +389,32 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
 }) {
   const { profil } = useAuth()
   const pseudo = profil?.pseudo ?? 'moi'
-  const liste = etat.videos
+  // DECOR LOCAL : il n'existe pas d'API de recits, la rangee du haut
+  // reste donc servie par demo.ts.
   const stories = etat.stories
+
+  const [liste, setListe] = useState<VideoAmis[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
+  // Incremente par « Réessayer » : l'effet de chargement repart.
+  const [tentative, setTentative] = useState(0)
+
+  useEffect(() => {
+    let valable = true
+    apiVideos.liste()
+      .then(v => { if (valable) { setListe(v); setErreur('') } })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [tentative])
+
+  const recharger = () => { setChargement(true); setTentative(n => n + 1) }
 
   const [index, setIndex] = useState(0)
   // Nombre de changements de carte depuis l'ouverture : il sert de numero
   // de passage aux cartes, pour perimer les pauses demandees.
   const [passage, setPassage] = useState(0)
-  const [videoCom, setVideoCom] = useState<VideoType | null>(null)
+  const [videoCom, setVideoCom] = useState<VideoAmis | null>(null)
   // Vrai des que le fil a quitte le haut : la rangee de stories se tasse.
   const [replie, setReplie] = useState(false)
   // La recherche recouvre l'ecran, ouverte par la loupe de l'entete.
@@ -400,6 +457,25 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
       <View style={s.fil}
         onLayout={e => setHauteur(e.nativeEvent.layout.height)}
         {...(replie ? {} : deploiement.panHandlers)}>
+        {chargement ? (
+          <View style={s.attente}>
+            <ActivityIndicator color="#fff" />
+            <Text style={s.attenteTexte}>Chargement…</Text>
+          </View>
+        ) : liste.length === 0 ? (
+          // Un fil vide et un fil en panne se ressemblent a l'ecran : le
+          // message du serveur distingue les deux.
+          <View style={s.attente}>
+            <Text style={s.attenteTexte}>
+              {erreur || 'Aucune vidéo pour le moment.'}
+            </Text>
+            {!!erreur && (
+              <Pressable style={s.reessayer} onPress={recharger}>
+                <Text style={s.reessayerTexte}>Réessayer</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : (
         <FlatList
           data={liste}
           keyExtractor={v => v.id}
@@ -424,9 +500,11 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
             <Carte item={item} actif={i === index} passage={passage}
               hauteur={hauteur} arrondi={!replie}
               decalage={replie ? 0 : HAUT_ENTETE + HAUT_STORIES}
+              onErreur={setErreur}
               onCommenter={setVideoCom} onVisiter={onVisiter} />
           )}
         />
+        )}
       </View>
 
       {/* Entete : titre centre et loupe. Posee au-dessus de tout, elle
@@ -453,6 +531,14 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
             <Bulle key={st.id} story={st} onOuvrir={onVisiter} />
           ))}
         </ScrollView>
+      )}
+
+      {/* Un j'aime ou un favori refuse par le serveur se signale ici : la
+          video continue de se lire, seul le bandeau apparait. */}
+      {!!erreur && liste.length > 0 && (
+        <Pressable style={s.bandeau} onPress={() => setErreur('')}>
+          <Text style={s.bandeauTexte}>{erreur}</Text>
+        </Pressable>
       )}
 
       {videoCom && (
@@ -555,6 +641,20 @@ const s = StyleSheet.create({
     borderWidth: 1.5, borderColor: '#000',
     alignItems: 'center', justifyContent: 'center',
   },
+
+  // --- Attente et pannes reseau ---
+  attente: { flex: 1, alignItems: 'center', justifyContent: 'center',
+    padding: 40, gap: 14 },
+  attenteTexte: { color: '#bbb', textAlign: 'center', fontSize: 15 },
+  reessayer: { borderWidth: 1, borderColor: 'rgba(255,255,255,.35)',
+    borderRadius: 22, paddingHorizontal: 22, minHeight: 44,
+    alignItems: 'center', justifyContent: 'center' },
+  reessayerTexte: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  // Bandeau pose au-dessus de la barre de liste de lecture.
+  bandeau: { position: 'absolute', left: 16, right: 16, bottom: 100, zIndex: 7,
+    backgroundColor: 'rgba(90,90,90,.92)', borderRadius: 10,
+    paddingVertical: 12, paddingHorizontal: 16 },
+  bandeauTexte: { color: '#fff', fontSize: 14, textAlign: 'center' },
 
   // --- Fil ---
   fil: { flex: 1 },
