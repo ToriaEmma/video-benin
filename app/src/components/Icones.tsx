@@ -393,3 +393,115 @@ export const MarquePage = ({ taille = 24, plein = false }: Props) => (
     <path d="M6 3h12a1 1 0 0 1 1 1v17l-7-5-7 5V4a1 1 0 0 1 1-1Z" />
   </svg>
 )
+
+/* ---------- Onglet « Amis » ---------- */
+
+// Avion en papier plein : la pastille rose sous l'avatar du rail d'actions.
+export const AvionEnvoi = ({ taille = 14 }: Props) => (
+  <svg {...base(taille)} stroke="none">
+    <path d="M21.4 3.2 2.9 10.6c-.9.4-.8 1.6.1 1.8l4.8 1.3 1.3 4.9c.2.9 1.4 1 1.8.1l7.4-18.5c.3-.7-.4-1.3-1-1Z" fill="currentColor" />
+    <path d="M8.6 14.2 20.3 4.4" stroke="#ff2856" strokeWidth={1.4} strokeLinecap="round" />
+  </svg>
+)
+
+// Trois lignes suivies d'une note : la barre « Liste de lecture ».
+export const ListeLecture = ({ taille = 18 }: Props) => (
+  <svg {...base(taille)} strokeWidth={1.9}>
+    <path d="M3 6h12M3 11h12M3 16h7" /><path d="M20 7v8" />
+    <ellipse cx="17.6" cy="16.4" rx="2.4" ry="2.1" fill="currentColor" stroke="none" />
+  </svg>
+)
+
+// Pastille « + » du bouton « Créer » de la rangee de stories.
+export const PlusStory = ({ taille = 14 }: Props) => (
+  <svg {...base(taille)} strokeWidth={3}><path d="M12 5v14M5 12h14" /></svg>
+)
+
+export const EtincelleEtiquette = ({ taille = 14 }: Props) => (
+  <svg {...base(taille)} stroke="none">
+    <path d="M10 2.5 11.9 8 17.5 10 11.9 12 10 17.5 8.1 12 2.5 10 8.1 8Z" fill="currentColor" />
+    <path d="M18 14.5 18.9 17.1 21.5 18 18.9 18.9 18 21.5 17.1 18.9 14.5 18 17.1 17.1Z" fill="currentColor" />
+  </svg>
+)
+
+/* ---------- Mosaique « Communauté » ---------- */
+
+// Pile de carres : la publication est un diaporama.
+export const Diaporama = ({ taille = 15 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2}>
+    <rect x="8" y="3" width="13" height="13" rx="2.4" />
+    <path d="M16 20.5H5.5A2.5 2.5 0 0 1 3 18V7.5" />
+  </svg>
+)
+
+export const LectureVignette = ({ taille = 15 }: Props) => (
+  <svg {...base(taille)} stroke="none"><path d="M7 3.5 20 12 7 20.5Z" fill="currentColor" /></svg>
+)
+
+export const CoeurPetit = ({ taille = 14 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2}>
+    <path d="M12 20.5 4.3 13a4.9 4.9 0 0 1 7.7-6 4.9 4.9 0 0 1 7.7 6Z" />
+  </svg>
+)
+
+/* ---------- Pseudo-categorie « LIVE » ---------- */
+
+export const CalendrierEtoile = ({ taille = 23 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="5" width="18" height="17" rx="2" /><path d="M7 2v6M17 2v6" />
+    <path d="m12 9 1.55 3.14 3.47.51-2.51 2.44.59 3.45L12 16.91l-3.1 1.63.59-3.45-2.51-2.44 3.47-.51Z" />
+  </svg>
+)
+
+// Camera video pleine : la pastille rouge de « Passer en LIVE ».
+export const CameraLive = ({ taille = 14 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <rect x="2" y="6.5" width="13" height="11" rx="2.6" />
+    <path d="M16.5 11.2 22 8v8l-5.5-3.2Z" />
+  </svg>
+)
+
+export const Couronne = ({ taille = 14 }: Props) => (
+  <svg {...base(taille)} stroke="none"><path d="M3 7.5l4 4 5-7 5 7 4-4-2 11H5Z" fill="currentColor" /></svg>
+)
+
+// Deux silhouettes dans un cadre : inviter des participants au LIVE.
+export const InvitesLive = ({ taille = 25 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="2.5" y="4.5" width="19" height="15" rx="2.6" />
+    <circle cx="9" cy="10.4" r="2.1" /><path d="M5.6 16.4a3.6 3.6 0 0 1 6.8 0" />
+    <path d="M15 9.5h4M15 13h3" />
+  </svg>
+)
+
+export const CadeauLive = ({ taille = 25 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="9" width="18" height="12" rx="2" /><path d="M2 9h20M12 9v12" />
+    <path d="M12 9S9.5 3 7 4.4 9.6 9 12 9Zm0 0s2.5-6 5-4.6S14.4 9 12 9Z" />
+  </svg>
+)
+
+export const ChevronBas = ({ taille = 18 }: Props) => (
+  <svg {...base(taille)}><path d="m6 9.5 6 6 6-6" /></svg>
+)
+
+export const ChevronHaut = ({ taille = 18 }: Props) => (
+  <svg {...base(taille)}><path d="m6 14.5 6-6 6 6" /></svg>
+)
+
+export const CoeurPlein = ({ taille = 20 }: Props) => (
+  <svg {...base(taille)} stroke="none">
+    <path d="M12 21 3.6 12.6a5.4 5.4 0 0 1 8.4-6.6 5.4 5.4 0 0 1 8.4 6.6Z" fill="currentColor" />
+  </svg>
+)
+
+/* ---------- Analyse video ---------- */
+
+// Silhouette avec une etoile : le bouton « Studio créateur ».
+export const StudioPastille = ({ taille = 18 }: Props) => (
+  <svg {...base(taille)} stroke="none" fill="currentColor">
+    <circle cx="9.4" cy="7" r="3.8" />
+    <path d="M2.4 20.4v-2.2c0-3.2 3.2-5 7-5 1.2 0 2.4.2 3.4.6l-1 6.6H2.4Z" />
+    <path d="m18 11.4 1.5 3.3 3.3 1.5-3.3 1.5L18 21l-1.5-3.3-3.3-1.5 3.3-1.5L18 11.4Z" />
+  </svg>
+)
