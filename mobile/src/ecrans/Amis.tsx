@@ -67,7 +67,7 @@ const EFFETS = [
   { nom: 'Lumière douce', couleur: '#ff8a3d' },
   { nom: 'Vintage 229', couleur: '#8d6cff' },
   { nom: 'Néon Cotonou', couleur: '#1ec0f0' },
-  { nom: 'Grain argentique', couleur: '#49c96d' },
+  { nom: 'Grain argentique', couleur: '#c43cc0' },
   { nom: 'Coucher chaud', couleur: '#ff4d7e' },
 ]
 const SONS = [
