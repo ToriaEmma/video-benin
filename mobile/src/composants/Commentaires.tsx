@@ -151,8 +151,8 @@ export default function Commentaires({
               <Pressable onPress={envoyer} hitSlop={8} disabled={envoi}
                 accessibilityRole="button" accessibilityLabel="Envoyer">
                 {envoi
-                  ? <ActivityIndicator color="#00a550" />
-                  : <Envoyer taille={23} couleur="#00a550" />}
+                  ? <ActivityIndicator color="#ff2856" />
+                  : <Envoyer taille={23} couleur="#ff2856" />}
               </Pressable>
             ) : (
               <View style={s.outils}>

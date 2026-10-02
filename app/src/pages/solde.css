@@ -61,7 +61,7 @@
 .solde-feuille p{line-height:1.35;font-size:14px;}
 .solde-action{display:block;width:100%;border-radius:30px;background:#ff2856!important;color:#fff!important;padding:15px;font-size:16px;font-weight:500;margin-top:34px;}
 .bienvenue .solde-feuille{left:16px;right:16px;bottom:20px;border-radius:30px;padding:20px 28px 34px;max-height:85dvh;}
-.solde-illustration{position:relative;color:#7044ff;background:#6de4da;border-radius:48% 52% 44% 56%;width:108px;height:85px;display:grid;place-items:center;margin:34px auto 26px;transform:rotate(-8deg);}
+.solde-illustration{position:relative;color:#7044ff;background:#16cce0;border-radius:48% 52% 44% 56%;width:108px;height:85px;display:grid;place-items:center;margin:34px auto 26px;transform:rotate(-8deg);}
 .solde-illustration span{position:absolute;right:-8px;top:-13px;color:#ff6279;font-size:40px;}.solde-illustration i{position:absolute;bottom:-5px;left:3px;background:#ff647b;color:#fff;border-radius:50%;font-style:normal;font-size:26px;}
 .solde-avantage{display:flex;align-items:flex-start;gap:12px;margin-top:20px;}.solde-avantage b{font-weight:600;font-size:16px;}.solde-avantage p{color:#777;margin:7px 0;}
 .guide .solde-feuille{text-align:center;}.solde-guide-dessin{position:relative;color:#e5e5e5;margin:30px auto;width:155px;}.solde-guide-dessin span{position:absolute;right:0;top:0;border-radius:50%;padding:16px;background:#fff;box-shadow:0 5px 20px #0002;color:#111;}

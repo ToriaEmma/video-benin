@@ -121,3 +121,15 @@ CREATE TABLE IF NOT EXISTS messages (
 
 CREATE INDEX IF NOT EXISTS messages_conversation
   ON messages(conversation_id, envoye_le);
+
+-- ---------- Recits ----------
+-- Un recit s'efface de lui-meme au bout de 24 h : la colonne de date
+-- suffit, les routes de lecture ecartent ce qui a expire.
+CREATE TABLE IF NOT EXISTS stories (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  auteur_id  uuid NOT NULL REFERENCES profils(id) ON DELETE CASCADE,
+  url        text NOT NULL,
+  cree_le    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS stories_auteur ON stories(auteur_id, cree_le DESC);

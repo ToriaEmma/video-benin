@@ -9,10 +9,9 @@ export const couleurs = {
   texteAttenue: 'rgba(255,255,255,.62)',
   bordure: 'rgba(255,255,255,.12)',
 
-  // Accent : vert et jaune du drapeau beninois, plutot que le cyan/magenta
-  // de TikTok -- voir section 2 du cahier des charges sur le risque lie a la
-  // reproduction des elements de marque.
-  accent: '#00a550',
+  // Accent unique de l'application : le rose, deja porte par les boutons
+  // d'action et les compteurs. Le jaune reste pour les etats chauds.
+  accent: '#ff2856',
   accentChaud: '#fcd116',
   danger: '#e8334a',
 } as const

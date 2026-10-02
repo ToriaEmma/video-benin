@@ -47,8 +47,8 @@ const FILTRES = [
 
 // Palette reprise de l'editeur de couverture (src/ecrans/Couverture.tsx).
 const COULEURS = [
-  '#ffffff', '#111111', '#e8485c', '#ef8d3c', '#eece4a', '#72c45f',
-  '#3fbfa2', '#45b4d8', '#3f7ff0', '#2b3fae',
+  '#ffffff', '#111111', '#e8485c', '#ef8d3c', '#eece4a', '#ff2856',
+  '#c43cc0', '#45b4d8', '#3f7ff0', '#2b3fae',
 ]
 
 const STICKERS = [

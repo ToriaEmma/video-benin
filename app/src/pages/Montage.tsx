@@ -11,7 +11,7 @@ import {
   MontageFiltres, MontageSousTitres, OutilPlus, Vitesse, Emoji,
 } from '../components/Icones'
 import ChoixSon from './ChoixSon'
-import { etatDemo } from '../lib/demo'
+import { apiBrouillons, televerser, fichierDepuisUrl } from '../lib/api'
 import type { Son } from '../lib/sons'
 import './mont.css'
 
@@ -43,8 +43,8 @@ const FILTRES = [
 
 // Palette reprise de l'editeur de couverture.
 const COULEURS = [
-  '#ffffff', '#111111', '#e8485c', '#ef8d3c', '#eece4a', '#72c45f',
-  '#3fbfa2', '#45b4d8', '#3f7ff0', '#2b3fae',
+  '#ffffff', '#111111', '#e8485c', '#ef8d3c', '#eece4a', '#ff2856',
+  '#c43cc0', '#45b4d8', '#3f7ff0', '#2b3fae',
 ]
 
 const STICKERS = [
@@ -165,6 +165,8 @@ export default function Montage({ url, pseudo, onRetour, onSuivant }: {
   const [feuille, setFeuille] = useState<'reglages' | 'stickers' | 'voix' | null>(null)
   const [choixSon, setChoixSon] = useState(false)
   const [son, setSon] = useState<Son | null>(null)
+  // Televersement du brouillon en cours : garde contre un double appui.
+  const [envoiBrouillon, setEnvoiBrouillon] = useState(false)
 
   const [filtre, setFiltre] = useState(0)
   const [vitesse, setVitesse] = useState(1)
@@ -234,15 +236,27 @@ export default function Montage({ url, pseudo, onRetour, onSuivant }: {
     avertir('Sticker ajouté — fais-le glisser.')
   }
 
-  // Menu de sortie : la video rejoint les brouillons conserves.
-  const enregistrerBrouillon = () => {
+  // Menu de sortie : la video rejoint les brouillons du compte. L'ecran des
+  // brouillons les lit depuis l'API, le fichier doit donc y etre televerse —
+  // le garder en memoire le perdrait a la fermeture de l'onglet.
+  const enregistrerBrouillon = async () => {
+    if (envoiBrouillon) return
     const legende = calques.filter(c => c.genre === 'texte').map(c => c.contenu).join(' ').trim()
-    etatDemo.brouillons.unshift({
-      id: `b${Date.now()}`, url, legende, octets: 0, date: Date.now(),
-      etiquette: son ? { type: 'son', nom: son.titre } : undefined,
-    })
+    setEnvoiBrouillon(true)
     setMenuSortie(false)
-    onRetour()
+    avertir('Enregistrement du brouillon…')
+    try {
+      const fichier = await fichierDepuisUrl(url)
+      const distante = await televerser(fichier)
+      await apiBrouillons.creer(distante, legende, fichier.size)
+      onRetour()
+    } catch (e) {
+      // Le montage reste ouvert : la prise n'est pas perdue parce que
+      // l'enregistrement a echoue.
+      avertir(e instanceof Error ? e.message : 'Enregistrement du brouillon impossible.')
+    } finally {
+      setEnvoiBrouillon(false)
+    }
   }
 
   const outilChoisi = (nom: string) => {
@@ -334,7 +348,7 @@ export default function Montage({ url, pseudo, onRetour, onSuivant }: {
             <button onClick={() => { setMenuSortie(false); onRetour() }}>
               <Corbeille taille={20} /><span className="mont-menu-rouge">Supprimer</span>
             </button>
-            <button onClick={enregistrerBrouillon}>
+            <button disabled={envoiBrouillon} onClick={enregistrerBrouillon}>
               <Brouillon taille={20} /><span>Enregistrer le brouillon</span>
             </button>
             <button onClick={() => {

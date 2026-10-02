@@ -3,13 +3,20 @@
 .fil-entete>div{display:flex;justify-content:center;gap:17px;min-width:0;}
 .fil-entete button{min-height:36px;position:relative;white-space:nowrap;font-size:16px;font-weight:600;color:#fffc;display:grid;place-items:center;}
 .fil-entete .actif{color:#fff;}.fil-entete .actif:after{content:'';position:absolute;bottom:-4px;height:2px;width:24px;background:white;border-radius:2px;}
-.fil-ecran .video-carte video{object-fit:cover;width:100%;height:100%;}
+/* « contain » et non « cover » : une video tournee en paysage garderait
+   sinon ses bords coupes pour remplir l'ecran. Le fond noir de la carte
+   occupe la place laissee libre. */
+.fil-ecran .video-carte video{object-fit:contain;width:100%;height:100%;background:#000;}
 .fil-ecran .video-carte:after{content:'';position:absolute;inset:55% 0 0;pointer-events:none;background:linear-gradient(transparent,#0005);}
 .fil-ecran .actions{z-index:2;right:8px;bottom:16px;gap:12px;}
 .fil-ecran .action{color:#fff;gap:2px;font-size:12px;text-shadow:0 1px 3px #0005;}
 .fil-ecran .action svg{width:32px;height:32px;}
 .fil-ecran .action.aime{color:#ff2856;}.fil-ecran .action.aime>span:last-child{color:#fff;}
-.fil-ecran .actions .avatar{width:38px;height:38px;border:1px solid white;background:#777;margin-bottom:5px;}
+.fil-ecran .actions .avatar{width:38px;height:38px;border:1px solid white;background:#777;}
+/* L'avatar et sa pastille forment un bloc : le « + » mord sur le bas de
+   l'avatar, comme dans l'application d'origine. */
+.fil-avatar-boite{position:relative;display:grid;place-items:center;margin-bottom:14px;}
+.fil-suivre{position:absolute;bottom:-9px;width:20px;height:20px;border:0;border-radius:50%;background:#ff2856;color:#fff;display:grid;place-items:center;padding:0;}
 .fil-ecran .fil-disque{width:36px;height:36px;}
 .fil-ecran .fil-favori{order:3;}.fil-ecran .actions .action:nth-of-type(4){order:4;}.fil-disque{order:5;border:7px solid #292929;width:40px;height:40px;border-radius:50%;background:#666;display:grid;place-items:center;font-size:13px;}
 .fil-ecran .infos{z-index:2;left:12px;right:68px;bottom:24px;text-shadow:0 1px 3px #0005;}
@@ -19,12 +26,23 @@
 .fil-disque{border:0;width:42px;height:42px;background:repeating-radial-gradient(circle,#292929 0 2px,#151515 3px 4px);overflow:hidden;color:white;animation:fil-disque-tour 8s linear infinite;animation-play-state:paused;}
 .fil-disque.tourne{animation-play-state:running;}.fil-disque img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
 @keyframes fil-disque-tour{to{transform:rotate(360deg)}}
-.fil-progression{appearance:none;-webkit-appearance:none;position:absolute;bottom:0;left:12px;width:calc(100% - 24px);height:16px;z-index:3;margin:0;padding:0;border:0;box-shadow:none;background:transparent;cursor:pointer;}
+/* Zone sensible de 30px pour s'attraper au pouce, le trait visible n'en
+   faisant que 2 : la hauteur du curseur sert de surface de prise. */
+.fil-progression{appearance:none;-webkit-appearance:none;position:absolute;bottom:0;left:12px;width:calc(100% - 24px);height:30px;z-index:3;margin:0;padding:0;border:0;box-shadow:none;background:transparent;cursor:pointer;touch-action:none;}
 .app:has(.fil-ecran)>.nav{border-top:0;}
 .fil-progression::-webkit-slider-runnable-track{height:2px;border-radius:2px;background:linear-gradient(to right,#fff9 var(--progression),#ffffff30 var(--progression));}
 .fil-progression::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:5px;height:5px;margin-top:-1.5px;border:0;border-radius:50%;background:#aaa;}
 .fil-progression::-moz-range-track{height:2px;border-radius:2px;background:#ffffff30;}.fil-progression::-moz-range-progress{height:2px;background:#fff9;}.fil-progression::-moz-range-thumb{width:5px;height:5px;border:0;border-radius:50%;background:#aaa;}
 .fil-progression:focus-visible{outline:1px solid white;outline-offset:2px;}
+/* Pendant le glissement le trait s'epaissit et le curseur grossit : le
+   doigt masque la barre, c'est le seul retour qui reste visible. */
+.fil-glisse::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(to right,#fff var(--progression),#ffffff40 var(--progression));}
+.fil-glisse::-webkit-slider-thumb{width:12px;height:12px;margin-top:-4px;background:#fff;}
+.fil-glisse::-moz-range-track{height:4px;border-radius:4px;background:#ffffff40;}
+.fil-glisse::-moz-range-progress{height:4px;background:#fff;}
+.fil-glisse::-moz-range-thumb{width:12px;height:12px;background:#fff;}
+/* Position atteinte, centree au-dessus de la barre. */
+.fil-minuteur{position:absolute;bottom:46px;left:50%;transform:translateX(-50%);z-index:4;border-radius:8px;padding:5px 11px;background:#0009;color:#fff;font-size:14px;font-weight:600;pointer-events:none;}
 @media(prefers-reduced-motion:reduce){.fil-disque{animation:none;}}
 .fil-attente{height:100%;display:grid;place-items:center;align-content:center;gap:14px;padding:40px;text-align:center;color:#bbb;}
 .fil-attente p{font-size:15px;margin:0;}

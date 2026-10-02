@@ -2,17 +2,21 @@
 .bst-rangee{display:flex;gap:14px;padding:0 14px 12px;overflow-x:auto;scrollbar-width:none;}
 .bst-rangee::-webkit-scrollbar{display:none;}
 .bst-bulle{position:relative;width:76px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;color:#fff;}
-/* Anneau cyan-vert autour de l'avatar, avec son liseret noir interieur. */
-.bst-anneau{width:76px;height:76px;border-radius:50%;border:2.5px solid #3fd0e0;display:grid;place-items:center;}
-.bst-vu{border-color:#ffffff42;}
+/* Anneau d'accent autour de l'avatar, avec son liseret noir interieur.
+   Il ne parait que sur un compte portant un recit non expire. */
+.bst-anneau{width:76px;height:76px;border-radius:50%;border:2.5px solid #ff2856;display:grid;place-items:center;}
+/* Bulle decorative, sans recit : l'anneau s'efface en simple bordure. */
+.bst-sans-recit{border-color:#ffffff30;}
 .bst-anneau-interieur{width:68px;height:68px;border-radius:50%;border:1.5px solid #000;display:grid;place-items:center;}
 .bst-avatar{width:65px;height:65px;border-radius:50%;background:#2c2c2e;display:grid;place-items:center;font-size:21px;font-weight:700;}
 .bst-avatar-simple{width:76px;height:76px;border-radius:50%;background:#2c2c2e;display:grid;place-items:center;font-size:21px;font-weight:700;}
 .bst-libelle{font-size:12px;margin-top:7px;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.bst-pastille-plus{position:absolute;right:1px;top:54px;width:23px;height:23px;border-radius:50%;background:#1ec0f0;border:2px solid #000;display:grid;place-items:center;}
+.bst-pastille-plus{position:absolute;right:1px;top:54px;width:23px;height:23px;border-radius:50%;background:#ff2856;border:2px solid #000;display:grid;place-items:center;}
 /* Compte propose : voile sombre et icone d'ajout, pour le distinguer d'un
    recit a regarder. */
 .bst-voile{position:absolute;top:0;width:76px;height:76px;border-radius:50%;background:#00000085;display:grid;place-items:center;}
 .bst-clair .bst-bulle{color:#111;}
 .bst-clair .bst-anneau-interieur{border-color:#fff;}
 .bst-clair .bst-pastille-plus{border-color:#fff;}
+.bst-erreur{flex-basis:100%;font-size:11.5px;color:#ff8b9b;margin:0;}
+.bst-bulle:disabled{opacity:.6;}

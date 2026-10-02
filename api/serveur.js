@@ -291,7 +291,9 @@ const listerVideos = async ({
       AND (${auteurId}::uuid IS NULL OR v.auteur_id = ${auteurId}::uuid)
       AND (${avant}::timestamptz IS NULL OR v.publiee_le < ${avant}::timestamptz)
       AND (${legende}::text IS NULL OR v.legende ILIKE ${legende}::text)
-      AND (NOT ${suivisSeuls} OR EXISTS (
+      -- Le fil « Amis » montre les comptes suivis et le lecteur lui-meme :
+      -- ses propres publications y ont leur place.
+      AND (NOT ${suivisSeuls} OR v.auteur_id = ${viewerId} OR EXISTS (
         SELECT 1 FROM abonnements a
         WHERE a.suiveur_id = ${viewerId} AND a.suivi_id = v.auteur_id
       ))
@@ -992,6 +994,121 @@ app.post('/conversations/:id/lu', exigerSession, route(async (req, res) => {
     WHERE conversation_id = ${id} AND profil_id = ${req.profilId}
   `
   res.json({ ok: true })
+}))
+
+// ------------------------------------------------------------
+// Recits
+//
+// Un recit vit 24 h. Rien ne les efface : les deux routes ecartent ce
+// qui a depasse l'heure, ce qui evite une tache de menage planifiee et
+// garde une publication rejouable le temps du debogage.
+// ------------------------------------------------------------
+
+const DUREE_RECIT = '24 hours'
+
+app.post('/stories', exigerSession, route(async (req, res) => {
+  const url = texteRequis(req.body?.url, 'url')
+  const [recit] = await sql`
+    INSERT INTO stories (auteur_id, url) VALUES (${req.profilId}, ${url})
+    RETURNING id, url, cree_le
+  `
+  res.status(201).json({
+    id: recit.id,
+    url: recit.url,
+    date: new Date(recit.cree_le).getTime(),
+  })
+}))
+
+// Les recits du lecteur et de ceux qu'il suit, groupes par auteur : la
+// bande n'affiche qu'une bulle par compte, portant son recit le plus
+// recent.
+app.get('/stories', sessionFacultative, route(async (req, res) => {
+  const viewerId = req.profilId || null
+  const lignes = await sql`
+    SELECT
+      p.id AS auteur_id, p.pseudo, p.avatar_url,
+      count(*)::int   AS nb,
+      max(s.cree_le)  AS derniere,
+      (array_agg(s.url ORDER BY s.cree_le DESC))[1] AS url
+    FROM stories s
+    JOIN profils p ON p.id = s.auteur_id
+    WHERE s.cree_le > now() - ${DUREE_RECIT}::interval
+      AND (
+        s.auteur_id = ${viewerId}
+        OR EXISTS (
+          SELECT 1 FROM abonnements a
+          WHERE a.suiveur_id = ${viewerId} AND a.suivi_id = s.auteur_id
+        )
+      )
+    GROUP BY p.id, p.pseudo, p.avatar_url
+    ORDER BY derniere DESC
+    LIMIT ${limiteDemandee(req.query.limite)}
+  `
+  res.json(lignes.map((l) => ({
+    id: l.auteur_id,
+    pseudo: l.pseudo,
+    avatarUrl: l.avatar_url,
+    url: l.url,
+    nb: l.nb,
+    date: new Date(l.derniere).getTime(),
+    moi: l.auteur_id === viewerId,
+  })))
+}))
+
+// ------------------------------------------------------------
+// Notifications
+//
+// Les trois evenements qui concernent le lecteur sont reunis en une
+// seule liste triee : un abonnement a son compte, un j'aime ou un
+// commentaire sur l'une de ses videos.
+// ------------------------------------------------------------
+
+app.get('/notifications', exigerSession, route(async (req, res) => {
+  const limite = limiteDemandee(req.query.limite)
+  const lignes = await sql`
+    SELECT genre, acteur_pseudo, acteur_avatar, video_id, texte, date FROM (
+      SELECT
+        'abonnement' AS genre,
+        p.pseudo     AS acteur_pseudo,
+        p.avatar_url AS acteur_avatar,
+        NULL::uuid   AS video_id,
+        NULL::text   AS texte,
+        a.cree_le    AS date
+      FROM abonnements a
+      JOIN profils p ON p.id = a.suiveur_id
+      WHERE a.suivi_id = ${req.profilId}
+
+      UNION ALL
+
+      SELECT 'jaime', p.pseudo, p.avatar_url, v.id, NULL::text, j.cree_le
+      FROM jaime j
+      JOIN videos v ON v.id = j.video_id
+      JOIN profils p ON p.id = j.profil_id
+      WHERE v.auteur_id = ${req.profilId}
+        AND v.supprimee_le IS NULL
+        AND j.profil_id <> ${req.profilId}
+
+      UNION ALL
+
+      SELECT 'commentaire', p.pseudo, p.avatar_url, v.id, c.texte, c.cree_le
+      FROM commentaires c
+      JOIN videos v ON v.id = c.video_id
+      JOIN profils p ON p.id = c.auteur_id
+      WHERE v.auteur_id = ${req.profilId}
+        AND v.supprimee_le IS NULL
+        AND c.auteur_id <> ${req.profilId}
+    ) evenements
+    ORDER BY date DESC
+    LIMIT ${limite}
+  `
+  res.json(lignes.map((l) => ({
+    genre: l.genre,
+    pseudo: l.acteur_pseudo,
+    avatarUrl: l.acteur_avatar,
+    videoId: l.video_id,
+    texte: l.texte,
+    date: new Date(l.date).getTime(),
+  })))
 }))
 
 // ------------------------------------------------------------

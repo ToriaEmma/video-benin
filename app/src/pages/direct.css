@@ -3,6 +3,10 @@
 .dir-sombre{display:flex;flex-direction:column;}
 .dir-hote{position:absolute;inset:0;display:block;}
 .dir-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+/* Plein ecran : « contain », pour qu'un direct filme en paysage ne perde
+   pas ses bords. L'apercu reduit garde « cover », son cadre etant une
+   vignette. */
+.dir-pleine .dir-video{object-fit:contain;background:#000;}
 
 /* Avatars : une initiale dans un rond gris. */
 .dir-avatar{display:grid;place-items:center;border-radius:50%;background:#6d6d75;color:#fff;font-weight:700;flex-shrink:0;}
@@ -66,7 +70,7 @@
 @keyframes dir-vol{from{transform:translateY(0);opacity:.9;}70%{opacity:.6;}to{transform:translateY(-190px);opacity:0;}}
 
 .dir-barre-basse{position:absolute;left:8px;right:8px;bottom:14px;z-index:4;display:flex;align-items:center;gap:6px;}
-.dir-bouton-couleur{width:30px;height:30px;border-radius:8px;background:#00a550;color:#fff;font-size:11px;font-weight:800;flex-shrink:0;display:grid;place-items:center;}
+.dir-bouton-couleur{width:30px;height:30px;border-radius:8px;background:#ff2856;color:#fff;font-size:11px;font-weight:800;flex-shrink:0;display:grid;place-items:center;}
 .dir-champ{flex:1;min-width:0;height:32px;border:0;border-radius:16px;background:rgba(255,255,255,.16);padding:0 12px;color:#fff;font-size:12.5px;font-family:inherit;outline:none;}
 .dir-champ::placeholder{color:rgba(255,255,255,.65);}
 .dir-action{display:flex;flex-direction:column;align-items:center;justify-content:center;min-width:26px;color:#fff;flex-shrink:0;}

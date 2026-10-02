@@ -27,7 +27,7 @@
 .det-ligne>svg:last-child{color:#c4c4c6;}
 .det-coche{color:#ff2856;display:grid;place-items:center;flex-shrink:0;}
 
-.det-pastille-verte{width:9px;height:9px;border-radius:50%;background:#2fbf6b;flex-shrink:0;}
+.det-pastille-active{width:9px;height:9px;border-radius:50%;background:#ff2856;flex-shrink:0;}
 
 .det-vider{background:#f1f1f2;border-radius:16px;padding:7px 14px;font-size:13px;font-weight:600;color:#111;flex-shrink:0;}
 .det-vider-inactif{opacity:.45;cursor:default;}

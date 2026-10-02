@@ -3,9 +3,9 @@
 // l'ecran de reglages du canal ouvert par la roue dentee.
 // ============================================================
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
-  View, StyleSheet, Pressable, FlatList, ScrollView,
+  View, StyleSheet, Pressable, FlatList, ScrollView, Image,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
@@ -16,9 +16,47 @@ import {
   CanalPublicite, CanalPromotion, CanalMarketplace, CanalLive,
   CanalMiniSerie, CanalApplication,
 } from '../composants/Icones'
+import { apiNotifications, type EvenementApi } from '../lib/api'
 import {
   etat, ageCourt, type Notification, type CanalNotification,
 } from '../lib/demo'
+
+// Ce que l'acteur a fait, en une phrase.
+const PHRASES: Record<EvenementApi['genre'], string> = {
+  abonnement: 's’est abonné à toi',
+  jaime: 'a aimé ta vidéo',
+  commentaire: 'a commenté ta vidéo',
+}
+
+// Ligne d'un evenement reel : l'avatar de l'acteur, ce qu'il a fait, et
+// l'age de l'evenement.
+function LigneEvenement({ evenement }: { evenement: EvenementApi }) {
+  return (
+    <View style={s.evenement}>
+      {evenement.avatarUrl
+        ? <Image source={{ uri: evenement.avatarUrl }} style={s.evAvatar} />
+        : (
+          <View style={[s.evAvatar, s.evAvatarVide]}>
+            <Text style={s.evLettre}>
+              {evenement.pseudo.charAt(0).toUpperCase()}
+            </Text>
+          </View>
+        )}
+
+      <View style={s.evTexte}>
+        <Text style={s.evTitre} numberOfLines={2}>
+          <Text style={s.evPseudo}>{evenement.pseudo}</Text>
+          {' '}{PHRASES[evenement.genre]}
+        </Text>
+        {!!evenement.texte && (
+          <Text style={s.evDetail} numberOfLines={2}>{evenement.texte}</Text>
+        )}
+      </View>
+
+      <Text style={s.evAge}>{ageCourt(evenement.date)}</Text>
+    </View>
+  )
+}
 
 // Filtres de la bande horizontale. `canal` a null pour « Tous », qui
 // laisse passer toutes les cartes.
@@ -159,13 +197,27 @@ export function ParametresNotifications({ onRetour }: { onRetour: () => void }) 
 export default function Notifications({ onRetour }: { onRetour: () => void }) {
   const [filtre, setFiltre] = useState(0)
   const [reglages, setReglages] = useState(false)
+  const [evenements, setEvenements] = useState<EvenementApi[]>([])
+
+  useEffect(() => {
+    apiNotifications.liste()
+      .then(setEvenements)
+      // Session absente ou reseau coupe : seules les cartes locales
+      // restent affichees.
+      .catch(() => undefined)
+  }, [])
 
   if (reglages) {
     return <ParametresNotifications onRetour={() => setReglages(false)} />
   }
 
   const canal = FILTRES[filtre].canal
+  // DECOR LOCAL : cartes de service semees dans demo.ts, sans contrepartie
+  // en base. Elles restent sous les evenements reels.
   const liste = etat.notifications.filter(n => !canal || n.canal === canal)
+  // Les abonnements, j'aime et commentaires reels ne portent pas de
+  // canal : ils ne paraissent donc que sous le filtre « Tous ».
+  const vraisEvenements = canal ? [] : evenements
 
   return (
     <SafeAreaView style={s.page} edges={['top']}>
@@ -196,8 +248,23 @@ export default function Notifications({ onRetour }: { onRetour: () => void }) {
         data={liste}
         keyExtractor={n => n.id}
         contentContainerStyle={s.liste}
+        // Les evenements reels passent devant : ce sont eux qui
+        // concernent vraiment le lecteur.
+        ListHeaderComponent={
+          vraisEvenements.length === 0 ? null : (
+            <View style={s.bloc}>
+              <Text style={s.blocTitre}>Activité</Text>
+              {vraisEvenements.map((e, i) => (
+                <LigneEvenement key={`${e.genre}-${e.pseudo}-${e.date}-${i}`}
+                  evenement={e} />
+              ))}
+            </View>
+          )
+        }
         ListEmptyComponent={
-          <Text style={s.vide}>Aucune notification dans ce canal.</Text>
+          vraisEvenements.length > 0 ? null : (
+            <Text style={s.vide}>Aucune notification dans ce canal.</Text>
+          )
         }
         renderItem={({ item }) => <Carte notification={item} />}
       />
@@ -226,6 +293,24 @@ const s = StyleSheet.create({
   puceTexteActive: { color: '#2a7ab0', fontWeight: '600' },
 
   liste: { paddingVertical: 8, paddingBottom: 28, gap: 14, flexGrow: 1 },
+
+  // Bloc des evenements reels, au-dessus des cartes de service.
+  bloc: { backgroundColor: '#fff', borderRadius: 12, marginHorizontal: 12,
+    paddingVertical: 4 },
+  blocTitre: { color: '#8e8e93', fontSize: 12, fontWeight: '600',
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 2 },
+
+  evenement: { flexDirection: 'row', alignItems: 'center', gap: 11,
+    paddingHorizontal: 16, paddingVertical: 10 },
+  evAvatar: { width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#ececec' },
+  evAvatarVide: { alignItems: 'center', justifyContent: 'center' },
+  evLettre: { color: '#111', fontSize: 15, fontWeight: '700' },
+  evTexte: { flex: 1, minWidth: 0, gap: 2 },
+  evTitre: { color: '#111', fontSize: 13.5, lineHeight: 18 },
+  evPseudo: { fontWeight: '700' },
+  evDetail: { color: '#8e8e93', fontSize: 12.5, lineHeight: 16 },
+  evAge: { color: '#b0b0b5', fontSize: 11.5 },
 
   // Une carte de notification.
   carte: { backgroundColor: '#fff', borderRadius: 12, marginHorizontal: 12,

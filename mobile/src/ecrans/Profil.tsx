@@ -314,7 +314,7 @@ export default function Profil({
                   <View style={s.note}><Text style={s.noteTexte}>Dis-nous tout</Text></View>
                 )}
                 <LinearGradient
-                  colors={['#00ddab', '#00ddab', '#09c9e8', '#138aff']}
+                  colors={['#16cce0', '#16cce0', '#09c9e8', '#138aff']}
                   locations={[0, .45, .7, 1]}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
                   style={[s.anneau, {

@@ -89,7 +89,7 @@ const s = StyleSheet.create({
   detail: { color: 'rgba(255,255,255,.62)', fontSize: 12, marginTop: 2 },
 
   bouton: { minHeight: 34, paddingHorizontal: 16, borderRadius: 8,
-    backgroundColor: '#00a550', alignItems: 'center', justifyContent: 'center' },
+    backgroundColor: '#ff2856', alignItems: 'center', justifyContent: 'center' },
   boutonSuivi: { backgroundColor: 'transparent', borderWidth: 1,
     borderColor: 'rgba(255,255,255,.22)' },
   boutonEnvoi: { opacity: 0.6 },

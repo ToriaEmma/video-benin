@@ -437,3 +437,49 @@ export const apiMessagerie = {
   marquerLu: (conversationId: string) =>
     requete<{ ok: true }>(`/conversations/${conversationId}/lu`, { methode: 'POST' }),
 }
+
+// ------------------------------------------------------------
+// Recits
+// ------------------------------------------------------------
+
+// Une bulle de la bande : un auteur et son recit le plus recent. L'API
+// groupe par auteur, la bande n'affichant qu'une bulle par compte.
+export type RecitApi = {
+  id: string
+  pseudo: string
+  avatarUrl: string | null
+  url: string
+  nb: number
+  date: number
+  moi: boolean
+}
+
+export const apiStories = {
+  // Les recits du lecteur et de ceux qu'il suit, les expires ecartes.
+  liste: () => requete<RecitApi[]>('/stories'),
+
+  publier: (url: string) =>
+    requete<{ id: string; url: string; date: number }>('/stories', {
+      methode: 'POST',
+      corps: { url },
+    }),
+}
+
+// ------------------------------------------------------------
+// Notifications
+// ------------------------------------------------------------
+
+// Evenement reel concernant le lecteur. `videoId` et `texte` ne sont
+// portes que par les genres qui s'y rapportent.
+export type EvenementApi = {
+  genre: 'abonnement' | 'jaime' | 'commentaire'
+  pseudo: string
+  avatarUrl: string | null
+  videoId: string | null
+  texte: string | null
+  date: number
+}
+
+export const apiNotifications = {
+  liste: () => requete<EvenementApi[]>('/notifications'),
+}

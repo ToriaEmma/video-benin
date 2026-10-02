@@ -39,7 +39,7 @@ export const SONS: Son[] = [
     id: 's2', titre: "Drum Circle",
     artiste: "Mark Richards",
     licence: "CC0",
-    publications: 65900, duree: 90, couleur: '#4f7d4a',
+    publications: 65900, duree: 90, couleur: '#4a5a7d',
     url: 'https://archive.org/download/CoconutGroveDrumCircle6Nov2010/Cgdc6Nov2010A1.mp3',
   },
   {
@@ -88,7 +88,7 @@ export const SONS: Son[] = [
     id: 's9', titre: "Classical Carnivale",
     artiste: "Twin Musicom",
     licence: "CC-BY 4.0",
-    publications: 1119, duree: 88, couleur: '#5a7d6a',
+    publications: 1119, duree: 88, couleur: '#6a5a7d',
     url: 'https://archive.org/download/twin-musicom-classical-carnivale/Classical%20Carnivale.mp3',
   },
   {

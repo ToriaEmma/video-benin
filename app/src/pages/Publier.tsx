@@ -34,6 +34,11 @@ const VISIBILITES: Record<Audience, NonNullable<NouvelleVideo['visibilite']>> = 
   moi: 'moi',
 }
 
+// Une video reprise d'un brouillon est deja hebergee : la retelecharger
+// pour la renvoyer telle quelle gaspillerait le forfait de l'utilisateur.
+// Seule une source locale (blob:) demande un televersement.
+const dejaHebergee = (url: string) => /^https?:/i.test(url)
+
 export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale }: {
   onPublie: () => void
   // Retour a l'ecran de tournage, sans rien enregistrer.
@@ -68,10 +73,13 @@ export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale 
     setEnvoi(true)
     setErreur('')
     setProgression(0)
-    setEtape('Envoi de la vidéo…')
+    setEtape(dejaHebergee(urlInitiale) ? 'Publication…' : 'Envoi de la vidéo…')
     try {
-      const aEnvoyer = await fichierDepuisUrl(urlInitiale)
-      const url = await televerser(aEnvoyer, setProgression)
+      let url = urlInitiale
+      if (!dejaHebergee(urlInitiale)) {
+        const aEnvoyer = await fichierDepuisUrl(urlInitiale)
+        url = await televerser(aEnvoyer, setProgression)
+      }
 
       setEtape('Publication…')
       await apiVideos.creer({
@@ -104,13 +112,21 @@ export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale 
     setEnvoi(true)
     setErreur('')
     setProgression(0)
-    setEtape('Envoi de la vidéo…')
+    setEtape(dejaHebergee(urlInitiale) ? 'Enregistrement…' : 'Envoi de la vidéo…')
     try {
       // Un brouillon porte lui aussi un fichier : sans televersement il
       // serait perdu a la fermeture de l'onglet.
-      const aEnvoyer = await fichierDepuisUrl(urlInitiale)
-      const url = await televerser(aEnvoyer, setProgression)
-      await apiBrouillons.creer(url, legende.trim(), aEnvoyer.size)
+      let url = urlInitiale
+      let octets = 0
+      if (dejaHebergee(urlInitiale)) {
+        setEtape('Enregistrement…')
+      } else {
+        const aEnvoyer = await fichierDepuisUrl(urlInitiale)
+        octets = aEnvoyer.size
+        url = await televerser(aEnvoyer, setProgression)
+        setEtape('Enregistrement…')
+      }
+      await apiBrouillons.creer(url, legende.trim(), octets)
       setLegende('')
       if (onBrouillon) onBrouillon()
       else onAnnuler()

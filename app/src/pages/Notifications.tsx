@@ -3,17 +3,50 @@
 // l'ecran de reglages ouvert par la roue dentee.
 // ============================================================
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Interrupteur from '../components/Interrupteur'
 import {
   Chevron, ChevronDroit, Engrenage, TroisPoints, Epingle, ClocheBarree,
   CanalPublicite, CanalPromotion, CanalMarketplace, CanalLive,
   CanalMiniSerie, CanalApplication,
 } from '../components/Icones'
+import { apiNotifications, type EvenementApi } from '../lib/api'
 import {
   etatDemo, ageCourt, type Notification, type CanalNotification,
 } from '../lib/demo'
 import './notifications.css'
+
+// Ce que l'acteur a fait, en une phrase.
+const PHRASES: Record<EvenementApi['genre'], string> = {
+  abonnement: 's’est abonné à toi',
+  jaime: 'a aimé ta vidéo',
+  commentaire: 'a commenté ta vidéo',
+}
+
+// Ligne d'un evenement reel : l'avatar de l'acteur, ce qu'il a fait, et
+// l'age de l'evenement.
+function LigneEvenement({ evenement }: { evenement: EvenementApi }) {
+  return (
+    <li className="ntf-ev">
+      {evenement.avatarUrl
+        ? <img className="ntf-ev-avatar" src={evenement.avatarUrl} alt="" />
+        : (
+          <span className="ntf-ev-avatar ntf-ev-vide">
+            {evenement.pseudo.charAt(0).toUpperCase()}
+          </span>
+        )}
+      <span className="ntf-ev-texte">
+        <span className="ntf-ev-titre">
+          <b>{evenement.pseudo}</b> {PHRASES[evenement.genre]}
+        </span>
+        {!!evenement.texte && (
+          <span className="ntf-ev-detail">{evenement.texte}</span>
+        )}
+      </span>
+      <span className="ntf-ev-age">{ageCourt(evenement.date)}</span>
+    </li>
+  )
+}
 
 type Glyphe = ({ taille }: { taille?: number }) => React.ReactElement
 
@@ -131,13 +164,27 @@ export function ParametresNotifications({ onRetour }: { onRetour: () => void }) 
 export default function Notifications({ onRetour }: { onRetour: () => void }) {
   const [filtre, setFiltre] = useState(0)
   const [reglages, setReglages] = useState(false)
+  const [evenements, setEvenements] = useState<EvenementApi[]>([])
+
+  useEffect(() => {
+    apiNotifications.liste()
+      .then(setEvenements)
+      // Session absente ou reseau coupe : seules les cartes locales
+      // restent affichees.
+      .catch(() => undefined)
+  }, [])
 
   if (reglages) {
     return <ParametresNotifications onRetour={() => setReglages(false)} />
   }
 
   const canal = FILTRES[filtre].canal
+  // DECOR LOCAL : cartes de service semees dans demo.ts, sans contrepartie
+  // en base. Elles restent sous les evenements reels.
   const liste = etatDemo.notifications.filter(n => !canal || n.canal === canal)
+  // Les abonnements, j'aime et commentaires reels ne portent pas de
+  // canal : ils ne paraissent donc que sous le filtre « Tous ».
+  const vraisEvenements = canal ? [] : evenements
 
   return (
     <section className="ntf-page">
@@ -159,7 +206,21 @@ export default function Notifications({ onRetour }: { onRetour: () => void }) {
       </div>
 
       <div className="ntf-liste">
-        {liste.length === 0
+        {/* Les evenements reels passent devant : ce sont eux qui
+            concernent vraiment le lecteur. */}
+        {vraisEvenements.length > 0 && (
+          <div className="ntf-bloc">
+            <h2 className="ntf-bloc-titre">Activité</h2>
+            <ul className="ntf-ev-liste">
+              {vraisEvenements.map((e, i) => (
+                <LigneEvenement key={`${e.genre}-${e.pseudo}-${e.date}-${i}`}
+                  evenement={e} />
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {liste.length === 0 && vraisEvenements.length === 0
           ? <p className="ntf-vide">Aucune notification dans ce canal.</p>
           : liste.map(n => <Carte key={n.id} notification={n} />)}
       </div>

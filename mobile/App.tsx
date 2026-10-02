@@ -131,6 +131,7 @@ function Application() {
                 pseudoVisite={profilVisite ?? undefined}
                 messageArrivee={messageProfil}
                 onBrouillons={() => setBrouillons(true)}
+                onVisiter={visiter}
                 onOuvrirVideo={(videos, index) => setLecture({ videos, index })}
                 onRetour={() => { setProfilVisite(null); setOnglet('fil') }}
               />

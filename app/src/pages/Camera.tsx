@@ -54,16 +54,24 @@ export default function Camera({ onFermer, onChoisir }: {
   const minuterie = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const [pret, setPret] = useState(false)
+  // Incremente par « Réessayer » : relance la demande d'acces a la camera.
+  const [essai, setEssai] = useState(0)
   const [frontale, setFrontale] = useState(true)
   const [mode, setMode] = useState('15 s')
   const [filtre, setFiltre] = useState(0)
   const [choixSon, setChoixSon] = useState(false)
   const [son, setSon] = useState<Son | null>(null)
   const [message, setMessage] = useState('')
+  // Refus d'acces a la camera, distinct des messages passagers : seul lui
+  // remplace le viseur, et un simple avertissement ne doit pas y mener.
+  const [refusAcces, setRefusAcces] = useState('')
   const [enregistrement, setEnregistrement] = useState(false)
   // Prises deja capturees : chaque appui ajoute un segment, la coche valide
   // l'ensemble. L'horloge continue d'une prise a l'autre.
   const [clips, setClips] = useState<Clip[]>([])
+  // Miroir des prises, lisible depuis les rappels de l'enregistreur, qui se
+  // referment sur l'etat du debut de la prise.
+  const clipsVivants = useRef<Clip[]>([])
   const [ecoule, setEcoule] = useState(0)
   const [outilsDeplies, setOutilsDeplies] = useState(false)
   // Mode « Effets » : s'active des qu'un filtre autre qu'Original est choisi.
@@ -100,8 +108,20 @@ export default function Camera({ onFermer, onChoisir }: {
         }
         if (!annule) setPret(true)
       })
-      .catch(() => {
-        if (!annule) setMessage('Autorise la caméra et le microphone dans ton navigateur, puis rouvre cet écran.')
+      .catch((e: unknown) => {
+        if (annule) return
+        // Le nom de l'erreur dit la cause reelle : la nommer evite de
+        // reprocher un refus a qui n'a simplement pas de camera.
+        const nom = (e as { name?: string } | null)?.name
+        if (nom === 'NotAllowedError' || nom === 'SecurityError') {
+          setRefusAcces('L’accès à la caméra a été refusé. Autorise la caméra et le microphone pour ce site dans les réglages de ton navigateur, puis rouvre cet écran.')
+        } else if (nom === 'NotFoundError' || nom === 'OverconstrainedError') {
+          setRefusAcces('Aucune caméra n’a été trouvée sur cet appareil. Tu peux importer une vidéo.')
+        } else if (nom === 'NotReadableError') {
+          setRefusAcces('La caméra est déjà utilisée par une autre application. Ferme-la, puis rouvre cet écran.')
+        } else {
+          setRefusAcces('La caméra n’a pas pu démarrer sur ce navigateur. Tu peux importer une vidéo.')
+        }
       })
     return () => {
       annule = true
@@ -109,11 +129,21 @@ export default function Camera({ onFermer, onChoisir }: {
       // nouvel objectif ait repondu.
       setPret(false)
       const rec = enregistreur.current
-      if (rec && rec.state !== 'inactive') { rec.onstop = null; rec.stop() }
+      if (rec && rec.state !== 'inactive') {
+        // Le flux disparait sous l'enregistreur : la prise en cours est
+        // perdue. L'etat doit redescendre, sinon l'horloge continue de
+        // tourner et le bouton d'arret ne commande plus rien.
+        rec.onstop = null
+        rec.stop()
+        enregistreur.current = null
+        setEnregistrement(false)
+      }
       flux.current?.getTracks().forEach(t => t.stop())
       flux.current = null
     }
-  }, [frontale, sansCamera])
+  }, [frontale, sansCamera, essai])
+
+  useEffect(() => { clipsVivants.current = clips }, [clips])
 
   // L'horloge ne tourne que pendant une prise.
   useEffect(() => {
@@ -157,20 +187,36 @@ export default function Camera({ onFermer, onChoisir }: {
       nouveau.ondataavailable = e => { if (e.data.size) morceaux.push(e.data) }
       nouveau.onstop = () => {
         setEnregistrement(false)
+        enregistreur.current = null
         const blob = new Blob(morceaux, { type: nouveau.mimeType || type || 'video/webm' })
-        if (blob.size) {
-          setClips(l => [...l, { url: URL.createObjectURL(blob), fin: duree.current }])
+        // Une prise vide ne doit pas disparaitre sans un mot : l'horloge
+        // repart de la fin du clip precedent, faute de nouveau segment.
+        if (!blob.size) {
+          avertir('La prise n’a rien enregistré. Réessaie.')
+          // `onstop` se referme sur l'etat du debut de la prise : la liste
+          // vivante est relue dans la reference, non dans `clips`.
+          const faites = clipsVivants.current
+          const fin = faites.length ? faites[faites.length - 1].fin : 0
+          duree.current = fin
+          setEcoule(fin)
+          return
         }
+        setClips(l => [...l, { url: URL.createObjectURL(blob), fin: duree.current }])
       }
       nouveau.onerror = () => {
         avertir('L’enregistrement a échoué. Réessaie.')
         setEnregistrement(false)
+        enregistreur.current = null
       }
       nouveau.start(250)
       setEnregistrement(true)
       setMessage('')
     } catch {
-      avertir('Impossible de démarrer l’enregistrement sur ce navigateur.')
+      // Aucun des formats proposes n'est accepte : l'import reste la seule
+      // voie, et le dire vaut mieux qu'un bouton qui ne reagit pas.
+      enregistreur.current = null
+      setEnregistrement(false)
+      avertir('Ce navigateur refuse d’enregistrer la vidéo. Tu peux importer une vidéo.')
     }
   }
 
@@ -194,10 +240,18 @@ export default function Camera({ onFermer, onChoisir }: {
     setEcoule(fin)
   }
 
-  // La coche valide le montage et passe a l'ecran suivant.
+  // La coche valide le montage et passe a l'ecran suivant. Le navigateur ne
+  // sait pas coller plusieurs enregistrements sans reencoder : seule la
+  // derniere prise part au montage, et l'ecran le dit au lieu de perdre les
+  // autres en silence. Leurs objets blob sont liberes ici.
   const valider = () => {
     const dernier = clips[clips.length - 1]
-    if (dernier) onChoisir(dernier.url)
+    if (!dernier) return
+    if (clips.length > 1
+      && !window.confirm(
+        `Seule la dernière prise sera publiée : ${clips.length - 1} prise(s) précédente(s) seront abandonnées. Continuer ?`)) return
+    clips.slice(0, -1).forEach(c => URL.revokeObjectURL(c.url))
+    onChoisir(dernier.url)
   }
 
   const reinitialiser = () => {
@@ -223,12 +277,15 @@ export default function Camera({ onFermer, onChoisir }: {
 
   const voile = FILTRES[filtre]
   const enMontage = enregistrement || clips.length > 0
-  // Camera refusee ou indisponible : la page se replie sur l'import, seule
-  // voie restante pour apporter une video.
-  const avis = sansCamera
+  // Camera indisponible ou refusee : la page se replie sur l'import, seule
+  // voie restante pour apporter une video. Un message passager, lui, laisse
+  // le viseur en place — sinon le moindre avertissement ferait disparaitre
+  // l'apercu et les prises deja filmees.
+  const empechement = sansCamera
     ? 'La caméra intégrée nécessite une adresse sécurisée (HTTPS). Tu peux importer une vidéo.'
-    : message
-  const refus = !pret && !!avis && clips.length === 0
+    : refusAcces
+  const refus = !!empechement && !pret && clips.length === 0
+  const avis = empechement || message
   // Avancement de l'arc rouge et position des coupes deja posees.
   const part = Math.min(ecoule / dureeMax, 1)
 
@@ -239,9 +296,19 @@ export default function Camera({ onFermer, onChoisir }: {
       </button>
       <div className="cam-refus">
         <IconeCamera taille={56} />
-        <h1>Autorisez la caméra</h1>
+        <h1>Caméra indisponible</h1>
         <p>{avis}</p>
-        <button className="cam-refus-action" onClick={() => importer.current?.click()}>
+        {/* Nouvel essai : une autorisation accordee apres coup ne doit pas
+            obliger a recharger la page. */}
+        {!sansCamera && (
+          <button className="cam-refus-action" onClick={() => {
+            setRefusAcces('')
+            setEssai(n => n + 1)
+          }}>
+            Réessayer
+          </button>
+        )}
+        <button className="cam-refus-second" onClick={() => importer.current?.click()}>
           Choisir une vidéo
         </button>
       </div>
@@ -299,11 +366,10 @@ export default function Camera({ onFermer, onChoisir }: {
             <button onClick={() => { setMenuSortie(false); reinitialiser(); onFermer() }}>
               <Corbeille taille={20} /><span className="cam-menu-rouge">Supprimer</span>
             </button>
-            <button onClick={() => {
-              setMenuSortie(false)
-              avertir('Brouillon enregistré.')
-              onFermer()
-            }}>
+            {/* L'enregistrement d'un brouillon demande de televerser le
+                fichier : c'est l'ecran de publication qui le fait. On y
+                conduit la prise au lieu d'annoncer un faux succes. */}
+            <button onClick={() => { setMenuSortie(false); valider() }}>
               <Brouillon taille={20} /><span>Enregistrer le brouillon</span>
             </button>
             <button onClick={() => { setMenuSortie(false); outil('Envoyer à des amis') }}>

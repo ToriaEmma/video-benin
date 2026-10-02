@@ -9,7 +9,7 @@ import Suggestions from '../components/Suggestions'
 import DirectLive from './DirectLive'
 import AnalyseVideo from './AnalyseVideo'
 import { Film } from '../components/Icones'
-import { Loupe } from '../components/Icones'
+import { Loupe, PlusStory } from '../components/Icones'
 import './fil.css'
 
 export type Video = VideoApi
@@ -19,13 +19,29 @@ const abreger = (n: number) =>
   : n >= 1_000 ? `${(n / 1_000).toFixed(1)} K`
   : String(n)
 
-function Carte({ video, actif, onVisiter, onErreur }: {
+// Position de lecture affichee pendant le glissement, en « m:ss ».
+const horloge = (secondes: number) => {
+  const s = Number.isFinite(secondes) ? Math.max(0, Math.floor(secondes)) : 0
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+// Au-dela de cette distance horizontale, le geste ouvre le profil de
+// l'auteur. La comparaison avec l'ecart vertical se fait a part : le fil
+// defile a la verticale, un glissement oblique ne doit pas le detourner.
+const SEUIL_LATERAL = 55
+
+function Carte({ video, actif, onVisiter, onErreur, suivi, onSuivi }: {
   video: Video
   actif: boolean
   onVisiter: (p: string) => void
   // Un j'aime ou un favori refuse remonte a l'ecran, qui l'affiche en
   // bandeau : la carte continue de se lire.
   onErreur: (message: string) => void
+  // Abonnement a l'auteur, tenu par l'ecran : la meme personne pouvant
+  // publier plusieurs videos du fil, la pastille doit disparaitre sur
+  // toutes ses cartes des qu'on s'abonne depuis l'une d'elles.
+  suivi: boolean
+  onSuivi: (pseudo: string, suivi: boolean) => void
 }) {
   const { profil } = useAuth()
   const ref = useRef<HTMLVideoElement>(null)
@@ -41,6 +57,18 @@ function Carte({ video, actif, onVisiter, onErreur }: {
   const [progression, setProgression] = useState(0)
   const [developpe, setDeveloppe] = useState(false)
   const [analyse, setAnalyse] = useState(false)
+  // Deplacement en cours sur la barre : la position chiffree ne s'affiche
+  // que pendant ce temps, elle encombrerait la video le reste du temps.
+  const [glisse, setGlisse] = useState(false)
+  // Duree totale, relevee par la video : la lire sur l'element pendant le
+  // rendu est interdit, et le minuteur en a besoin pour s'afficher.
+  const [duree, setDuree] = useState(0)
+  // Seconde visee, relevee pendant le glissement : `currentTime` de
+  // l'element ne declenche pas de rendu, il faut donc la garder ici.
+  const [visee, setVisee] = useState(0)
+  // Abscisse et ordonnee du doigt au debut du geste, pour reconnaitre un
+  // glissement franchement horizontal.
+  const depart = useRef<{ x: number; y: number } | null>(null)
 
   // La lecture ne demarre que sur la carte visible : lire les autres en fond
   // consommerait des donnees pour rien, ce qui est le premier critere produit
@@ -95,6 +123,31 @@ function Carte({ video, actif, onVisiter, onErreur }: {
   }
 
   const pseudo = video.pseudo
+  const sienne = !!profil && profil.pseudo === pseudo
+
+  // Abonnement depuis le fil, sur le meme modele que le j'aime :
+  // affiche d'abord, confirme ensuite, defait si le serveur refuse.
+  const suivre = () => {
+    onSuivi(pseudo, true)
+    apiInteractions.suivre(pseudo)
+      .then(r => onSuivi(pseudo, r.suivi))
+      .catch((e: Error) => { onSuivi(pseudo, false); onErreur(e.message) })
+  }
+
+  // Glissement vers la droite : le profil de l'auteur. Le fil defilant a
+  // la verticale, le geste n'est retenu que s'il est franchement
+  // horizontal, sans quoi il volerait le defilement d'une video a l'autre.
+  const auDebutLateral = (e: React.PointerEvent) => {
+    depart.current = { x: e.clientX, y: e.clientY }
+  }
+  const aLaFinLaterale = (e: React.PointerEvent) => {
+    const d = depart.current
+    depart.current = null
+    if (!d) return
+    const dx = e.clientX - d.x
+    const dy = e.clientY - d.y
+    if (dx > SEUIL_LATERAL && Math.abs(dx) > Math.abs(dy) * 2) onVisiter(pseudo)
+  }
 
   // L'analyse attend la forme de demonstration : la video de l'API la
   // remplit, `publieeLe` passant de l'ISO au « mois-jour » qu'elle lit.
@@ -120,7 +173,10 @@ function Carte({ video, actif, onVisiter, onErreur }: {
   }
 
   return (
-    <div className="video-carte">
+    <div className="video-carte"
+      onPointerDown={auDebutLateral}
+      onPointerUp={aLaFinLaterale}
+      onPointerCancel={() => { depart.current = null }}>
       <video
         ref={ref}
         src={video.url}
@@ -130,7 +186,17 @@ function Carte({ video, actif, onVisiter, onErreur }: {
         preload={actif ? 'auto' : 'none'}
         onPlay={() => setPause(false)}
         onPause={() => setPause(true)}
-        onTimeUpdate={e => { const v = e.currentTarget; setProgression(v.duration ? v.currentTime / v.duration * 100 : 0) }}
+        onLoadedMetadata={e => {
+          const d = e.currentTarget.duration
+          setDuree(Number.isFinite(d) ? d : 0)
+        }}
+        onTimeUpdate={e => {
+          // Pendant un glissement la barre appartient au doigt : la
+          // relever depuis la video la ferait sauter en arriere.
+          if (glisse) return
+          const v = e.currentTarget
+          setProgression(v.duration ? v.currentTime / v.duration * 100 : 0)
+        }}
         onClick={(e) => {
           const el = e.currentTarget
           if (el.paused) el.play().catch(() => undefined)
@@ -140,9 +206,19 @@ function Carte({ video, actif, onVisiter, onErreur }: {
       {pause && <button className="fil-play" aria-label="Lire la vidéo" onClick={() => ref.current?.play().catch(() => undefined)}><svg width="60" height="66" viewBox="0 0 60 66" aria-hidden="true"><path d="M8 4Q3 1 3 8v50q0 7 5 4l46-26q6-3 0-6Z" fill="white"/></svg></button>}
 
       <div className="actions">
-        <button className="avatar" onClick={() => onVisiter(pseudo)} aria-label={`Profil de ${pseudo}`}>
-          {pseudo.charAt(0).toUpperCase()}
-        </button>
+        <span className="fil-avatar-boite">
+          <button className="avatar" onClick={() => onVisiter(pseudo)} aria-label={`Profil de ${pseudo}`}>
+            {pseudo.charAt(0).toUpperCase()}
+          </button>
+          {/* S'abonner sans quitter le fil. La pastille s'efface une fois
+              l'abonnement pris, et ne parait pas sur ses propres videos. */}
+          {!sienne && !suivi && (
+            <button className="fil-suivre" onClick={suivre}
+              aria-label={`S'abonner à ${pseudo}`}>
+              <PlusStory taille={12} />
+            </button>
+          )}
+        </span>
 
         <button className={`action${aime ? ' aime' : ''}`} onClick={basculerAime}>
           <span className="glyphe"><svg width="34" height="34" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true"><path d="M16 29C12 26 2 19 2 10.7 2 5.5 5.3 2 9.7 2c2.8 0 5 1.5 6.3 3.8C17.3 3.5 19.5 2 22.3 2 26.7 2 30 5.5 30 10.7 30 19 20 26 16 29Z"/></svg></span>
@@ -166,7 +242,39 @@ function Carte({ video, actif, onVisiter, onErreur }: {
         <button className="pseudo" onClick={() => onVisiter(pseudo)}>@{pseudo}</button>
         {video.legende && <button className={`legende ${developpe ? 'developpee' : ''}`} onClick={() => setDeveloppe(!developpe)} aria-expanded={developpe}>{video.legende}{!developpe && <span>… plus</span>}</button>}
       </div>
-      <input className="fil-progression" style={{'--progression': `${progression}%`} as CSSProperties} type="range" aria-label="Position de lecture" min="0" max="100" step="0.1" value={progression} onChange={e => {const v = ref.current;if(v && Number.isFinite(v.duration)) {v.currentTime = Number(e.target.value)/100*v.duration;setProgression(Number(e.target.value))}}}/>
+      {/* Barre de lecture : le curseur occupe toute la largeur et une
+          hauteur confortable au pouce, le trait visible restant fin. Le
+          glissement du curseur deplace la lecture, et un simple appui
+          ailleurs sur la barre y saute directement. */}
+      <input
+        className={`fil-progression${glisse ? ' fil-glisse' : ''}`}
+        style={{ '--progression': `${progression}%` } as CSSProperties}
+        type="range" aria-label="Position de lecture"
+        min="0" max="100" step="0.1" value={progression}
+        onPointerDown={() => setGlisse(true)}
+        onPointerUp={() => setGlisse(false)}
+        onPointerCancel={() => setGlisse(false)}
+        onKeyDown={() => setGlisse(true)}
+        onKeyUp={() => setGlisse(false)}
+        onBlur={() => setGlisse(false)}
+        onChange={e => {
+          const v = ref.current
+          const part = Number(e.target.value)
+          setProgression(part)
+          if (v && Number.isFinite(v.duration)) {
+            const seconde = part / 100 * v.duration
+            v.currentTime = seconde
+            setVisee(seconde)
+          }
+        }}
+      />
+
+      {/* Position atteinte, montree seulement pendant le deplacement. */}
+      {glisse && (
+        <span className="fil-minuteur">
+          {horloge(visee)} / {horloge(duree)}
+        </span>
+      )}
 
       {ouvrirCom && (
         <Commentaires
@@ -192,6 +300,7 @@ function Carte({ video, actif, onVisiter, onErreur }: {
 }
 
 export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string) => void; onRechercher: () => void }) {
+  const { profil } = useAuth()
   const [categorie, setCategorie] = useState('Pour toi')
   const [videos, setVideos] = useState<Video[]>([])
   const [chargement, setChargement] = useState(true)
@@ -201,6 +310,31 @@ export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string
   const [erreurAction, setErreurAction] = useState('')
   const [indexActif, setIndexActif] = useState(0)
   const filRef = useRef<HTMLDivElement>(null)
+
+  // Comptes suivis, charges une fois pour tout le fil : la video de l'API
+  // ne porte pas la relation d'abonnement, et une requete par carte en
+  // ferait autant que de videos. L'echec laisse l'ensemble a « non suivi »,
+  // et la pastille reste donc proposee.
+  const [abonnes, setAbonnes] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    const moi = profil?.pseudo
+    if (!moi) return
+    let valable = true
+    apiInteractions.abonnements(moi, { limite: 200 })
+      .then(c => { if (valable) setAbonnes(new Set(c.map(x => x.pseudo))) })
+      .catch(() => { /* Liste d'abonnements indisponible. */ })
+    return () => { valable = false }
+  }, [profil?.pseudo])
+
+  // L'abonnement se note par pseudo et non par video : le meme auteur peut
+  // tenir plusieurs cartes du fil, toutes doivent suivre.
+  const marquerSuivi = (pseudo: string, suivi: boolean) =>
+    setAbonnes(anciens => {
+      const prochains = new Set(anciens)
+      if (suivi) prochains.add(pseudo)
+      else prochains.delete(pseudo)
+      return prochains
+    })
 
   // « Suivis » et « Pour toi » lisent deux routes distinctes : le
   // chargement se relance donc au changement d'onglet.
@@ -279,6 +413,7 @@ export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string
     <div className="fil" ref={filRef} onScroll={auDefilement}>
       {videos.map((v, i) => (
         <Carte key={v.id} video={v} actif={i === indexActif}
+          suivi={abonnes.has(v.pseudo)} onSuivi={marquerSuivi}
           onVisiter={onVisiter} onErreur={setErreurAction} />
       ))}
     </div>

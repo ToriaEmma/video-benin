@@ -25,7 +25,7 @@ function Icone({ nom, taille = 24 }: { nom: string; taille?: number }) {
 /* ---------- Illustrations des ecrans d'activation ---------- */
 function Ampoule() {
   return <svg width="112" height="112" viewBox="0 0 96 96" fill="none" aria-hidden="true">
-    <path d="M48 12c-11 0-19.5 8.4-19.5 19 0 7 3.6 11.4 6.4 14.9 1.9 2.3 3.1 3.8 3.1 5.6v2.5h20v-2.5c0-1.8 1.2-3.3 3.1-5.6 2.8-3.5 6.4-7.9 6.4-14.9 0-10.6-8.5-19-19.5-19Z" fill="#6de4da"/>
+    <path d="M48 12c-11 0-19.5 8.4-19.5 19 0 7 3.6 11.4 6.4 14.9 1.9 2.3 3.1 3.8 3.1 5.6v2.5h20v-2.5c0-1.8 1.2-3.3 3.1-5.6 2.8-3.5 6.4-7.9 6.4-14.9 0-10.6-8.5-19-19.5-19Z" fill="#16cce0"/>
     <path d="M42 54c0-3-6-6-6-13a12 12 0 0 1 24 0c0 7-6 10-6 13" stroke="#111" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"/>
     <path d="M42 60h12M43 66h10M45 71h6" stroke="#111" strokeWidth="2.4" strokeLinecap="round"/>
     <path d="M69 26l7-4M72 38h8M68 50l7 4" stroke="#111" strokeWidth="2.4" strokeLinecap="round"/>

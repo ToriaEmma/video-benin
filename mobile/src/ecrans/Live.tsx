@@ -522,7 +522,7 @@ const s = StyleSheet.create({
 
   switch: { width: 49, height: 29, borderRadius: 15, backgroundColor: '#e2e2e2',
     padding: 3, justifyContent: 'center' },
-  switchActif: { backgroundColor: '#00cba2' },
+  switchActif: { backgroundColor: '#ff2856' },
   switchPastille: { width: 23, height: 23, borderRadius: 12,
     backgroundColor: '#fff' },
   switchPastilleActive: { alignSelf: 'flex-end' },

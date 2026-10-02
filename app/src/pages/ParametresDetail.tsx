@@ -288,7 +288,7 @@ export function Securite({ onRetour }: { onRetour: () => void }) {
                 <span className="det-nom">Navigateur — session en cours</span>
                 <span className="det-detail">Connecté maintenant</span>
               </div>
-              <i className="det-pastille-verte" />
+              <i className="det-pastille-active" />
             </div>
           </Groupe>
           <Note>

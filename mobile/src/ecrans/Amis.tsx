@@ -37,6 +37,17 @@ import {
   PlusStory, EtincelleEtiquette,
 } from '../composants/Icones'
 
+// Position de lecture affichee pendant le glissement, en « m:ss ».
+const horloge = (secondes: number) => {
+  const s = Math.max(0, Math.floor(secondes))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+// Au-dela de cette distance horizontale, le geste ouvre le profil de
+// l'auteur. La comparaison avec l'ecart vertical se fait a part : le fil
+// pagine a la verticale, un glissement oblique ne doit pas le detourner.
+const SEUIL_LATERAL = 55
+
 // Le premier geste vers le haut n'avance pas d'une video : il rend
 // d'abord l'ecran entier a la premiere, en tassant la rangee de recits.
 // La liste paginant, le moindre defilement sauterait sinon directement
@@ -169,7 +180,7 @@ function Grappe({ pseudo, stories }: {
 
 function Carte({
   item, actif, passage, hauteur, arrondi, decalage, onCommenter, onVisiter,
-  onErreur,
+  onErreur, suivi, onSuivi,
 }: {
   item: VideoAmis
   actif: boolean
@@ -186,6 +197,11 @@ function Carte({
   onCommenter: (v: VideoAmis) => void
   onVisiter?: (pseudo: string) => void
   onErreur: (message: string) => void
+  // Abonnement a l'auteur, tenu par l'ecran : la meme personne pouvant
+  // publier plusieurs videos du fil, la pastille doit disparaitre sur
+  // toutes ses cartes des qu'on s'abonne depuis l'une d'elles.
+  suivi: boolean
+  onSuivi: (pseudo: string, suivi: boolean) => void
 }) {
   const lecteur = useVideoPlayer(item.url, p => {
     p.loop = true; p.timeUpdateEventInterval = 0.25
@@ -202,6 +218,21 @@ function Carte({
   // remettre a zero depuis l'effet de lecture.
   const [pausee, setPausee] = useState(-1)
   const pauseVoulue = pausee === passage
+  const [progression, setProgression] = useState(0)
+  // Deplacement en cours sur la barre : tant qu'il dure, la barre suit le
+  // doigt et non le lecteur, qui continue d'avancer sous lui.
+  const [glisse, setGlisse] = useState(false)
+  // Largeur mesuree de la barre : elle convertit l'abscisse du doigt en
+  // fraction de la duree. Mesuree plutot que deduite de la fenetre, les
+  // marges laterales etant deja retirees.
+  //
+  // La reponse au geste etant creee une fois pour toutes, elle ne peut pas
+  // lire un etat : la mesure passe donc par ce couple accesseur/depot, cree
+  // avec elle et clos sur sa propre variable.
+  const [mesure] = useState(() => {
+    let largeur = 0
+    return { lire: () => largeur, poser: (v: number) => { largeur = v } }
+  })
 
   const { isPlaying } = useEvent(
     lecteur, 'playingChange', { isPlaying: lecteur.playing })
@@ -212,6 +243,17 @@ function Carte({
     if (actif) lecteur.play()
     else lecteur.pause()
   }, [actif, lecteur])
+
+  // Pendant un glissement la barre appartient au doigt : la relever depuis
+  // le lecteur la ferait sauter en arriere a chaque tour du minuteur.
+  useEffect(() => {
+    if (!actif || glisse) return
+    const minuteur = setInterval(() => {
+      const duree = lecteur.duration
+      if (duree > 0) setProgression((lecteur.currentTime / duree) * 100)
+    }, 250)
+    return () => clearInterval(minuteur)
+  }, [actif, lecteur, glisse])
 
   // La vue part quand la carte devient celle qu'on regarde, et non a
   // chaque rendu. L'echec est silencieux : rater un comptage ne doit pas
@@ -268,16 +310,73 @@ function Carte({
     } catch { /* annule */ }
   }
 
+  // Abonnement depuis le fil, sur le meme modele que le j'aime :
+  // affiche d'abord, confirme ensuite, defait si le serveur refuse.
+  const suivre = () => {
+    onSuivi(item.pseudo, true)
+    apiInteractions.suivre(item.pseudo)
+      .then(r => onSuivi(item.pseudo, r.suivi))
+      .catch((e: Error) => { onSuivi(item.pseudo, false); onErreur(e.message) })
+  }
+
+  // Deplacement de la position de lecture. Creee une fois pour toutes :
+  // la lire pendant le rendu interdit de passer par une ref.
+  const [frottement] = useState(() => {
+    // Abscisse du contact initial dans la barre. Le deplacement s'y ajoute
+    // ensuite : `locationX` devient faux des que le doigt sort de la barre,
+    // ce qui arrive sans cesse en visant les extremites.
+    let origine = 0
+    const deplacer = (x: number) => {
+      const duree = lecteur.duration
+      if (duree <= 0 || mesure.lire() <= 0) return
+      const part = Math.min(1, Math.max(0, x / mesure.lire()))
+      setProgression(part * 100)
+      lecteur.currentTime = part * duree
+    }
+    return PanResponder.create({
+      // La barre reclame le geste des le contact : un simple appui doit
+      // deja deplacer la lecture, sans attendre un deplacement.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      // Le fil pagine a la verticale, et la carte guette le glissement
+      // lateral : sans cela l'un des deux volerait le geste en cours.
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: e => {
+        setGlisse(true)
+        origine = e.nativeEvent.locationX
+        deplacer(origine)
+      },
+      onPanResponderMove: (_, g) => deplacer(origine + g.dx),
+      onPanResponderRelease: () => { setGlisse(false); lecteur.play() },
+      onPanResponderTerminate: () => setGlisse(false),
+    })
+  })
+
+  // Glissement vers la droite : le profil de l'auteur. Le fil paginant a
+  // la verticale, le geste n'est retenu que s'il est franchement
+  // horizontal, sans quoi il volerait le defilement d'une video a l'autre.
+  const [lateral] = useState(() => PanResponder.create({
+    onMoveShouldSetPanResponder: (_, g) =>
+      g.dx > SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+    onPanResponderRelease: (_, g) => {
+      if (g.dx > SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2) {
+        onVisiter?.(item.pseudo)
+      }
+    },
+  }))
+
   return (
-    <View style={[s.carte, { height: hauteur }]}>
+    <View style={[s.carte, { height: hauteur }]} {...lateral.panHandlers}>
       <View style={[s.cadre, { top: decalage }, arrondi && s.cadreArrondi]}>
         <Pressable style={StyleSheet.absoluteFill}
           onPress={() => {
             if (isPlaying) { setPausee(passage); lecteur.pause() }
             else { setPausee(-1); lecteur.play() }
           }}>
+          {/* « contain » et non « cover » : une video tournee en paysage
+              garderait sinon ses bords coupes pour remplir le cadre. */}
           <VideoView player={lecteur} style={StyleSheet.absoluteFill}
-            contentFit="cover" nativeControls={false} />
+            contentFit="contain" nativeControls={false} />
         </Pressable>
 
         <LinearGradient colors={['transparent', 'rgba(0,0,0,.55)']}
@@ -293,16 +392,28 @@ function Carte({
         {/* Rail d'actions, de haut en bas : avatar et sa pastille d'envoi,
             j'aime, commentaires, favori, partage, disque. */}
         <View style={s.actions}>
-          <Pressable style={s.avatarBoite} onPress={() => onVisiter?.(item.pseudo)}>
-            <View style={s.avatar}>
-              <Text style={s.avatarLettre}>
-                {item.pseudo.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-            <View style={s.pastilleEnvoi}>
-              <AvionEnvoi taille={13} couleur="#fff" />
-            </View>
-          </Pressable>
+          <View style={s.avatarBoite}>
+            <Pressable onPress={() => onVisiter?.(item.pseudo)}>
+              <View style={s.avatar}>
+                <Text style={s.avatarLettre}>
+                  {item.pseudo.charAt(0).toUpperCase()}
+                </Text>
+              </View>
+            </Pressable>
+            {/* S'abonner sans quitter le fil : le « + » occupe la place de
+                la pastille d'envoi tant qu'on ne suit pas l'auteur, et
+                lui rend une fois l'abonnement pris. */}
+            {suivi ? (
+              <View style={s.pastilleEnvoi}>
+                <AvionEnvoi taille={13} couleur="#fff" />
+              </View>
+            ) : (
+              <Pressable style={s.pastilleSuivre} onPress={suivre} hitSlop={8}
+                accessibilityLabel={`S'abonner à ${item.pseudo}`}>
+                <PlusStory taille={12} couleur="#fff" />
+              </Pressable>
+            )}
+          </View>
 
           <Pressable style={s.action} onPress={basculerAime} hitSlop={6}>
             <CoeurFil taille={34} couleur={aime ? '#ff2856' : '#fff'} />
@@ -363,6 +474,29 @@ function Carte({
         </View>
       </View>
 
+      {/* Barre de lecture : la zone sensible est haute pour s'attraper au
+          pouce, le trait visible reste fin. Elle se tient au-dessus de la
+          barre de liste de lecture, qui occupe deja le bas du cadre. */}
+      <View style={s.zoneBarre} {...frottement.panHandlers}
+        onLayout={e => mesure.poser(e.nativeEvent.layout.width)}>
+        <View style={[s.barre, glisse && s.barreGlissee]}>
+          <View style={[s.barreRemplie, { width: `${progression}%` },
+            glisse && s.barreRemplieGlissee]} />
+        </View>
+      </View>
+
+      {/* Position atteinte, montree seulement pendant le glissement : le
+          reste du temps elle encombrerait la video. */}
+      {glisse && (
+        <View style={s.minuteur} pointerEvents="none">
+          <View style={s.minuteurPille}>
+            <Text style={s.minuteurTexte}>
+              {horloge(lecteur.currentTime)} / {horloge(lecteur.duration)}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {/* Barre pleine largeur de la liste de lecture, juste au-dessus de
           la barre de navigation. */}
       <Pressable style={s.barreListe}>
@@ -412,6 +546,31 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
   }, [tentative])
 
   const recharger = () => { setChargement(true); setTentative(n => n + 1) }
+
+  // Comptes suivis, charges une fois pour tout le fil : la video de l'API
+  // ne porte pas la relation d'abonnement, et une requete par carte en
+  // ferait autant que de videos. L'onglet ne montrant que des comptes
+  // suivis, la pastille y est normalement absente ; elle reparait apres un
+  // desabonnement fait ailleurs, le fil n'etant pas recharge pour autant.
+  const [suivis, setSuivis] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    if (!profil?.pseudo) return
+    let valable = true
+    apiInteractions.abonnements(profil.pseudo, { limite: 200 })
+      .then(c => { if (valable) setSuivis(new Set(c.map(x => x.pseudo))) })
+      .catch(() => { /* Liste d'abonnements indisponible. */ })
+    return () => { valable = false }
+  }, [profil?.pseudo])
+
+  // L'abonnement se note par pseudo et non par video : le meme auteur peut
+  // tenir plusieurs cartes du fil, toutes doivent suivre.
+  const marquerSuivi = (p: string, suivi: boolean) =>
+    setSuivis(anciens => {
+      const prochains = new Set(anciens)
+      if (suivi) prochains.add(p)
+      else prochains.delete(p)
+      return prochains
+    })
 
   const [index, setIndex] = useState(0)
   // Nombre de changements de carte depuis l'ouverture : il sert de numero
@@ -507,6 +666,8 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
             <Carte item={item} actif={i === index} passage={passage}
               hauteur={hauteur} arrondi={!replie}
               decalage={replie ? 0 : HAUT_ENTETE + HAUT_STORIES}
+              suivi={item.pseudo === pseudo || suivis.has(item.pseudo)}
+              onSuivi={marquerSuivi}
               onErreur={setErreur}
               onCommenter={setVideoCom} onVisiter={onVisiter} />
           )}
@@ -740,6 +901,40 @@ const s = StyleSheet.create({
   },
 
   // --- Barre de la liste de lecture ---
+  // Pastille d'abonnement, a la place de la pastille d'envoi.
+  pastilleSuivre: {
+    position: 'absolute', bottom: -10, alignSelf: 'center',
+    width: 20, height: 20, borderRadius: 10, backgroundColor: '#ff2856',
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  // Zone sensible de la barre de lecture : 28pt de haut pour s'attraper au
+  // pouce, alors que le trait n'en fait que 2. Elle se pose au-dessus de la
+  // barre de liste de lecture, haute de 41pt.
+  zoneBarre: {
+    position: 'absolute', left: 12, right: 12, bottom: 41, height: 28,
+    justifyContent: 'flex-end', paddingBottom: 3, zIndex: 4,
+  },
+  barre: {
+    height: 2, backgroundColor: 'rgba(255,255,255,.19)', borderRadius: 2,
+  },
+  barreRemplie: { height: 2, backgroundColor: 'rgba(255,255,255,.6)', borderRadius: 2 },
+  // Pendant le glissement la barre s'epaissit : le doigt la masque, et
+  // c'est le seul retour qui reste visible autour de lui.
+  barreGlissee: { height: 4, borderRadius: 4 },
+  barreRemplieGlissee: { height: 4, borderRadius: 4, backgroundColor: '#fff' },
+
+  // Position de lecture, affichee au centre pendant le glissement.
+  minuteur: {
+    position: 'absolute', left: 0, right: 0, bottom: 95, zIndex: 4,
+    alignItems: 'center',
+  },
+  minuteurPille: {
+    backgroundColor: 'rgba(0,0,0,.6)', borderRadius: 8,
+    paddingVertical: 5, paddingHorizontal: 11,
+  },
+  minuteurTexte: { color: '#fff', fontSize: 14, fontWeight: '600' },
+
   barreListe: {
     position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3,
     flexDirection: 'row', alignItems: 'center', gap: 9,

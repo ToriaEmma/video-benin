@@ -37,7 +37,7 @@ import Notifications from './Notifications'
 
 // Teintes des avatars, piochees d'apres le pseudo : deux comptes differents
 // gardent ainsi la meme couleur d'un ecran a l'autre.
-const TEINTES = ['#6f5bd4', '#ff2856', '#16cce0', '#e8820c', '#1aa260', '#c43cc0']
+const TEINTES = ['#6f5bd4', '#ff2856', '#16cce0', '#e8820c', '#2b3fae', '#c43cc0']
 
 const teinteAvatar = (pseudo: string) => {
   let somme = 0

@@ -46,7 +46,7 @@ const masquer = (telephone: string) => {
 
 // Teintes des avatars, tirees du pseudo pour qu'un compte garde la
 // sienne d'un ecran a l'autre.
-const TEINTES = ['#6f5bd4', '#ff2856', '#16cce0', '#e8820c', '#1aa260']
+const TEINTES = ['#6f5bd4', '#ff2856', '#16cce0', '#e8820c', '#c43cc0']
 const teinte = (pseudo: string) => {
   let somme = 0
   for (let i = 0; i < pseudo.length; i++) somme += pseudo.charCodeAt(i)

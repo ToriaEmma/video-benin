@@ -306,7 +306,7 @@ const s = StyleSheet.create({
   },
   compteur: { color: 'rgba(255,255,255,.5)', fontSize: 12, textAlign: 'right', marginVertical: 6 },
   bouton: {
-    backgroundColor: '#00a550', borderRadius: 10, padding: 15,
+    backgroundColor: '#ff2856', borderRadius: 10, padding: 15,
     alignItems: 'center', marginTop: 10, minHeight: 48, justifyContent: 'center',
   },
   boutonTexte: { color: '#000', fontWeight: '700', fontSize: 16 },

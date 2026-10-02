@@ -271,7 +271,7 @@ export function Securite({ onRetour }: { onRetour: () => void }) {
                 <Text style={s.nom}>Téléphone — session en cours</Text>
                 <Text style={s.detail}>Connecté maintenant</Text>
               </View>
-              <View style={s.pastilleVerte} />
+              <View style={s.pastilleActive} />
             </View>
           </Groupe>
           <Note>
@@ -793,8 +793,8 @@ const s = StyleSheet.create({
   valeur: { fontSize: 14, color: '#8a8a8e' },
   poids: { fontSize: 14, color: '#111', fontWeight: '600' },
 
-  pastilleVerte: { width: 9, height: 9, borderRadius: 4.5,
-    backgroundColor: '#2fbf6b' },
+  pastilleActive: { width: 9, height: 9, borderRadius: 4.5,
+    backgroundColor: '#ff2856' },
 
   vider: { backgroundColor: '#f1f1f2', borderRadius: 16,
     paddingHorizontal: 14, paddingVertical: 7 },

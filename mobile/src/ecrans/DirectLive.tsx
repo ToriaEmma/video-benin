@@ -177,8 +177,11 @@ export default function DirectLive({ onFermer }: {
   if (plein) {
     return (
       <View style={s.pagePleine}>
+        {/* Plein ecran : « contain », pour qu'un direct filme en paysage
+            ne perde pas ses bords. L'apercu reduit du bas garde « cover »,
+            son cadre etant une vignette. */}
         <VideoView player={lecteur} style={StyleSheet.absoluteFill}
-          contentFit="cover" nativeControls={false} />
+          contentFit="contain" nativeControls={false} />
 
         <LinearGradient colors={['rgba(0,0,0,.45)', 'transparent']}
           style={s.voileHaut} pointerEvents="none" />
@@ -472,7 +475,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   boutonCouleur: {
-    width: 30, height: 30, borderRadius: 8, backgroundColor: '#00a550',
+    width: 30, height: 30, borderRadius: 8, backgroundColor: '#ff2856',
     alignItems: 'center', justifyContent: 'center',
   },
   boutonCouleurTexte: { color: '#fff', fontSize: 11, fontWeight: '800' },

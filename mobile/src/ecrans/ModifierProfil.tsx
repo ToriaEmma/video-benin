@@ -14,10 +14,10 @@ type Cle = 'nom' | 'pseudo' | 'bio'
 // Regle de la version web : lettres, chiffres, points et tirets bas, 3 a 24.
 const PSEUDO_VALIDE = /^[a-zA-Z0-9_.]{3,24}$/
 
-// Coche verte affichee quand le pseudo respecte le format (.edition-saisie svg).
+// Coche affichee quand le pseudo respecte le format (.edition-saisie svg).
 const Coche = ({ taille = 19 }: { taille?: number }) => (
   <Svg width={taille} height={taille} viewBox="0 0 24 24" fill="none"
-    stroke="#00ce96" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round">
+    stroke="#ff2856" strokeWidth={4} strokeLinecap="round" strokeLinejoin="round">
     <Path d="m5 12 5 6 9-12" />
   </Svg>
 )

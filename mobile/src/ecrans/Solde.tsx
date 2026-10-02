@@ -697,7 +697,7 @@ const s = StyleSheet.create({
   feuilleTexte: { fontSize: 14, lineHeight: 19, color: '#111' },
   centre: { textAlign: 'center' },
 
-  illustration: { backgroundColor: '#6de4da', borderRadius: 50, width: 108,
+  illustration: { backgroundColor: '#16cce0', borderRadius: 50, width: 108,
     height: 85, alignItems: 'center', justifyContent: 'center',
     alignSelf: 'center', marginTop: 34, marginBottom: 26,
     transform: [{ rotate: '-8deg' }] },

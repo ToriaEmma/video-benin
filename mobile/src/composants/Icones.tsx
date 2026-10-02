@@ -708,7 +708,7 @@ export const LogoFacebook = ({ taille = 33 }: P) => (
   </Svg>
 )
 
-// Bulle de message verte : l'application Messages d'iOS.
+// Bulle de message : l'application Messages d'iOS, a sa couleur de marque.
 export const LogoSMS = ({ taille = 33 }: P) => (
   <Svg width={taille} height={taille} viewBox="0 0 48 48">
     <Circle cx="24" cy="24" r="24" fill="#4bd964" />

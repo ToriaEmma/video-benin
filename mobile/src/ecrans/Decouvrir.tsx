@@ -102,7 +102,7 @@ export default function Decouvrir({ onVisiter, onOuvrirVideo }: {
           value={terme} onChangeText={setTerme}
           returnKeyType="search" onSubmitEditing={chercher} />
         <Pressable style={s.loupe} onPress={chercher} hitSlop={8}>
-          <Loupe taille={22} couleur="#00a550" />
+          <Loupe taille={22} couleur="#ff2856" />
         </Pressable>
       </View>
 
@@ -115,7 +115,7 @@ export default function Decouvrir({ onVisiter, onOuvrirVideo }: {
           <View>
             {recherche ? <>
               <Pressable style={s.retour} onPress={reinitialiser}>
-                <Chevron taille={16} couleur="#00a550" />
+                <Chevron taille={16} couleur="#ff2856" />
                 <Text style={s.retourTexte}>Retour aux tendances</Text>
               </Pressable>
 
@@ -168,7 +168,7 @@ const s = StyleSheet.create({
 
   retour: { flexDirection: 'row', alignItems: 'center', gap: 4,
     marginBottom: 16 },
-  retourTexte: { color: '#00a550', fontSize: 14, fontWeight: '600' },
+  retourTexte: { color: '#ff2856', fontSize: 14, fontWeight: '600' },
 
   section: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 12 },
   sectionEspacee: { marginTop: 24 },
