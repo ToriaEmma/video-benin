@@ -30,6 +30,7 @@ import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../composants/Commentaires'
 import Decouvrir from './Decouvrir'
+import Suggestions from '../composants/Suggestions'
 import {
   CoeurFil, BulleFil, PartageFil, Favori, LecturePleine, LoupeEntete,
   NoteDisque, SonNote, Chevron, AjoutPersonne, AvionEnvoi, ListeLecture,
@@ -478,6 +479,8 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
                 <Text style={s.reessayerTexte}>Réessayer</Text>
               </Pressable>
             )}
+            {/* Le fil vide devient actionnable : on suit depuis ici meme. */}
+            {!erreur && <Suggestions onVisiter={onVisiter} />}
           </View>
         ) : (
         <FlatList

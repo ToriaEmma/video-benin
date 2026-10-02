@@ -143,6 +143,9 @@ input, textarea { font: inherit; color: inherit; }
 /* ---------- Etats ---------- */
 .vide { height: 100%; display: grid; place-content: center; text-align: center; gap: 10px; padding: 40px 24px; color: var(--texte-attenue); }
 .vide .glyphe { font-size: 44px; }
+/* Suggestions dans un fil vide : la liste defile sans pousser le message. */
+.vide .suggestions { width: 100%; max-width: 420px; margin: 6px auto 0; text-align: left; overflow-y: auto; max-height: 46vh; }
+.vide .suggestions .comptes-liste-titre { color: var(--texte); }
 .chargement { height: 100%; display: grid; place-items: center; color: var(--texte-attenue); }
 
 /* ---------- Commentaires ---------- */
@@ -171,6 +174,20 @@ input, textarea { font: inherit; color: inherit; }
 .recherche input { flex: 1; background: var(--surface); border: 1px solid var(--bordure); border-radius: 10px; padding: 12px 14px; font-size: 16px; }
 .resultat { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--bordure); }
 .resultat .avatar { width: 44px; height: 44px; font-size: 17px; border-width: 1px; }
+.resultat .avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+/* Ligne de compte : identite a gauche, bouton d'abonnement a droite. */
+.compte-identite { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; color: inherit; font: inherit; }
+.compte-textes { min-width: 0; display: grid; gap: 2px; }
+.compte-pseudo { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.compte-detail { font-size: 12px; color: var(--texte-attenue); overflow-wrap: anywhere; }
+.compte-suivre { flex-shrink: 0; min-height: 34px; padding: 0 16px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 600; }
+.compte-suivre.suivi { background: transparent; border: 1px solid var(--bordure); color: var(--texte); }
+.compte-suivre:disabled { opacity: .6; }
+
+/* Panneau des abonnes/abonnements, ouvert depuis les compteurs du profil. */
+.comptes-liste-titre { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+.comptes-liste-etat { font-size: 13px; color: var(--texte-attenue); margin: 10px 0; }
 
 /* ---------- Profil : barre superieure ---------- */
 .profil-barre {

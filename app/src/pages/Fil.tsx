@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth'
 import Commentaires from '../components/Commentaires'
 import EnvoyerA from '../components/EnvoyerA'
 import Communaute from './Communaute'
+import Suggestions from '../components/Suggestions'
 import DirectLive from './DirectLive'
 import AnalyseVideo from './AnalyseVideo'
 import { Film } from '../components/Icones'
@@ -271,6 +272,8 @@ export default function Fil({ onVisiter, onRechercher }: { onVisiter: (p: string
       <span>{suivis
         ? 'Abonne-toi à des comptes pour remplir ce fil'
         : 'Soyez le premier à publier'}</span>
+      {/* Le fil vide devient actionnable : on suit depuis ici meme. */}
+      {suivis && <Suggestions onVisiter={onVisiter} />}
     </div>
   ) : (
     <div className="fil" ref={filRef} onScroll={auDefilement}>

@@ -1,16 +1,15 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { apiInteractions, apiVideos, type VideoApi } from '../lib/api'
+import { apiRecherche, apiVideos, type CompteApi, type VideoApi } from '../lib/api'
 import { Lecture, Loupe, Chevron } from '../components/Icones'
-
-type Compte = { id: string; pseudo: string; bio: string }
-type VideoResultat = VideoApi
+import LigneCompte from '../components/LigneCompte'
 
 export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => void }) {
   const [terme, setTerme] = useState('')
-  const [comptes, setComptes] = useState<Compte[]>([])
-  const [videos, setVideos] = useState<VideoResultat[]>([])
+  const [comptes, setComptes] = useState<CompteApi[]>([])
+  const [videos, setVideos] = useState<VideoApi[]>([])
   const [recherche, setRecherche] = useState(false)
-  const [populaires, setPopulaires] = useState<VideoResultat[]>([])
+  const [enCours, setEnCours] = useState(false)
+  const [populaires, setPopulaires] = useState<VideoApi[]>([])
   const [chargement, setChargement] = useState(true)
   const [erreur, setErreur] = useState('')
   const [reprise, setReprise] = useState(0)
@@ -30,25 +29,25 @@ export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => voi
     return () => { valable = false }
   }, [reprise])
 
-  // Faute de route de recherche, les legendes sont filtrees sur le fil
-  // deja charge, et le pseudo est cherche a l'exact : /profils/:pseudo ne
-  // repond pas aux fragments.
+  // Comptes et videos arrivent d'un seul appel : le serveur compare le
+  // fragment au pseudo, au nom et aux legendes.
   const chercher = async (e: FormEvent) => {
     e.preventDefault()
     const q = terme.trim()
     if (!q) return
     setRecherche(true)
+    setEnCours(true)
     setErreur('')
-
-    const q2 = q.toLowerCase()
-    setVideos(populaires.filter(v => v.legende.toLowerCase().includes(q2)))
-
     try {
-      const p = await apiInteractions.profil(q)
-      setComptes([{ id: p.id, pseudo: p.pseudo, bio: p.bio ?? '' }])
-    } catch {
-      // Aucun compte ne porte exactement ce pseudo : la section reste vide.
+      const r = await apiRecherche.tout(q)
+      setComptes(r.comptes)
+      setVideos(r.videos)
+    } catch (err) {
       setComptes([])
+      setVideos([])
+      setErreur(err instanceof Error ? err.message : 'Recherche impossible')
+    } finally {
+      setEnCours(false)
     }
   }
 
@@ -57,6 +56,7 @@ export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => voi
     setRecherche(false)
     setComptes([])
     setVideos([])
+    setErreur('')
   }
 
   return (
@@ -83,29 +83,30 @@ export default function Decouvrir({ onVisiter }: { onVisiter: (p: string) => voi
             <Chevron taille={16} /> Retour aux tendances
           </button>
 
+          {erreur && (
+            <p role="alert" style={{ color: 'var(--texte-attenue)', fontSize: 13 }}>
+              {erreur}
+            </p>
+          )}
+
           <h2 style={{ fontSize: 15, marginBottom: 10 }}>Comptes</h2>
-          {comptes.length === 0 ? (
-            <p style={{ color: 'var(--texte-attenue)', fontSize: 14 }}>
-              Aucun compte à ce pseudo. La recherche de comptes demande le
-              pseudo exact.
+          {enCours ? (
+            <p style={{ color: 'var(--texte-attenue)', fontSize: 13 }}>Recherche…</p>
+          ) : comptes.length === 0 ? (
+            <p style={{ color: 'var(--texte-attenue)', fontSize: 13 }}>
+              Aucun compte ne correspond
             </p>
           ) : (
             comptes.map((c) => (
-              <div className="resultat" key={c.id} onClick={() => onVisiter(c.pseudo)} style={{ cursor: 'pointer' }}>
-                <div className="avatar">{c.pseudo.charAt(0).toUpperCase()}</div>
-                <div>
-                  <div style={{ fontWeight: 600 }}>@{c.pseudo}</div>
-                  {c.bio && (
-                    <div style={{ fontSize: 13, color: 'var(--texte-attenue)' }}>{c.bio}</div>
-                  )}
-                </div>
-              </div>
+              <LigneCompte key={c.id} compte={c} onVisiter={onVisiter} />
             ))
           )}
 
           <h2 style={{ fontSize: 15, margin: '24px 0 10px' }}>Vidéos</h2>
-          {videos.length === 0 ? (
-            <p style={{ color: 'var(--texte-attenue)', fontSize: 14 }}>Aucune vidéo trouvée</p>
+          {enCours ? (
+            <p style={{ color: 'var(--texte-attenue)', fontSize: 13 }}>Recherche…</p>
+          ) : videos.length === 0 ? (
+            <p style={{ color: 'var(--texte-attenue)', fontSize: 13 }}>Aucune vidéo trouvée</p>
           ) : (
             <div className="grille">
               {videos.map((v) => (

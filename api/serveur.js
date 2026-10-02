@@ -267,7 +267,9 @@ app.post('/televersements', exigerSession, route(async (req, res) => {
 // entre comptes qui se suivent mutuellement, 'moi' pour l'auteur.
 // ------------------------------------------------------------
 
-const listerVideos = async ({ viewerId, auteurId, limite, avant, videoId, suivisSeuls = false }) => {
+const listerVideos = async ({
+  viewerId, auteurId, limite, avant, videoId, suivisSeuls = false, legende = null,
+}) => {
   const lignes = await sql`
     SELECT
       v.*,
@@ -288,6 +290,7 @@ const listerVideos = async ({ viewerId, auteurId, limite, avant, videoId, suivis
       AND (${videoId}::uuid IS NULL OR v.id = ${videoId}::uuid)
       AND (${auteurId}::uuid IS NULL OR v.auteur_id = ${auteurId}::uuid)
       AND (${avant}::timestamptz IS NULL OR v.publiee_le < ${avant}::timestamptz)
+      AND (${legende}::text IS NULL OR v.legende ILIKE ${legende}::text)
       AND (NOT ${suivisSeuls} OR EXISTS (
         SELECT 1 FROM abonnements a
         WHERE a.suiveur_id = ${viewerId} AND a.suivi_id = v.auteur_id
@@ -620,6 +623,139 @@ app.get('/profils/:pseudo', sessionFacultative, route(async (req, res) => {
     nbVideos: profil.nb_videos,
     suivi: Boolean(profil.suivi),
   })
+}))
+
+// ------------------------------------------------------------
+// Recherche et decouverte
+//
+// Les quatre routes rendent la meme forme de compte : l'application
+// affiche partout la meme ligne, avec son bouton d'abonnement.
+// ------------------------------------------------------------
+
+const comptePublic = (c) => ({
+  id: c.id,
+  pseudo: c.pseudo,
+  nom: c.nom,
+  avatar_url: c.avatar_url,
+  bio: c.bio,
+  nbAbonnes: Number(c.nb_abonnes),
+  suivi: Boolean(c.suivi),
+})
+
+// Le terme devient un motif ILIKE. Les jokers saisis par l'utilisateur
+// sont neutralises : « % » seul ramenerait la table entiere.
+const motifRecherche = (terme) =>
+  `%${terme.replace(/[\\%_]/g, (c) => `\\${c}`)}%`
+
+app.get('/recherche', sessionFacultative, route(async (req, res) => {
+  const terme = req.query.q
+  if (typeof terme !== 'string' || terme.trim() === '') {
+    throw new Refus(400, 'Indique ce que tu cherches')
+  }
+  const motif = motifRecherche(terme.trim())
+  const viewerId = req.profilId || null
+  const limite = limiteDemandee(req.query.limite)
+
+  const comptes = await sql`
+    SELECT
+      p.id, p.pseudo, p.nom, p.avatar_url, p.bio,
+      (SELECT count(*)::int FROM abonnements a WHERE a.suivi_id = p.id) AS nb_abonnes,
+      EXISTS (
+        SELECT 1 FROM abonnements a
+        WHERE a.suiveur_id = ${viewerId} AND a.suivi_id = p.id
+      ) AS suivi
+    FROM profils p
+    WHERE p.pseudo ILIKE ${motif} OR p.nom ILIKE ${motif}
+    -- Le pseudo qui commence par le terme passe devant : c'est le compte
+    -- que l'on cherchait le plus probablement.
+    ORDER BY (p.pseudo ILIKE ${terme.trim() + '%'}) DESC, nb_abonnes DESC, p.pseudo
+    LIMIT ${limite}
+  `
+
+  const videos = await listerVideos({
+    viewerId,
+    auteurId: null,
+    videoId: null,
+    legende: motif,
+    limite,
+    avant: null,
+  })
+
+  res.json({ comptes: comptes.map(comptePublic), videos })
+}))
+
+// Les deux listes d'abonnement ne different que par la colonne jointe.
+const listerComptesLies = async ({ profilId, viewerId, sens, limite }) => {
+  const lignes = sens === 'abonnes'
+    ? await sql`
+        SELECT
+          p.id, p.pseudo, p.nom, p.avatar_url, p.bio,
+          (SELECT count(*)::int FROM abonnements x WHERE x.suivi_id = p.id) AS nb_abonnes,
+          EXISTS (
+            SELECT 1 FROM abonnements x
+            WHERE x.suiveur_id = ${viewerId} AND x.suivi_id = p.id
+          ) AS suivi
+        FROM abonnements a
+        JOIN profils p ON p.id = a.suiveur_id
+        WHERE a.suivi_id = ${profilId}
+        ORDER BY a.cree_le DESC
+        LIMIT ${limite}
+      `
+    : await sql`
+        SELECT
+          p.id, p.pseudo, p.nom, p.avatar_url, p.bio,
+          (SELECT count(*)::int FROM abonnements x WHERE x.suivi_id = p.id) AS nb_abonnes,
+          EXISTS (
+            SELECT 1 FROM abonnements x
+            WHERE x.suiveur_id = ${viewerId} AND x.suivi_id = p.id
+          ) AS suivi
+        FROM abonnements a
+        JOIN profils p ON p.id = a.suivi_id
+        WHERE a.suiveur_id = ${profilId}
+        ORDER BY a.cree_le DESC
+        LIMIT ${limite}
+      `
+  return lignes.map(comptePublic)
+}
+
+app.get('/profils/:pseudo/abonnes', sessionFacultative, route(async (req, res) => {
+  const cible = await trouverProfilParPseudo(req.params.pseudo)
+  res.json(await listerComptesLies({
+    profilId: cible.id,
+    viewerId: req.profilId || null,
+    sens: 'abonnes',
+    limite: limiteDemandee(req.query.limite),
+  }))
+}))
+
+app.get('/profils/:pseudo/abonnements', sessionFacultative, route(async (req, res) => {
+  const cible = await trouverProfilParPseudo(req.params.pseudo)
+  res.json(await listerComptesLies({
+    profilId: cible.id,
+    viewerId: req.profilId || null,
+    sens: 'abonnements',
+    limite: limiteDemandee(req.query.limite),
+  }))
+}))
+
+// Comptes a suivre : les plus suivis que le lecteur ne suit pas encore.
+// C'est la sortie de secours d'un fil « Suivis » vide.
+app.get('/suggestions', exigerSession, route(async (req, res) => {
+  const lignes = await sql`
+    SELECT
+      p.id, p.pseudo, p.nom, p.avatar_url, p.bio,
+      (SELECT count(*)::int FROM abonnements a WHERE a.suivi_id = p.id) AS nb_abonnes,
+      false AS suivi
+    FROM profils p
+    WHERE p.id <> ${req.profilId}
+      AND NOT EXISTS (
+        SELECT 1 FROM abonnements a
+        WHERE a.suiveur_id = ${req.profilId} AND a.suivi_id = p.id
+      )
+    ORDER BY nb_abonnes DESC, p.cree_le DESC
+    LIMIT ${limiteDemandee(req.query.limite)}
+  `
+  res.json(lignes.map(comptePublic))
 }))
 
 // ------------------------------------------------------------

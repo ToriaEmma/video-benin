@@ -7,15 +7,20 @@
 // video dans le lecteur, via `onOuvrirVideo`.
 // ============================================================
 
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, FlatList, useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Text, TextInput } from '../composants/Texte'
 import { Loupe, Chevron, Lecture } from '../composants/Icones'
-import { etat, comptesDemo, abreger, type Video } from '../lib/demo'
+import LigneCompte from '../composants/LigneCompte'
+import { abreger, type Video } from '../lib/demo'
+import {
+  apiRecherche, apiVideos, type CompteApi, type VideoApi,
+} from '../lib/api'
 
 function Case({ item, largeur, onOuvrir }: {
   item: Video; largeur: number; onOuvrir?: () => void
@@ -44,23 +49,45 @@ export default function Decouvrir({ onVisiter, onOuvrirVideo }: {
   const largeurCase = (width - 32 - 8) / 3
   const [terme, setTerme] = useState('')
   const [recherche, setRecherche] = useState(false)
-  const [comptes, setComptes] = useState<typeof comptesDemo>([])
-  const [videos, setVideos] = useState<Video[]>([])
+  const [enCours, setEnCours] = useState(false)
+  const [comptes, setComptes] = useState<CompteApi[]>([])
+  const [videos, setVideos] = useState<VideoApi[]>([])
+  const [populaires, setPopulaires] = useState<VideoApi[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
 
-  // Les plus vues en tete, comme la requete `order('vues')` du web.
-  const populaires = useMemo(
-    () => [...etat.videos].sort((a, b) => b.vues - a.vues), [])
+  // L'API n'expose pas de classement : les plus vues passent en tete ici
+  // meme, ce qui suffit au volume d'un ecran.
+  useEffect(() => {
+    let valable = true
+    apiVideos.liste({ limite: 50 })
+      .then(v => {
+        if (valable) setPopulaires([...v].sort((a, b) => b.vues - a.vues))
+      })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [])
 
-  const chercher = () => {
-    const q = terme.trim().toLowerCase()
+  // Comptes et videos arrivent d'un seul appel : le serveur compare le
+  // fragment au pseudo, au nom et aux legendes.
+  const chercher = useCallback(() => {
+    const q = terme.trim()
     if (!q) return
     setRecherche(true)
-    setComptes(comptesDemo.filter(c => c.pseudo.includes(q)))
-    setVideos(etat.videos.filter(v => v.legende.toLowerCase().includes(q)))
-  }
+    setEnCours(true)
+    setErreur('')
+    apiRecherche.tout(q)
+      .then(r => { setComptes(r.comptes); setVideos(r.videos) })
+      .catch((e: Error) => {
+        setComptes([]); setVideos([]); setErreur(e.message)
+      })
+      .finally(() => setEnCours(false))
+  }, [terme])
 
   const reinitialiser = () => {
     setTerme(''); setRecherche(false); setComptes([]); setVideos([])
+    setErreur('')
   }
 
   // En recherche, la grille des videos trouvees ; sinon les populaires.
@@ -92,31 +119,26 @@ export default function Decouvrir({ onVisiter, onOuvrirVideo }: {
                 <Text style={s.retourTexte}>Retour aux tendances</Text>
               </Pressable>
 
+              {!!erreur && <Text style={s.vide}>{erreur}</Text>}
+
               <Text style={s.section}>Comptes</Text>
-              {comptes.length === 0
-                ? <Text style={s.vide}>Aucun compte trouvé</Text>
-                : comptes.map(c => (
-                  <Pressable style={s.resultat} key={c.id}
-                    onPress={() => onVisiter?.(c.pseudo)}>
-                    <View style={s.avatar}>
-                      <Text style={s.avatarLettre}>
-                        {c.pseudo.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={s.resultatCorps}>
-                      <Text style={s.resultatPseudo}>@{c.pseudo}</Text>
-                      {!!c.bio && <Text style={s.resultatBio}>{c.bio}</Text>}
-                    </View>
-                  </Pressable>
-                ))}
+              {enCours
+                ? <Text style={s.vide}>Recherche…</Text>
+                : comptes.length === 0
+                  ? <Text style={s.vide}>Aucun compte ne correspond</Text>
+                  : comptes.map(c => (
+                    <LigneCompte key={c.id} compte={c} onVisiter={onVisiter} />
+                  ))}
 
               <Text style={[s.section, s.sectionEspacee]}>Vidéos</Text>
-              {videos.length === 0 && (
+              {!enCours && videos.length === 0 && (
                 <Text style={s.vide}>Aucune vidéo trouvée</Text>
               )}
             </> : <>
               <Text style={s.section}>Vidéos populaires</Text>
-              {populaires.length === 0 && (
+              {chargement && <ActivityIndicator color="#fff" />}
+              {!chargement && !!erreur && <Text style={s.vide}>{erreur}</Text>}
+              {!chargement && !erreur && populaires.length === 0 && (
                 <Text style={s.vide}>Aucune vidéo pour le moment</Text>
               )}
             </>}
@@ -150,16 +172,7 @@ const s = StyleSheet.create({
 
   section: { color: '#fff', fontSize: 15, fontWeight: '700', marginBottom: 12 },
   sectionEspacee: { marginTop: 24 },
-  vide: { color: 'rgba(255,255,255,.62)', fontSize: 14, marginBottom: 8 },
-
-  resultat: { flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 10 },
-  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#232323',
-    alignItems: 'center', justifyContent: 'center' },
-  avatarLettre: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  resultatCorps: { flex: 1 },
-  resultatPseudo: { color: '#fff', fontWeight: '600', fontSize: 15 },
-  resultatBio: { color: 'rgba(255,255,255,.62)', fontSize: 13, marginTop: 2 },
+  vide: { color: 'rgba(255,255,255,.62)', fontSize: 13, marginBottom: 8 },
 
   case: { margin: 1, borderRadius: 4, backgroundColor: '#161616',
     overflow: 'hidden' },

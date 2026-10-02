@@ -7,6 +7,7 @@ import { useEvent } from 'expo'
 import { abreger, type Video } from '../lib/demo'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import Suggestions from '../composants/Suggestions'
 import Commentaires from '../composants/Commentaires'
 import {
   CoeurFil, BulleFil, PartageFil, Favori, LecturePleine, LiveEntete,
@@ -298,6 +299,10 @@ export default function Fil({
             <Pressable style={s.reessayer} onPress={recharger}>
               <Text style={s.reessayerTexte}>Réessayer</Text>
             </Pressable>
+          )}
+          {/* Le fil vide devient actionnable : on suit depuis ici meme. */}
+          {!erreur && categorie === 'Suivis' && (
+            <Suggestions onVisiter={onVisiter} />
           )}
         </View>
       ) : autonome || filApi === categorie ? (

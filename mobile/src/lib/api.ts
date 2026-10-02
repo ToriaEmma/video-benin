@@ -120,6 +120,18 @@ export type ProfilDetaille = ProfilApi & {
 
 export type Session = { jeton: string; profil: ProfilApi }
 
+// Ligne de compte rendue par la recherche, les listes d'abonnement et
+// les suggestions : partout la meme, avec son bouton d'abonnement.
+export type CompteApi = {
+  id: string
+  pseudo: string
+  nom: string | null
+  avatar_url: string | null
+  bio: string | null
+  nbAbonnes: number
+  suivi: boolean
+}
+
 // La video de l'API porte deux champs de plus que celle de demo.ts :
 // l'identifiant de l'auteur et la date de mise a la corbeille.
 export type VideoApi = Video & {
@@ -335,6 +347,34 @@ export const apiInteractions = {
     requete<{ suivi: boolean }>(`/profils/${pseudoUrl(pseudo)}/abonnement`, { methode: 'DELETE' }),
 
   profil: (pseudo: string) => requete<ProfilDetaille>(`/profils/${pseudoUrl(pseudo)}`),
+
+  // Les comptes qui suivent ce profil.
+  abonnes: (pseudo: string, p?: Pagination) =>
+    requete<CompteApi[]>(`/profils/${pseudoUrl(pseudo)}/abonnes${parametres(p)}`),
+
+  // Les comptes que ce profil suit.
+  abonnements: (pseudo: string, p?: Pagination) =>
+    requete<CompteApi[]>(`/profils/${pseudoUrl(pseudo)}/abonnements${parametres(p)}`),
+
+  // Comptes a suivre, les plus suivis d'abord : de quoi sortir d'un fil
+  // « Suivis » vide.
+  suggestions: (p?: Pagination) =>
+    requete<CompteApi[]>(`/suggestions${parametres(p)}`),
+}
+
+// ------------------------------------------------------------
+// Recherche
+// ------------------------------------------------------------
+
+export type ResultatRecherche = { comptes: CompteApi[]; videos: VideoApi[] }
+
+export const apiRecherche = {
+  // Comptes et videos en un seul aller-retour. Le terme accepte les
+  // fragments : le serveur compare en ILIKE sur le pseudo et le nom.
+  tout: (q: string, p?: Pagination) =>
+    requete<ResultatRecherche>(
+      `/recherche?q=${encodeURIComponent(q)}${parametres(p).replace('?', '&')}`,
+    ),
 }
 
 // ------------------------------------------------------------

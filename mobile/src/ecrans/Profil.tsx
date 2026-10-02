@@ -17,6 +17,7 @@ import Parametres from './Parametres'
 import Solde from './Solde'
 import ModifierProfil from './ModifierProfil'
 import ComptesProfil from '../composants/ComptesProfil'
+import ListeComptes, { type SensListe } from '../composants/ListeComptes'
 import {
   Crayon, Menu, AjoutPersonne, Cloche, Fleche, Chevron,
   Grille, Cadenas, Coeur, Repartage, Studio, Lecture, Plus, Triangle, FavoriContour,
@@ -70,7 +71,7 @@ function CaseBrouillons({ largeur, nombre, url, octets, onPresser }: {
 }
 
 export default function Profil({
-  pseudoVisite, onRetour, messageArrivee, onBrouillons, onOuvrirVideo,
+  pseudoVisite, onRetour, messageArrivee, onBrouillons, onOuvrirVideo, onVisiter,
 }: {
   pseudoVisite?: string; onRetour?: () => void
   // Message affiche brievement en arrivant, apres un enregistrement.
@@ -79,6 +80,8 @@ export default function Profil({
   onBrouillons?: () => void
   // Ouvre le lecteur plein ecran sur la video choisie dans la grille.
   onOuvrirVideo?: (videos: Video[], index: number) => void
+  // Ouvre le profil d'un compte touche dans les listes d'abonnement.
+  onVisiter?: (pseudo: string) => void
 }) {
   const { profil, deconnecter } = useAuth()
   // Mesure reactive : en Expo Go la largeur n'est pas encore connue au
@@ -105,6 +108,8 @@ export default function Profil({
   const [solde, setSolde] = useState(false)
   const [edition, setEdition] = useState(false)
   const [comptesOuverts, setComptesOuverts] = useState(false)
+  // Feuille ouverte par les compteurs « Suivis » et « Followers ».
+  const [listeOuverte, setListeOuverte] = useState<SensListe | null>(null)
   const [onglet, setOnglet] = useState<'videos' | 'privees' | 'repartages' | 'favoris' | 'aimees'>('videos')
   // Le bandeau gris « Brouillon enregistré » s'efface au bout de 2 secondes.
   // `efface` repart a faux a chaque nouveau message grace a la cle de l'effet.
@@ -282,18 +287,18 @@ export default function Profil({
 
                 {/* .profil-stats : gap 20px, marge haute 20px */}
                 <View style={s.stats}>
-                  <View style={s.stat}>
+                  <Pressable style={s.stat} onPress={() => setListeOuverte('abonnements')}>
                     <Text style={[s.statNombre, petitEcran.nombre]} numberOfLines={1}>
                       {abreger(nbSuivis)}
                     </Text>
                     <Text style={[s.statNom, petitEcran.nom]} numberOfLines={1}>Suivis</Text>
-                  </View>
-                  <View style={s.stat}>
+                  </Pressable>
+                  <Pressable style={s.stat} onPress={() => setListeOuverte('abonnes')}>
                     <Text style={[s.statNombre, petitEcran.nombre]} numberOfLines={1}>
                       {abreger(nbAbonnes)}
                     </Text>
                     <Text style={[s.statNom, petitEcran.nom]} numberOfLines={1}>Followers</Text>
-                  </View>
+                  </Pressable>
                   <View style={s.stat}>
                     <Text style={[s.statNombre, petitEcran.nombre]} numberOfLines={1}>
                       {abreger(totalAime)}
@@ -434,6 +439,11 @@ export default function Profil({
       {comptesOuverts && (
         <ComptesProfil pseudo={pseudo} avatar={profil?.avatar_url}
           onFermer={() => setComptesOuverts(false)} />
+      )}
+
+      {!!listeOuverte && (
+        <ListeComptes pseudo={pseudo} sens={listeOuverte}
+          onFermer={() => setListeOuverte(null)} onVisiter={onVisiter} />
       )}
 
       {menuOuvert && (

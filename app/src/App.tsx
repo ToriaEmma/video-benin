@@ -93,6 +93,7 @@ function Application() {
                 pseudoVisite={profilVisite ?? undefined}
                 messageArrivee={messageProfil}
                 onBrouillons={() => setBrouillons(true)}
+                onVisiter={visiter}
                 onRetour={() => {
                   setProfilVisite(null)
                   setOnglet('fil')

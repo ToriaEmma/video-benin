@@ -14,6 +14,7 @@ import './profil.css'
 import MenuProfil from '../components/MenuProfil'
 import Parametres from './Parametres'
 import ComptesProfil from '../components/ComptesProfil'
+import ListeComptes, { type SensListe } from '../components/ListeComptes'
 import ModifierProfil from './ModifierProfil'
 import Solde from './Solde'
 
@@ -27,6 +28,8 @@ type Props = {
   messageArrivee?: string
   // Ouvre la page qui liste les brouillons.
   onBrouillons?: () => void
+  // Ouvre le profil d'un compte touche dans les listes d'abonnement.
+  onVisiter?: (pseudo: string) => void
 }
 
 const abreger = (n: number) =>
@@ -35,7 +38,7 @@ const abreger = (n: number) =>
   : String(n)
 
 export default function Profil({
-  pseudoVisite, onRetour, messageArrivee, onBrouillons,
+  pseudoVisite, onRetour, messageArrivee, onBrouillons, onVisiter,
 }: Props) {
   const { profil, deconnecter } = useAuth()
   const monProfil = !pseudoVisite || pseudoVisite === profil?.pseudo
@@ -62,6 +65,8 @@ export default function Profil({
   const [soldeOuvert, setSoldeOuvert] = useState(false)
   const [parametresOuverts, setParametresOuverts] = useState(false)
   const [comptesOuverts, setComptesOuverts] = useState(false)
+  // Panneau ouvert par les compteurs « Suivis » et « Followers ».
+  const [listeOuverte, setListeOuverte] = useState<SensListe | null>(null)
   const [onglet, setOnglet] = useState<'videos' | 'privees' | 'repartages' | 'favoris' | 'aimees'>('videos')
   useEffect(() => { setOnglet('videos') }, [pseudoVisite])
 
@@ -235,6 +240,7 @@ export default function Profil({
 
       {menuOuvert && <MenuProfil onFermer={() => setMenuOuvert(false)} onDeconnecter={deconnecter} onSolde={() => { setMenuOuvert(false); setSoldeOuvert(true) }} onParametres={() => { setMenuOuvert(false); setParametresOuverts(true) }} />}
       {monProfil && comptesOuverts && <ComptesProfil pseudo={pseudo} avatar={profil?.avatar_url} onFermer={() => setComptesOuverts(false)} />}
+      {listeOuverte && <ListeComptes pseudo={pseudo} sens={listeOuverte} onFermer={() => setListeOuverte(null)} onVisiter={onVisiter} />}
 
       {/* Identite : nom, pseudo, avatar */}
       <div className="profil-identite">
@@ -242,8 +248,8 @@ export default function Profil({
           <div className="profil-nom">{monProfil ? <button className="profil-choix-compte" aria-label="Changer de compte" aria-haspopup="dialog" aria-expanded={comptesOuverts} onClick={() => setComptesOuverts(true)}><span>{profil?.nom || pseudo}</span><svg width="15" height="12" viewBox="0 0 16 12" fill="currentColor" aria-hidden="true"><path d="M2 3h12L8 10z" /></svg></button> : pseudo}</div>
           <div className="profil-pseudo">@{pseudo}</div>
           <div className="profil-stats">
-        <div className="bloc"><b>{abreger(nbSuivis)}</b><span>Suivis</span></div>
-        <div className="bloc"><b>{abreger(nbAbonnes)}</b><span>Followers</span></div>
+        <button className="bloc" aria-haspopup="dialog" onClick={() => setListeOuverte('abonnements')}><b>{abreger(nbSuivis)}</b><span>Suivis</span></button>
+        <button className="bloc" aria-haspopup="dialog" onClick={() => setListeOuverte('abonnes')}><b>{abreger(nbAbonnes)}</b><span>Followers</span></button>
         <div className="bloc"><b>{abreger(nbAime)}</b><span>J'aime</span></div>
           </div>
         </div>
