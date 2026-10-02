@@ -1,6 +1,6 @@
 {
   "appId": "bj.gouv.videobenin",
-  "appName": "Tok 229",
+  "appName": "TockTick",
   "webDir": "dist",
   "android": {
     "allowMixedContent": true

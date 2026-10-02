@@ -125,7 +125,7 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
   const partager = async () => {
     const resultat = await partagerNatif(
       `@${pseudo}`,
-      video.legende || 'Regarde cette vidéo sur Tok 229',
+      video.legende || 'Regarde cette vidéo sur TockTick',
       `${window.location.origin}/?v=${video.id}`,
     )
     if (resultat === 'copie') alert('Lien copié')

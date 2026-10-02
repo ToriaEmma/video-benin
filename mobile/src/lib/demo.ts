@@ -404,7 +404,7 @@ export const etat = {
       vignette: SOURCES[0],
     },
     {
-      id: 'n2', canal: 'application', etiquette: 'Tok 229 · Activités',
+      id: 'n2', canal: 'application', etiquette: 'TockTick · Activités',
       titre: 'Encore quelques abonnés avant de débloquer de nouveaux outils',
       corps: 'À partir de 100 abonnés, ton compte accède aux statistiques '
         + 'détaillées de chaque publication, aux directs plus longs et à la '
@@ -414,7 +414,7 @@ export const etat = {
       date: LANCEMENT - MINUTE * 60 * 24 * 3,
     },
     {
-      id: 'n3', canal: 'application', etiquette: 'Tok 229 · Mises à jour',
+      id: 'n3', canal: 'application', etiquette: 'TockTick · Mises à jour',
       titre: 'Tes vidéos font mieux que 90 % des comptes comparables',
       corps: 'Sur les trente derniers jours, la durée de visionnage moyenne de '
         + 'tes vidéos dépasse celle de neuf comptes béninois sur dix de taille '

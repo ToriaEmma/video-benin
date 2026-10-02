@@ -238,7 +238,7 @@ export function FeuillePartage({ visible, choisies, onBasculer, onFermer }: {
     <Feuille visible={visible} titre="Partager sur" onFermer={onFermer}
       croixCerclee={false} fondGris>
       <p className="fle-intro">
-        Après la publication, Tok 229 ouvrira l&apos;application que tu
+        Après la publication, TockTick ouvrira l&apos;application que tu
         sélectionnes ci-dessous afin que tu puisses la partager.
       </p>
 

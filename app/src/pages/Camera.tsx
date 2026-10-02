@@ -135,7 +135,7 @@ export default function Camera({ onFermer, onChoisir }: {
       setMessage('')
       return
     }
-    // Outils de capture et de montage : ni l'API Tok 229 ni la camera du
+    // Outils de capture et de montage : ni l'API TockTick ni la camera du
     // navigateur ne les portent.
     avertir(`${nom} : non pris en charge par la caméra du navigateur.`)
   }

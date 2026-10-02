@@ -176,7 +176,7 @@ export function Notifications({ onRetour }: { onRetour: () => void }) {
         </Groupe>
 
         <Note>
-          Ces préférences valent pour les notifications envoyées par Tok 229.
+          Ces préférences valent pour les notifications envoyées par TockTick.
           Ton navigateur garde le dernier mot : s’il bloque les notifications
           du site, rien ne t’est envoyé.
         </Note>
@@ -604,7 +604,7 @@ export function PartagerProfil({ pseudo, onRetour }: {
   // Le partage natif n'existe pas partout sur le web : le presse-papiers
   // sert de repli, et sans lui on le dit franchement.
   const partager = async () => {
-    const texte = `Retrouve @${pseudo} sur Tok 229\n${lien}`
+    const texte = `Retrouve @${pseudo} sur TockTick\n${lien}`
     if (navigator.share) {
       try { await navigator.share({ text: texte }) } catch { /* partage annule */ }
       return

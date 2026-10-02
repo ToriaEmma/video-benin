@@ -188,13 +188,13 @@ export default function Solde({ onRetour }: { onRetour: () => void }) {
   // de laisser croire a une mise en service prochaine.
   const OUTILS = [
     { nom: 'Récompenses LIVE', icone: 'piece',
-      raison: 'Tok 229 n’a pas encore de diffusion en direct, donc aucune récompense à reverser.' },
+      raison: 'TockTick n’a pas encore de diffusion en direct, donc aucune récompense à reverser.' },
     { nom: 'Monétisation', icone: 'graphique',
-      raison: 'Aucun programme de monétisation n’est ouvert : Tok 229 ne verse pas de revenus.' },
+      raison: 'Aucun programme de monétisation n’est ouvert : TockTick ne verse pas de revenus.' },
     { nom: 'Campagnes', icone: 'etoile',
-      raison: 'Tok 229 ne vend pas de publicité : il n’y a aucune campagne à gérer.' },
+      raison: 'TockTick ne vend pas de publicité : il n’y a aucune campagne à gérer.' },
     { nom: 'Gestionnaire d’abonnement', icone: 'etoile',
-      raison: 'Tok 229 ne propose aucun abonnement payant.' },
+      raison: 'TockTick ne propose aucun abonnement payant.' },
   ]
 
   const FAQ = [

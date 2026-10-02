@@ -342,7 +342,7 @@ export default function Profil({
         </div>
       ) : onglet === 'repartages' ? (
         <p className="profil-etat">
-          Tok 229 n’enregistre pas encore les repartages : rien à lister ici.
+          TockTick n’enregistre pas encore les repartages : rien à lister ici.
         </p>
       ) : (onglet === 'favoris' || onglet === 'aimees') && chargementOnglet ? (
         <p className="profil-etat">Chargement…</p>

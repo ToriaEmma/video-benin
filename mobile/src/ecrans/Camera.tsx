@@ -31,7 +31,7 @@ const FILTRES = [
 const DUREES = ['10 min', '60 s', '15 s', 'PHOTO', 'TEXTE']
 // Pourquoi chaque outil reste muet. Filmer, choisir un filtre et allumer
 // la lampe fonctionnent ; le reste demande un vrai moteur de montage, que
-// Tok 229 n'a pas. Chaque bouton le dit plutot que de promettre une suite.
+// TockTick n'a pas. Chaque bouton le dit plutot que de promettre une suite.
 const RAISONS_OUTILS: Record<string, string> = {
   Minuteur: 'le déclenchement différé n’est pas encore en place.',
   Disposition: 'les modèles de disposition demandent un moteur de montage.',
@@ -40,7 +40,7 @@ const RAISONS_OUTILS: Record<string, string> = {
   "Plus d'outils": 'il n’y a pas d’autre outil pour l’instant.',
   'Enregistrer l’effet': 'les effets ne sont pas encore enregistrables.',
   Agrandir: 'l’aperçu agrandi n’est pas encore en place.',
-  'Diffusion LIVE': 'Tok 229 n’a pas encore de diffusion en direct.',
+  'Diffusion LIVE': 'TockTick n’a pas encore de diffusion en direct.',
   'Envoyer à des amis': 'partage ta vidéo une fois publiée.',
   Créer: 'il n’y a pas d’autre mode de création pour l’instant.',
 }

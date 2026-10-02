@@ -250,7 +250,7 @@ export default function Messages() {
             <span className="msg-service"><Eclair taille={24} /></span>
             <span className="msg-ligne-corps">
               <span className="msg-ligne-pseudo">Notifications système</span>
-              <span className="msg-apercu">Activités et mises à jour de Tok 229</span>
+              <span className="msg-apercu">Activités et mises à jour de TockTick</span>
             </span>
             <span className="msg-ligne-fin"><ChevronDroit taille={18} /></span>
           </button>

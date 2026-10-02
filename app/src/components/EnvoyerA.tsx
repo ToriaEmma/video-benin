@@ -116,7 +116,7 @@ export default function EnvoyerA({
   // Le partage natif n'existe pas partout sur le web : le presse-papiers
   // sert de repli, et sans lui on le dit franchement.
   const partager = async () => {
-    const texte = `${legende}\n\nRegarde cette vidéo sur Tok 229`
+    const texte = `${legende}\n\nRegarde cette vidéo sur TockTick`
     if (navigator.share) {
       try { await navigator.share({ text: texte }) } catch { /* Partage annule. */ }
       return
@@ -136,8 +136,8 @@ export default function EnvoyerA({
     if (cle === 'supprimer') { onFermer(); onSupprimer?.(); return }
     if (cle === 'stats' && onAnalytiques) { onFermer(); onAnalytiques(); return }
     // Duo, collage, stickers, promotion : autant de traitements video et
-    // de regies publicitaires que l'API Tok 229 ne couvre pas.
-    annoncer(`${nom} : cette fonction n’existe pas dans Tok 229.`)
+    // de regies publicitaires que l'API TockTick ne couvre pas.
+    annoncer(`${nom} : cette fonction n’existe pas dans TockTick.`)
   }
 
   return (

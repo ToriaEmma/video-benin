@@ -1,5 +1,5 @@
 // ============================================================
-// Client de l'API Tok 229 (api/serveur.js).
+// Client de l'API TockTick (api/serveur.js).
 //
 // Tout l'acces reseau de l'application passe par ce fichier : les
 // ecrans appellent les enveloppes typees et n'ont jamais a connaitre

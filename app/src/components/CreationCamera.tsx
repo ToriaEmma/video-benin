@@ -41,7 +41,7 @@ export default function CreationCamera({ onChoisir, onFermer }: { onChoisir: (f:
   const glisserFin = () => { depart.current = null }
   const outil = (nom: string) => {
     if (nom === 'Filtres' || nom === 'Effets') {setFiltre(v => (v + 1) % filtres.length);setMessage('');return}
-    // Ces outils relevent de la capture et du montage : ni l'API Tok 229
+    // Ces outils relevent de la capture et du montage : ni l'API TockTick
     // ni la camera du navigateur ne les portent.
     setMessage(`${nom} : non pris en charge par la caméra du navigateur.`)
   }

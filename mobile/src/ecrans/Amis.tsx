@@ -263,7 +263,7 @@ function Carte({
   const partager = async () => {
     try {
       await Share.share({
-        message: `${item.legende}\n\nRegarde cette vidéo sur Tok 229`,
+        message: `${item.legende}\n\nRegarde cette vidéo sur TockTick`,
       })
     } catch { /* annule */ }
   }

@@ -22,7 +22,7 @@ type Glyphe = ({ taille }: { taille?: number }) => React.ReactElement
 const FILTRES: { nom: string; canal: CanalNotification | null }[] = [
   { nom: 'Tous', canal: null },
   { nom: 'LIVE', canal: 'live' },
-  { nom: 'Tok 229', canal: 'application' },
+  { nom: 'TockTick', canal: 'application' },
   { nom: 'Assistant promotion', canal: 'promotion' },
 ]
 
@@ -40,7 +40,7 @@ const CANAUX: { nom: string; Icone: Glyphe }[] = [
   { nom: 'Creator Marketplace', Icone: CanalMarketplace },
   { nom: 'LIVE', Icone: CanalLive },
   { nom: 'Mini-série', Icone: CanalMiniSerie },
-  { nom: 'Tok 229', Icone: CanalApplication },
+  { nom: 'TockTick', Icone: CanalApplication },
 ]
 
 function Carte({ notification }: { notification: Notification }) {

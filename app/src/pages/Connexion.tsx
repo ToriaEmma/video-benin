@@ -209,7 +209,7 @@ export default function Connexion({ onSucces }: { onSucces?: () => void } = {}) 
           <button onClick={() => ouvrir('comptes')}>Se connecter</button>
         </>}>
           <h2 className="cnx-titre">
-            {etape === 'telephone' ? 'Inscription à Tok 229' : 'Choisis ton pseudo'}
+            {etape === 'telephone' ? 'Inscription à TockTick' : 'Choisis ton pseudo'}
           </h2>
 
           {etape === 'telephone' ? <>

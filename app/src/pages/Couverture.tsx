@@ -193,10 +193,10 @@ export default function Couverture({ url, onAnnuler, onEnregistrer }: {
             <span className="couv-style-carre">
               {nom === 'Aucun' && <Interdit taille={30} />}
               {nom === 'Standard' && <b className="couv-style-aa">Aa</b>}
-              {nom === 'Vector' && <span className="couv-badge-vector">Tok 229</span>}
-              {nom === 'Glitch' && <span className="couv-badge-glitch"><i /><em>Tok 229</em></span>}
-              {nom === 'Tint' && <span className="couv-badge-tint"><i /><em>Tok 229</em></span>}
-              {nom === 'Emboss' && <span className="couv-badge-emboss">Tok 229</span>}
+              {nom === 'Vector' && <span className="couv-badge-vector">TockTick</span>}
+              {nom === 'Glitch' && <span className="couv-badge-glitch"><i /><em>TockTick</em></span>}
+              {nom === 'Tint' && <span className="couv-badge-tint"><i /><em>TockTick</em></span>}
+              {nom === 'Emboss' && <span className="couv-badge-emboss">TockTick</span>}
             </span>
             <small>{nom}</small>
           </button>

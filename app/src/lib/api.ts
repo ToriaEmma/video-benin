@@ -1,5 +1,5 @@
 // ============================================================
-// Client de l'API Tok 229 (api/serveur.js).
+// Client de l'API TockTick (api/serveur.js).
 //
 // Jumeau web de mobile/src/lib/api.ts : meme surface, meme forme de
 // reponses. Tout l'acces reseau passe par ce fichier, les ecrans n'ont

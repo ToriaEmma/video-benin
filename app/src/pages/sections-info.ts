@@ -86,7 +86,7 @@ export const SECTIONS_INFO: Record<string, SectionInfo> = {
     titre: 'Publicités',
     paragraphe: 'Tu pourras consulter ici les thèmes utilisés pour choisir '
       + 'les publicités qui te sont montrées, et refuser qu’elles '
-      + 'soient personnalisées. Tok 229 ne diffuse pas encore de '
+      + 'soient personnalisées. TockTick ne diffuse pas encore de '
       + 'publicité : ce réglage est pris d’avance.',
     groupe: 'Déjà réglable',
     bascules: [

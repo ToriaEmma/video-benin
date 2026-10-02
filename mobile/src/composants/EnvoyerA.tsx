@@ -84,13 +84,13 @@ const ACTIONS: Action[] = [
   { cle: 'story', nom: 'Ajouter à la Story', Icone: AjoutStory },
 ]
 
-// Pourquoi chaque action reste muette. Tok 229 n'expose ni montage, ni
+// Pourquoi chaque action reste muette. TockTick n'expose ni montage, ni
 // publicite, ni moderation : plutot qu'une promesse vague, chaque bouton
 // dit ce qui lui manque. Ce que l'API sait faire est branche dans `agir`.
-const SANS_ROUTE = 'cette action n’existe pas encore dans Tok 229.'
-const SANS_MONTAGE = 'Tok 229 ne fait pas encore de montage vidéo.'
-const SANS_PUB = 'Tok 229 ne vend pas de publicité.'
-const SANS_STORY = 'Tok 229 n’a pas encore de Stories.'
+const SANS_ROUTE = 'cette action n’existe pas encore dans TockTick.'
+const SANS_MONTAGE = 'TockTick ne fait pas encore de montage vidéo.'
+const SANS_PUB = 'TockTick ne vend pas de publicité.'
+const SANS_STORY = 'TockTick n’a pas encore de Stories.'
 
 const RAISONS: Record<string, string> = {
   telecharger: 'l’enregistrement dans la pellicule n’est pas encore en place.',
@@ -104,10 +104,10 @@ const RAISONS: Record<string, string> = {
   animee: SANS_MONTAGE,
   sticker: SANS_MONTAGE,
   gif: SANS_MONTAGE,
-  legendes: 'Tok 229 ne génère pas encore de sous-titres.',
+  legendes: 'TockTick ne génère pas encore de sous-titres.',
   vitesse: 'la vitesse de lecture n’est pas réglable ici.',
   groupe: 'les conversations de groupe n’existent pas encore.',
-  diffuser: 'Tok 229 n’a pas encore de diffusion en direct.',
+  diffuser: 'TockTick n’a pas encore de diffusion en direct.',
   epingler: 'épingler une publication n’est pas encore possible.',
   motscles: 'les mots-clés ne sont pas encore gérés.',
   // Le serveur sait modifier une publication, mais aucun ecran ne porte
@@ -138,7 +138,7 @@ export default function EnvoyerA({
 
   const partager = async () => {
     try {
-      await Share.share({ message: `${legende}\n\nRegarde cette vidéo sur Tok 229` })
+      await Share.share({ message: `${legende}\n\nRegarde cette vidéo sur TockTick` })
     } catch { /* Partage annule. */ }
   }
 
