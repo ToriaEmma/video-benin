@@ -49,7 +49,8 @@
       "expo-video",
       "expo-media-library",
       "expo-audio",
-      "expo-image"
+      "expo-image",
+      "expo-asset"
     ],
     "owner": "emmatorias-team",
     "extra": {
@@ -62,7 +63,6 @@
     },
     "updates": {
       "url": "https://u.expo.dev/763f68a8-5bc3-42ee-a70e-2dc3cabce830"
-    },
-    "privacy": "public"
+    }
   }
 }
