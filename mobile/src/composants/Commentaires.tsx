@@ -1,17 +1,19 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   View, FlatList, Pressable, StyleSheet, Modal, KeyboardAvoidingView,
-  Platform, SafeAreaView, type TextInput as SaisieNative
+  Platform, SafeAreaView, ActivityIndicator, Alert,
+  type TextInput as SaisieNative
 } from 'react-native'
 import { Text, TextInput } from './Texte'
-import { etat, type Commentaire, type Video } from '../lib/demo'
+import { type Commentaire, type Video } from '../lib/demo'
+import { apiCommentaires } from '../lib/api'
 import {
   Croix, Tri, Envoyer, ImageCommentaire, Emoji, Mention,
 } from './Icones'
 
 // « à l'instant », « il y a 5 min », « il y a 2 h », « il y a 3 j » : repris
-// de app/src/components/Commentaires.tsx. Sans horodatage, on retombe sur la
-// chaine deja ecrite dans les donnees de demonstration.
+// de app/src/components/Commentaires.tsx. L'API fournit `horodatage` ; sans
+// lui on retombe sur la date telle quelle.
 export const depuis = (c: Commentaire) => {
   if (c.horodatage == null) return c.date
   const s = Math.floor((Date.now() - c.horodatage) / 1000)
@@ -21,30 +23,66 @@ export const depuis = (c: Commentaire) => {
   return `il y a ${Math.floor(s / 86400)} j`
 }
 
-export default function Commentaires({ video, pseudo, onFermer }: {
+export default function Commentaires({
+  video, pseudo, onFermer, onVariation,
+}: {
   video: Video; pseudo: string; onFermer: () => void
+  // Signale a l'ecran appelant qu'un commentaire a ete ajoute (+1) ou
+  // retire (-1) : son compteur suit sans recharger la video.
+  onVariation?: (n: number) => void
 }) {
   const [texte, setTexte] = useState('')
-  const [liste, setListe] = useState(
-    etat.commentaires.filter(c => c.videoId === video.id),
-  )
+  const [liste, setListe] = useState<Commentaire[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [envoi, setEnvoi] = useState(false)
   // Les plus recents d'abord par defaut ; le bouton de l'entete renverse.
   const [ancien, setAncien] = useState(false)
   // Message d'etat affiche sous la barre de saisie.
   const [message, setMessage] = useState('')
   const saisie = useRef<SaisieNative>(null)
 
+  // Le serveur renvoie les commentaires du plus ancien au plus recent :
+  // on renverse pour que la feuille ouvre sur les derniers ecrits.
+  useEffect(() => {
+    let valable = true
+    apiCommentaires.liste(video.id)
+      .then(c => { if (valable) { setListe([...c].reverse()); setMessage('') } })
+      .catch((e: Error) => { if (valable) setMessage(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [video.id])
+
   const envoyer = () => {
-    if (!texte.trim()) return
-    const nouveau = {
-      id: `c${Date.now()}`, videoId: video.id,
-      texte: texte.trim(), pseudo, date: "à l'instant",
-      horodatage: Date.now(),
-    }
-    etat.commentaires.unshift(nouveau)
-    video.nbCommentaires += 1
-    setListe([nouveau, ...liste])
-    setTexte('')
+    const propre = texte.trim()
+    if (!propre || envoi) return
+    setEnvoi(true)
+    apiCommentaires.ajouter(video.id, propre)
+      .then(cree => {
+        setListe(l => [cree, ...l])
+        setTexte(''); setMessage('')
+        onVariation?.(1)
+      })
+      .catch((e: Error) => setMessage(e.message))
+      .finally(() => setEnvoi(false))
+  }
+
+  // L'API n'autorise la suppression qu'a l'auteur du commentaire et a
+  // celui de la video : un refus remonte tel quel sous la saisie.
+  const supprimer = (c: Commentaire) => {
+    Alert.alert('Supprimer ce commentaire ?', undefined, [
+      { text: 'Annuler', style: 'cancel' },
+      {
+        text: 'Supprimer', style: 'destructive',
+        onPress: () => {
+          apiCommentaires.supprimer(c.id)
+            .then(() => {
+              setListe(l => l.filter(x => x.id !== c.id))
+              onVariation?.(-1)
+            })
+            .catch((e: Error) => setMessage(e.message))
+        },
+      },
+    ])
   }
 
   // « Répondre » prefixe la saisie d'une mention de l'auteur.
@@ -84,9 +122,11 @@ export default function Commentaires({ video, pseudo, onFermer }: {
             style={{ flex: 1 }}
             contentContainerStyle={{ padding: 16 }}
             keyboardShouldPersistTaps="handled"
-            ListEmptyComponent={<Text style={s.vide}>Aucun commentaire. Soyez le premier.</Text>}
+            ListEmptyComponent={chargement
+              ? <View style={s.attente}><ActivityIndicator color="#fff" /></View>
+              : <Text style={s.vide}>Aucun commentaire. Soyez le premier.</Text>}
             renderItem={({ item }) => (
-              <View style={s.commentaire}>
+              <Pressable style={s.commentaire} onLongPress={() => supprimer(item)}>
                 <View style={s.avatar}>
                   <Text style={s.avatarLettre}>{item.pseudo.charAt(0).toUpperCase()}</Text>
                 </View>
@@ -100,7 +140,7 @@ export default function Commentaires({ video, pseudo, onFermer }: {
                     </Pressable>
                   </View>
                 </View>
-              </View>
+              </Pressable>
             )}
           />
 
@@ -108,9 +148,11 @@ export default function Commentaires({ video, pseudo, onFermer }: {
             <TextInput ref={saisie} style={s.champ} placeholder="Ajouter un commentaire…"
               placeholderTextColor="#777" value={texte} onChangeText={setTexte} maxLength={300} />
             {texte.trim() ? (
-              <Pressable onPress={envoyer} hitSlop={8} accessibilityRole="button"
-                accessibilityLabel="Envoyer">
-                <Envoyer taille={23} couleur="#00a550" />
+              <Pressable onPress={envoyer} hitSlop={8} disabled={envoi}
+                accessibilityRole="button" accessibilityLabel="Envoyer">
+                {envoi
+                  ? <ActivityIndicator color="#00a550" />
+                  : <Envoyer taille={23} couleur="#00a550" />}
               </Pressable>
             ) : (
               <View style={s.outils}>
@@ -155,6 +197,7 @@ const s = StyleSheet.create({
   enteteGauche: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   titre: { color: '#fff', fontSize: 14, fontWeight: '600' },
   vide: { color: 'rgba(255,255,255,.6)', textAlign: 'center', marginTop: 28 },
+  attente: { paddingTop: 28, alignItems: 'center' },
   commentaire: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   avatar: {
     width: 32, height: 32, borderRadius: 16, backgroundColor: '#232323',

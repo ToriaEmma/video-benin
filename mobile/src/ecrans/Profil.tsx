@@ -1,12 +1,16 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, FlatList, SafeAreaView, useWindowDimensions, Image,
-  Alert,
+  Alert, ActivityIndicator,
 } from 'react-native'
 import { Text } from '../composants/Texte'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useVideoPlayer, VideoView } from 'expo-video'
-import { etat, comptesDemo, abreger, poidsLisible, type Video } from '../lib/demo'
+import { abreger, poidsLisible, type Brouillon as BrouillonType, type Video } from '../lib/demo'
+import {
+  apiBrouillons, apiInteractions, apiVideos,
+  type ProfilDetaille, type VideoApi,
+} from '../lib/api'
 import { useAuth } from '../lib/auth'
 import MenuProfil from '../composants/MenuProfil'
 import Parametres from './Parametres'
@@ -101,9 +105,6 @@ export default function Profil({
   const [solde, setSolde] = useState(false)
   const [edition, setEdition] = useState(false)
   const [comptesOuverts, setComptesOuverts] = useState(false)
-  // Force le reaffichage de la grille apres une suppression.
-  const [, setRevision] = useState(0)
-  const [suivi, setSuivi] = useState(false)
   const [onglet, setOnglet] = useState<'videos' | 'privees' | 'repartages' | 'favoris' | 'aimees'>('videos')
   // Le bandeau gris « Brouillon enregistré » s'efface au bout de 2 secondes.
   // `efface` repart a faux a chaque nouveau message grace a la cle de l'effet.
@@ -116,20 +117,71 @@ export default function Profil({
   const message = efface ? undefined : messageArrivee
 
   const pseudo = monProfil ? profil?.pseudo ?? '' : pseudoVisite!
-  const videos = monProfil
-    ? etat.mesVideos
-    : etat.videos.filter(v => v.pseudo === pseudoVisite)
 
-  // Seul l'onglet « videos » a du contenu pour l'instant.
-  const videosOnglet = onglet === 'videos' ? videos : []
-  // Les brouillons n'apparaissent que sur son propre profil, en tete de grille.
-  const brouillons = monProfil && onglet === 'videos' ? etat.brouillons : []
-  const poidsBrouillons = brouillons.reduce((t, b) => t + b.octets, 0)
+  // En-tete du profil : compteurs et relation d'abonnement viennent de
+  // /profils/:pseudo, qui porte aussi la bio du compte visite.
+  const [entete, setEntete] = useState<ProfilDetaille | null>(null)
+  const [suivi, setSuivi] = useState(false)
+  // Grille de l'onglet courant, et brouillons de son propre profil.
+  const [videos, setVideos] = useState<VideoApi[]>([])
+  const [brouillons, setBrouillons] = useState<BrouillonType[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
+
+  useEffect(() => {
+    if (!pseudo) return
+    let valable = true
+    apiInteractions.profil(pseudo)
+      .then(p => { if (valable) { setEntete(p); setSuivi(p.suivi) } })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+    return () => { valable = false }
+  }, [pseudo])
+
+  // Chaque onglet a sa source : la grille se recharge donc quand on en
+  // change, et non une seule fois a l'ouverture de l'ecran.
+  useEffect(() => {
+    if (!pseudo) return
+    let valable = true
+    const charger = async () => {
+      setChargement(true)
+      try {
+        const v =
+          onglet === 'favoris' ? await apiInteractions.favoris()
+          : onglet === 'aimees' ? await apiInteractions.jaimees()
+          : onglet === 'videos' ? await apiVideos.duProfil(pseudo)
+          // « Privées » et « Repartages » n'ont pas de route : la grille
+          // reste vide et son message d'invite s'affiche.
+          : []
+        if (valable) { setVideos(v); setErreur('') }
+      } catch (e) {
+        if (valable) { setVideos([]); setErreur((e as Error).message) }
+      } finally {
+        if (valable) setChargement(false)
+      }
+    }
+    void charger()
+    return () => { valable = false }
+  }, [pseudo, onglet])
+
+  // Les brouillons sont prives : on ne les demande que sur son profil.
+  useEffect(() => {
+    if (!monProfil || onglet !== 'videos') return
+    let valable = true
+    apiBrouillons.liste()
+      .then(b => { if (valable) setBrouillons(b) })
+      .catch(() => { /* Brouillons indisponibles : la tuile reste absente. */ })
+    return () => { valable = false }
+  }, [monProfil, onglet])
+
+  // L'onglet « videos » de son propre profil est le seul a montrer la
+  // tuile des brouillons, en tete de grille.
+  const tuileBrouillons = monProfil && onglet === 'videos' ? brouillons : []
+  const poidsBrouillons = tuileBrouillons.reduce((t, b) => t + b.octets, 0)
 
   // La tuile des brouillons occupe la premiere case, devant les videos.
-  const cases: ({ id: string } | Video)[] = brouillons.length > 0
-    ? [{ id: 'brouillons' }, ...videosOnglet]
-    : videosOnglet
+  const cases: ({ id: string } | Video)[] = tuileBrouillons.length > 0
+    ? [{ id: 'brouillons' }, ...videos]
+    : videos
 
   const supprimer = (id: string) => {
     if (!monProfil) return
@@ -138,21 +190,38 @@ export default function Profil({
       {
         text: 'Supprimer', style: 'destructive',
         onPress: () => {
-          etat.videos = etat.videos.filter(v => v.id !== id)
-          etat.mesVideos = etat.mesVideos.filter(v => v.id !== id)
-          setRevision(n => n + 1)
+          apiVideos.supprimer(id)
+            .then(() => {
+              setVideos(l => l.filter(v => v.id !== id))
+              // Le compteur de publications de l'en-tete suit la grille.
+              setEntete(p => (p ? { ...p, nbVideos: Math.max(0, p.nbVideos - 1) } : p))
+            })
+            .catch((e: Error) => setErreur(e.message))
         },
       },
     ])
   }
 
-  const nbSuivis = monProfil ? 0 : 23
-  const nbAbonnes = monProfil ? 0 : 3418 + (suivi ? 1 : 0)
+  const basculerSuivi = () => {
+    const vise = !suivi
+    setSuivi(vise)
+    const envoi = vise
+      ? apiInteractions.suivre(pseudo)
+      : apiInteractions.nePlusSuivre(pseudo)
+    envoi
+      .then(r => {
+        setSuivi(r.suivi)
+        setEntete(p => (p ? {
+          ...p, nbAbonnes: Math.max(0, p.nbAbonnes + (r.suivi ? 1 : -1)),
+        } : p))
+      })
+      .catch((e: Error) => { setSuivi(!vise); setErreur(e.message) })
+  }
+
+  const nbSuivis = entete?.nbSuivis ?? 0
+  const nbAbonnes = entete?.nbAbonnes ?? 0
   const totalAime = videos.reduce((t, v) => t + v.nbAime, 0)
-  const compteVisite = pseudoVisite
-    ? comptesDemo.find(c => c.pseudo === pseudoVisite)
-    : undefined
-  const bio = monProfil ? profil?.bio ?? '' : compteVisite?.bio ?? ''
+  const bio = monProfil ? profil?.bio ?? '' : entete?.bio ?? ''
 
   if (monProfil && !profil) return null
   if (monProfil && edition) return <ModifierProfil onRetour={() => setEdition(false)} />
@@ -266,7 +335,7 @@ export default function Profil({
             {!monProfil && (
               <View style={s.actions}>
                 <Pressable style={[s.principal, suivi && s.principalSuivi]}
-                  onPress={() => setSuivi(!suivi)}>
+                  onPress={basculerSuivi}>
                   <Text style={[s.principalTexte, suivi && { color: '#111' }]}>
                     {suivi ? 'Abonné' : 'Suivre'}
                   </Text>
@@ -320,34 +389,46 @@ export default function Profil({
           </View>
         }
         ListEmptyComponent={
-          <Text style={s.vide}>
-            {onglet !== 'videos'
-              ? onglet === 'privees' ? 'Aucune vidéo privée'
-                : onglet === 'repartages' ? 'Aucune vidéo repartagée'
-                : onglet === 'favoris' ? 'Aucune vidéo enregistrée'
-                : 'Aucune vidéo aimée'
-              : monProfil ? "Vous n'avez pas encore publié de vidéo" : 'Aucune vidéo publiée'}
-          </Text>
+          chargement
+            ? <View style={s.attente}><ActivityIndicator color="#888" /></View>
+            // Une grille vide par nature et une grille en panne se
+            // ressemblent : le message du serveur prime sur l'invite.
+            : <Text style={s.vide}>
+                {erreur || (onglet !== 'videos'
+                  ? onglet === 'privees' ? 'Aucune vidéo privée'
+                    : onglet === 'repartages' ? 'Aucune vidéo repartagée'
+                    : onglet === 'favoris' ? 'Aucune vidéo enregistrée'
+                    : 'Aucune vidéo aimée'
+                  : monProfil ? "Vous n'avez pas encore publié de vidéo" : 'Aucune vidéo publiée')}
+              </Text>
         }
         ListFooterComponent={
-          monProfil && videosOnglet.length > 0
+          monProfil && onglet === 'videos' && videos.length > 0
             ? <Text style={s.aide}>Appui long sur une vidéo pour la supprimer</Text>
             : null
         }
         renderItem={({ item }) => item.id === 'brouillons'
-          ? <CaseBrouillons largeur={largeurCase} nombre={brouillons.length}
-              url={brouillons[0].url} octets={poidsBrouillons}
+          ? <CaseBrouillons largeur={largeurCase} nombre={tuileBrouillons.length}
+              url={tuileBrouillons[0].url} octets={poidsBrouillons}
               onPresser={() => onBrouillons?.()} />
           : <Vignette item={item as Video} largeur={largeurCase}
               onSupprimer={monProfil ? supprimer : undefined}
               onOuvrir={() => onOuvrirVideo?.(
-                videosOnglet, videosOnglet.indexOf(item as Video))} />}
+                videos, videos.indexOf(item as VideoApi))} />}
       />
 
       {!!message && (
         <View style={s.toast} pointerEvents="none">
           <Text style={s.toastTexte}>{message}</Text>
         </View>
+      )}
+
+      {/* Echec d'un abonnement ou d'une suppression, la grille restant
+          affichee : le bandeau se referme au toucher. */}
+      {!!erreur && videos.length > 0 && (
+        <Pressable style={s.toastErreur} onPress={() => setErreur('')}>
+          <Text style={s.toastTexte}>{erreur}</Text>
+        </Pressable>
       )}
 
       {comptesOuverts && (
@@ -424,6 +505,7 @@ const s = StyleSheet.create({
   ongletActif: { borderBottomWidth: 2, borderBottomColor: '#111' },
 
   vide: { color: '#888', textAlign: 'center', padding: 40, fontSize: 14 },
+  attente: { padding: 40, alignItems: 'center' },
   aide: { fontSize: 12, color: '#888', marginTop: 12, textAlign: 'center',
     paddingHorizontal: 16, paddingBottom: 28 },
   // Bandeau gris de confirmation, centre sous la barre du haut.
@@ -431,6 +513,10 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(90,90,90,.9)', borderRadius: 8,
     paddingVertical: 12, paddingHorizontal: 20, maxWidth: '80%' },
   toastTexte: { color: '#fff', fontSize: 15, fontWeight: '500', textAlign: 'center' },
+  // Meme bandeau, pose en bas : il ne doit pas recouvrir l'en-tete du profil.
+  toastErreur: { position: 'absolute', bottom: 28, alignSelf: 'center',
+    backgroundColor: 'rgba(90,90,90,.92)', borderRadius: 8,
+    paddingVertical: 12, paddingHorizontal: 20, maxWidth: '85%' },
 
   case: { margin: 1, backgroundColor: '#f2f2f2' },
   // « Brouillons: 11 » pose en haut a gauche de la premiere case.

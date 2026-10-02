@@ -7,7 +7,6 @@ import { Text, TextInput } from '../composants/Texte'
 import * as ImagePicker from 'expo-image-picker'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { File } from 'expo-file-system'
-import { etat } from '../lib/demo'
 import Couverture from './Couverture'
 import {
   FeuilleLien, FeuilleAudience, FeuilleOptions, FeuillePartage,
@@ -15,7 +14,7 @@ import {
   AUDIENCES, OPTIONS_PAR_DEFAUT,
   type Audience, type Options, type Application, type Departement,
 } from './FeuillesPublication'
-import { useAuth } from '../lib/auth'
+import { apiBrouillons, apiVideos, type NouvelleVideo } from '../lib/api'
 import {
   Camera, Chevron, ChevronDroit, Brouillon,
   PubLien, PubMonde, PubOptions, PubPublier, MontagePartage, PubLieu,
@@ -23,12 +22,19 @@ import {
 
 const DUREE_MAX = 90
 
+// L'ecran parle d'audience, l'API de visibilite : « tous » y devient
+// « monde », les deux autres valeurs portent le meme nom.
+const VISIBILITES: Record<Audience, NonNullable<NouvelleVideo['visibilite']>> = {
+  tous: 'monde',
+  amis: 'amis',
+  moi: 'moi',
+}
+
 export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon }: {
   onPublie: () => void; uriInitiale?: string; onAnnuler?: () => void
   // Brouillon enregistre : la page appelante bascule sur le profil.
   onBrouillon?: () => void
 }) {
-  const { profil } = useAuth()
   const [uri, setUri] = useState<string | null>(uriInitiale ?? null)
   const lecteur = useVideoPlayer(uri ?? '', p => { p.loop = true; p.muted = true })
 
@@ -88,36 +94,43 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
   }
 
   const publier = () => {
-    if (!uri) return
+    if (!uri || envoi) return
     setEnvoi(true)
-    const nouvelle = {
-      id: `v${Date.now()}`, url: uri, legende: legende.trim(),
-      vues: 0, pseudo: profil?.pseudo ?? 'vous',
-      aime: false, nbAime: 0, nbCommentaires: 0, departement,
-    }
-    etat.videos.unshift(nouvelle)
-    etat.mesVideos.unshift(nouvelle)
-    setUri(null); setLegende(''); setEnvoi(false)
-    onPublie()
+    apiVideos.creer({
+      url: uri,
+      legende: legende.trim(),
+      departement,
+      visibilite: VISIBILITES[audience],
+      // Les deux premiers interrupteurs de « Plus d'options » sont les
+      // seuls que l'API connaisse ; les autres restent locaux a l'ecran.
+      commentaires_autorises: options.commentaires,
+      reutilisation_autorisee: options.reutilisation,
+    })
+      .then(() => { setUri(null); setLegende(''); onPublie() })
+      .catch((e: Error) => Alert.alert('Publication impossible', e.message))
+      .finally(() => setEnvoi(false))
   }
 
   // « Brouillons » : la video est mise de cote avec sa description, puis
   // on repart sur le profil ou la tuile des brouillons l'affiche.
   const enregistrerBrouillon = () => {
     if (!uri) { onAnnuler?.(); return }
+    if (envoi) return
     let octets = 0
     try {
       const fichier = new File(uri)
       if (fichier.exists) octets = fichier.size
     } catch { /* Poids illisible : la tuile n'affichera pas de taille. */ }
 
-    etat.brouillons.unshift({
-      id: `b${Date.now()}`, url: uri, legende: legende.trim(), octets,
-      date: Date.now(),
-    })
-    setUri(null); setLegende('')
-    if (onBrouillon) onBrouillon()
-    else onAnnuler?.()
+    setEnvoi(true)
+    apiBrouillons.creer(uri, legende.trim(), octets)
+      .then(() => {
+        setUri(null); setLegende('')
+        if (onBrouillon) onBrouillon()
+        else onAnnuler?.()
+      })
+      .catch((e: Error) => Alert.alert('Enregistrement impossible', e.message))
+      .finally(() => setEnvoi(false))
   }
 
   // Sans video choisie : l'ecran d'import.

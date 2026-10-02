@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
-import { View, FlatList, Pressable, StyleSheet } from 'react-native'
+import { View, FlatList, Pressable, StyleSheet, ActivityIndicator } from 'react-native'
 import { Text } from '../composants/Texte'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEvent } from 'expo'
-import { etat, abreger, type Video as VideoType } from '../lib/demo'
+import { abreger, type Video } from '../lib/demo'
+import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../composants/Commentaires'
 import {
@@ -19,19 +20,29 @@ import DirectLive from './DirectLive'
 // Memes categories que app/src/pages/Fil.tsx.
 const CATEGORIES = ['Communauté', 'Suivis', 'Pour toi']
 
-function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
-  item: VideoType; actif: boolean; hauteur: number
-  onCommenter: (v: VideoType) => void
+// Le fil general lit les videos de l'API, qui portent `favori` ; les
+// listes ouvertes depuis un autre ecran n'en ont pas toujours.
+type VideoFil = Video & { favori?: boolean }
+
+function Carte({
+  item, actif, hauteur, onCommenter, onVisiter, sienne, nbCommentaires, onErreur,
+}: {
+  item: VideoFil; actif: boolean; hauteur: number
+  onCommenter: (v: VideoFil) => void
   onVisiter?: (pseudo: string) => void
   // Sur sa propre publication, le partage devient trois points et
   // ouvre la feuille « Envoyer à ».
   sienne?: boolean
+  // Compteur tenu par l'ecran : la feuille des commentaires le fait
+  // varier, et la carte doit suivre sans que l'API soit reinterrogee.
+  nbCommentaires: number
+  onErreur: (message: string) => void
 }) {
   const lecteur = useVideoPlayer(item.url, p => { p.loop = true; p.timeUpdateEventInterval = 0.25 })
 
   const [aime, setAime] = useState(item.aime)
   const [nbAime, setNbAime] = useState(item.nbAime)
-  const [favori, setFavori] = useState(false)
+  const [favori, setFavori] = useState(Boolean(item.favori))
   const [developpe, setDeveloppe] = useState(false)
   const [progression, setProgression] = useState(0)
   // Pause demandee par l'utilisateur, a distinguer d'un simple chargement.
@@ -60,10 +71,40 @@ function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
     else { lecteur.pause(); lecteur.currentTime = 0 }
   }, [actif, lecteur])
 
+  // La vue part quand la carte devient celle qu'on regarde, et non a
+  // chaque rendu. L'echec est silencieux : rater un comptage ne doit pas
+  // interrompre le visionnage.
+  useEffect(() => {
+    if (!actif) return
+    apiVideos.vue(item.id).catch(() => { /* Compteur de vues indisponible. */ })
+  }, [actif, item.id])
+
+  // Le serveur renvoie le decompte reel : on l'affiche d'abord de maniere
+  // optimiste, puis on se recale dessus, et on revient en arriere si la
+  // requete echoue.
   const basculerAime = () => {
-    const n = !aime
-    setAime(n); setNbAime(v => v + (n ? 1 : -1))
-    item.aime = n; item.nbAime += n ? 1 : -1
+    const vise = !aime
+    setAime(vise); setNbAime(v => v + (vise ? 1 : -1))
+    const envoi = vise
+      ? apiInteractions.aimer(item.id)
+      : apiInteractions.retirerJaime(item.id)
+    envoi
+      .then(r => { setAime(r.aime); setNbAime(r.nbAime) })
+      .catch((e: Error) => {
+        setAime(!vise); setNbAime(v => v + (vise ? -1 : 1))
+        onErreur(e.message)
+      })
+  }
+
+  const basculerFavori = () => {
+    const vise = !favori
+    setFavori(vise)
+    const envoi = vise
+      ? apiInteractions.mettreEnFavori(item.id)
+      : apiInteractions.retirerFavori(item.id)
+    envoi
+      .then(r => setFavori(r.favori))
+      .catch((e: Error) => { setFavori(!vise); onErreur(e.message) })
   }
 
   return (
@@ -102,10 +143,10 @@ function Carte({ item, actif, hauteur, onCommenter, onVisiter, sienne }: {
 
         <Pressable style={s.action} onPress={() => onCommenter(item)} hitSlop={6}>
           <BulleFil taille={34} couleur="#fff" />
-          <Text style={s.compteur}>{abreger(item.nbCommentaires)}</Text>
+          <Text style={s.compteur}>{abreger(nbCommentaires)}</Text>
         </Pressable>
 
-        <Pressable style={s.action} onPress={() => setFavori(!favori)} hitSlop={6}>
+        <Pressable style={s.action} onPress={basculerFavori} hitSlop={6}>
           <Favori taille={32} plein={favori} couleur={favori ? '#fcd116' : '#fff'} />
           <Text style={s.compteur}>Favori</Text>
         </Pressable>
@@ -160,7 +201,7 @@ export default function Fil({
   onVisiter?: (pseudo: string) => void
   onRechercher?: () => void
   // Liste a lire. Par defaut le fil general ; le profil passe la sienne.
-  videos?: VideoType[]
+  videos?: VideoFil[]
   // Video sur laquelle s'ouvrir dans cette liste.
   indexInitial?: number
   // Terme affiche dans la barre de recherche, quand elle remplace les
@@ -171,10 +212,36 @@ export default function Fil({
   const { profil } = useAuth()
   const [categorie, setCategorie] = useState('Pour toi')
   const [index, setIndex] = useState(indexInitial)
-  // Fil autonome : on lit la liste fournie, sans les categories du haut.
-  const liste = videos ?? etat.videos
   const autonome = videos !== undefined
-  const [videoCom, setVideoCom] = useState<VideoType | null>(null)
+  // Fil general : la liste vient de l'API. En mode autonome, l'appelant
+  // fournit la sienne et aucune requete n'est lancee.
+  const [listeApi, setListeApi] = useState<VideoFil[]>([])
+  const [chargement, setChargement] = useState(!autonome)
+  const [erreur, setErreur] = useState('')
+  const liste = videos ?? listeApi
+
+  const recharger = () => {
+    setChargement(true)
+    apiVideos.liste()
+      .then(v => { setListeApi(v); setErreur('') })
+      .catch((e: Error) => setErreur(e.message))
+      .finally(() => setChargement(false))
+  }
+
+  useEffect(() => {
+    if (autonome) return
+    let valable = true
+    apiVideos.liste()
+      .then(v => { if (valable) { setListeApi(v); setErreur('') } })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [autonome])
+
+  // Les commentaires sont comptes ici : la feuille en ajoute et en retire,
+  // et le compteur de la carte doit suivre sans recharger tout le fil.
+  const [ajouts, setAjouts] = useState<Record<string, number>>({})
+  const [videoCom, setVideoCom] = useState<VideoFil | null>(null)
   // Hauteur reelle du fil, barre de navigation deduite : c'est le pas du
   // defilement par ecran. La mesurer evite de dependre de la hauteur de la
   // fenetre, qui serait trop grande et desalignerait chaque video.
@@ -196,7 +263,26 @@ export default function Fil({
   return (
     <View style={s.page}
       onLayout={e => setHauteur(e.nativeEvent.layout.height)}>
-      {autonome || categorie === 'Pour toi' ? (
+      {!autonome && categorie === 'Pour toi' && chargement ? (
+        <View style={s.attente}>
+          <ActivityIndicator color="#fff" />
+          <Text style={s.attenteTexte}>Chargement…</Text>
+        </View>
+      ) : !autonome && categorie === 'Pour toi' && liste.length === 0 ? (
+        // Un fil vide et un fil en panne se ressemblent a l'ecran : le
+        // message du serveur distingue les deux, et le bouton permet de
+        // retenter sans quitter l'onglet.
+        <View style={s.attente}>
+          <Text style={s.attenteTexte}>
+            {erreur || 'Aucune vidéo pour le moment.'}
+          </Text>
+          {!!erreur && (
+            <Pressable style={s.reessayer} onPress={recharger}>
+              <Text style={s.reessayerTexte}>Réessayer</Text>
+            </Pressable>
+          )}
+        </View>
+      ) : autonome || categorie === 'Pour toi' ? (
         <FlatList
           data={liste}
           keyExtractor={v => v.id}
@@ -215,6 +301,8 @@ export default function Fil({
           renderItem={({ item, index: i }) => (
             <Carte item={item} actif={i === index} hauteur={hauteur}
               sienne={item.pseudo === profil?.pseudo}
+              nbCommentaires={item.nbCommentaires + (ajouts[item.id] ?? 0)}
+              onErreur={setErreur}
               onCommenter={setVideoCom} onVisiter={onVisiter} />
           )}
         />
@@ -278,10 +366,20 @@ export default function Fil({
         </View>
       )}
 
+      {/* Un j'aime ou un favori refuse par le serveur se signale ici : la
+          video continue de se lire, seul le bandeau apparait. */}
+      {!!erreur && (autonome || liste.length > 0) && (
+        <Pressable style={s.bandeau} onPress={() => setErreur('')}>
+          <Text style={s.bandeauTexte}>{erreur}</Text>
+        </Pressable>
+      )}
+
       {videoCom && (
         <Commentaires
           video={videoCom}
           pseudo={profil?.pseudo ?? 'moi'}
+          onVariation={n => setAjouts(a => (
+            { ...a, [videoCom.id]: (a[videoCom.id] ?? 0) + n }))}
           onFermer={() => setVideoCom(null)}
         />
       )}
@@ -384,6 +482,16 @@ const s = StyleSheet.create({
   },
   barreRemplie: { height: 2, backgroundColor: 'rgba(255,255,255,.6)', borderRadius: 2 },
 
-  attente: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
+  attente: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 14 },
   attenteTexte: { color: '#bbb', textAlign: 'center', fontSize: 15 },
+  reessayer: { borderWidth: 1, borderColor: 'rgba(255,255,255,.35)',
+    borderRadius: 22, paddingHorizontal: 22, minHeight: 44,
+    alignItems: 'center', justifyContent: 'center' },
+  reessayerTexte: { color: '#fff', fontSize: 15, fontWeight: '600' },
+
+  // Bandeau d'erreur pose au-dessus de la barre de navigation.
+  bandeau: { position: 'absolute', left: 16, right: 16, bottom: 90, zIndex: 4,
+    backgroundColor: 'rgba(90,90,90,.92)', borderRadius: 10,
+    paddingVertical: 12, paddingHorizontal: 16 },
+  bandeauTexte: { color: '#fff', fontSize: 14, textAlign: 'center' },
 })

@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, FlatList, ScrollView, useWindowDimensions, Alert,
+  ActivityIndicator,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
@@ -8,7 +9,8 @@ import { Text } from '../composants/Texte'
 import {
   Chevron, Calques, NoteEtiquette, EtincelleEtiquette,
 } from '../composants/Icones'
-import { etat, poidsLisible, jourEtMois, type Brouillon } from '../lib/demo'
+import { poidsLisible, jourEtMois, type Brouillon } from '../lib/demo'
+import { apiBrouillons } from '../lib/api'
 
 // Filtres proposes sous le titre. Seul le premier est actif pour l'instant :
 // les deux autres attendent les effets et les modeles.
@@ -78,10 +80,19 @@ export default function Brouillons({ onRetour, onPublier }: {
   const largeurCase = (width - 6) / 3
   const [selection, setSelection] = useState(false)
   const [choisis, setChoisis] = useState<string[]>([])
-  // Force le reaffichage apres une suppression.
-  const [, setRevision] = useState(0)
+  const [brouillons, setBrouillons] = useState<Brouillon[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
 
-  const brouillons = etat.brouillons
+  useEffect(() => {
+    let valable = true
+    apiBrouillons.liste()
+      .then(b => { if (valable) { setBrouillons(b); setErreur('') } })
+      .catch((e: Error) => { if (valable) setErreur(e.message) })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [])
+
   const poidsTotal = brouillons.reduce((t, b) => t + b.octets, 0)
 
   const quitterSelection = () => { setSelection(false); setChoisis([]) }
@@ -102,8 +113,17 @@ export default function Brouillons({ onRetour, onPublier }: {
         {
           text: 'Supprimer', style: 'destructive',
           onPress: () => {
-            etat.brouillons = etat.brouillons.filter(b => !choisis.includes(b.id))
-            quitterSelection(); setRevision(n => n + 1)
+            // Chaque brouillon a sa propre requete : on retire de la
+            // grille ceux que le serveur a bien supprimes, et l'echec
+            // des autres reste visible.
+            Promise.allSettled(choisis.map(id => apiBrouillons.supprimer(id)))
+              .then(resultats => {
+                const partis = choisis.filter((_, i) => resultats[i].status === 'fulfilled')
+                setBrouillons(l => l.filter(b => !partis.includes(b.id)))
+                const echec = resultats.find(r => r.status === 'rejected')
+                setErreur(echec ? (echec.reason as Error).message : '')
+                quitterSelection()
+              })
           },
         },
       ],
@@ -139,8 +159,10 @@ export default function Brouillons({ onRetour, onPublier }: {
       </View>
 
       <Text style={s.titre}>
-        {brouillons.length} brouillon{brouillons.length > 1 ? 's' : ''}
-        {' · '}{poidsLisible(poidsTotal)}
+        {chargement ? 'Chargement…' : <>
+          {brouillons.length} brouillon{brouillons.length > 1 ? 's' : ''}
+          {' · '}{poidsLisible(poidsTotal)}
+        </>}
       </Text>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -157,13 +179,23 @@ export default function Brouillons({ onRetour, onPublier }: {
         keyExtractor={b => b.id}
         numColumns={3}
         contentContainerStyle={s.grille}
-        ListEmptyComponent={<Text style={s.vide}>Aucun brouillon</Text>}
+        ListEmptyComponent={chargement
+          ? <View style={s.attente}><ActivityIndicator color="#888" /></View>
+          : <Text style={s.vide}>{erreur || 'Aucun brouillon'}</Text>}
         renderItem={({ item }) => (
           <Case item={item} largeur={largeurCase} selection={selection}
             choisi={choisis.includes(item.id)}
             onPresser={() => selection ? basculer(item.id) : onPublier(item)} />
         )}
       />
+
+      {/* Suppression refusee alors que la grille reste garnie : le
+          message du serveur se pose au-dessus du pied de page. */}
+      {!!erreur && brouillons.length > 0 && (
+        <Pressable style={s.bandeau} onPress={() => setErreur('')}>
+          <Text style={s.bandeauTexte}>{erreur}</Text>
+        </Pressable>
+      )}
 
       {/* En selection, les deux actions occupent le pied de page. */}
       {selection && (
@@ -236,6 +268,11 @@ const s = StyleSheet.create({
     flexShrink: 1 },
 
   vide: { color: '#888', textAlign: 'center', padding: 40, fontSize: 14 },
+  attente: { padding: 40, alignItems: 'center' },
+  bandeau: { marginHorizontal: 16, marginBottom: 10, borderRadius: 8,
+    backgroundColor: 'rgba(90,90,90,.92)',
+    paddingVertical: 12, paddingHorizontal: 16 },
+  bandeauTexte: { color: '#fff', fontSize: 14, textAlign: 'center' },
 
   pied: { flexDirection: 'row', gap: 12, paddingHorizontal: 16,
     paddingTop: 10, paddingBottom: 18 },
