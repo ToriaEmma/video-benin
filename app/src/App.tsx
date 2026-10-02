@@ -9,6 +9,7 @@ import Montage from './pages/Montage'
 import Profil from './pages/Profil'
 import Brouillons from './pages/Brouillons'
 import Decouvrir from './pages/Decouvrir'
+import AmisEcran from './pages/Amis'
 import Messages from './pages/Messages'
 import { Accueil, Amis, Messages as IconeMessages, Plus, Personne } from './components/Icones'
 
@@ -37,6 +38,11 @@ function Application() {
   const [messageProfil, setMessageProfil] = useState<string | undefined>()
   // Vrai quand la liste des brouillons recouvre le profil.
   const [brouillons, setBrouillons] = useState(false)
+  // La recherche recouvre l'onglet « Amis », ouverte par sa loupe ou par
+  // celle du fil : c'est ainsi que mobile enchaine les deux ecrans.
+  const [recherche, setRecherche] = useState(false)
+
+  const ouvrirRecherche = () => { setRecherche(true); setOnglet('decouvrir') }
 
   const visiter = (pseudo: string) => {
     setProfilVisite(pseudo)
@@ -49,8 +55,12 @@ function Application() {
   return (
     <div className="app">
       <div className="contenu">
-        {onglet === 'fil' && <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('decouvrir')} />}
-        {onglet === 'decouvrir' && <Decouvrir onVisiter={visiter} />}
+        {onglet === 'fil' && <Fil key={cleFil} onVisiter={visiter} onRechercher={ouvrirRecherche} />}
+        {onglet === 'decouvrir' && (
+          recherche
+            ? <Decouvrir onVisiter={(p) => { setRecherche(false); visiter(p) }} />
+            : <AmisEcran onVisiter={visiter} onRechercher={() => setRecherche(true)} />
+        )}
         {onglet === 'messages' && <Messages />}
         {onglet === 'publier' && (
           videoChoisie
@@ -108,7 +118,8 @@ function Application() {
           <span>Accueil</span>
         </button>
 
-        <button className={onglet === 'decouvrir' ? 'actif' : ''} onClick={() => setOnglet('decouvrir')}>
+        <button className={onglet === 'decouvrir' ? 'actif' : ''}
+          onClick={() => { setRecherche(false); setOnglet('decouvrir') }}>
           <Amis taille={26} />
           <span>Amis</span>
         </button>

@@ -1,30 +1,44 @@
 // ============================================================
 // Onglet « Amis » : fil video plein ecran sombre, surmonte d'une
-// rangee de stories.
+// rangee de recits.
 //
 // Deux etats, commandes par le defilement du fil :
-//   - deploye (en haut du fil) : les bulles de stories en grand, la
+//   - deploye (en haut du fil) : les bulles de recits en grand, la
 //     video dessous avec des coins hauts arrondis ;
 //   - replie (des que ca defile) : les bulles se tassent en une grappe
 //     de petits avatars en haut a gauche, la video passe plein cadre
 //     derriere l'entete.
 //
-// La mecanique de lecture est celle de Fil.tsx : un lecteur par carte,
-// seule la carte visible lit.
+// La mecanique de lecture et les interactions sont celles de Fil.tsx :
+// un lecteur par carte, seule la carte visible lit, et le fil vient de
+// GET /videos/suivis.
 // ============================================================
 
-import { useEffect, useRef, useState } from 'react'
-import { etatDemo, abreger, type VideoDemo, type Story } from '../lib/demo'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { apiInteractions, apiVideos, type VideoApi } from '../lib/api'
+import { abreger, etatDemo } from '../lib/demo'
+import type { Story } from '../lib/demo'
 import { useAuth } from '../lib/auth'
 import { partager as partagerNatif } from '../lib/natif'
 import Commentaires from '../components/Commentaires'
 import BandeStories from '../components/BandeStories'
-import Decouvrir from './Decouvrir'
+import Suggestions from '../components/Suggestions'
 import {
-  Loupe, Chevron, AvionEnvoi, ListeLecture, PlusStory, EtincelleEtiquette,
-  MarquePage, SonNote,
+  Loupe, ChevronDroit, AvionEnvoi, ListeLecture, PlusStory,
+  EtincelleEtiquette, MarquePage, SonNote,
 } from '../components/Icones'
 import './amis.css'
+
+// Position de lecture affichee pendant le glissement, en « m:ss ».
+const horloge = (secondes: number) => {
+  const s = Number.isFinite(secondes) ? Math.max(0, Math.floor(secondes)) : 0
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+// Au-dela de cette distance horizontale, le geste ouvre le profil de
+// l'auteur. La comparaison avec l'ecart vertical se fait a part : le fil
+// defile a la verticale, un glissement oblique ne doit pas le detourner.
+const SEUIL_LATERAL = 55
 
 // Habillage de demonstration des cartes : effet, son et liste de lecture
 // n'existent pas encore dans les donnees, on les derive de la video pour
@@ -33,7 +47,7 @@ const EFFETS = [
   { nom: 'Lumière douce', couleur: '#ff8a3d' },
   { nom: 'Vintage 229', couleur: '#8d6cff' },
   { nom: 'Néon Cotonou', couleur: '#1ec0f0' },
-  { nom: 'Grain argentique', couleur: '#49c96d' },
+  { nom: 'Grain argentique', couleur: '#c43cc0' },
   { nom: 'Coucher chaud', couleur: '#ff4d7e' },
 ]
 const SONS = [
@@ -77,21 +91,48 @@ function Grappe({ pseudo, stories }: { pseudo: string; stories: Story[] }) {
   )
 }
 
-function Carte({ video, actif, replie, onCommenter, onVisiter }: {
-  video: VideoDemo
+function Carte({ video, actif, replie, nbCom, onCommenter, onVisiter, onErreur, suivi, onSuivi }: {
+  video: VideoApi
   actif: boolean
   // Replie : la video occupe tout le cadre. Deploye, elle recule sous la
-  // rangee de stories et ses coins hauts s'arrondissent.
+  // rangee de recits et ses coins hauts s'arrondissent.
   replie: boolean
-  onCommenter: (v: VideoDemo) => void
+  // Nombre de commentaires tenu par l'ecran : la feuille vit au-dessus
+  // du fil, c'est donc elle qui en fait varier le compte.
+  nbCom: number
+  onCommenter: (v: VideoApi) => void
   onVisiter: (pseudo: string) => void
+  // Un j'aime ou un favori refuse remonte a l'ecran, qui l'affiche en
+  // bandeau : la carte continue de se lire.
+  onErreur: (message: string) => void
+  // Abonnement a l'auteur, tenu par l'ecran : la meme personne pouvant
+  // publier plusieurs videos du fil, la pastille doit disparaitre sur
+  // toutes ses cartes des qu'on s'abonne depuis l'une d'elles.
+  suivi: boolean
+  onSuivi: (pseudo: string, suivi: boolean) => void
 }) {
+  const { profil } = useAuth()
   const ref = useRef<HTMLVideoElement>(null)
+  // Les compteurs arrivent deja dans la video : aucune requete de plus a
+  // l'affichage d'une carte.
   const [aime, setAime] = useState(video.aime)
   const [nbAime, setNbAime] = useState(video.nbAime)
-  const [favori, setFavori] = useState(false)
+  const [favori, setFavori] = useState(video.favori)
   const [developpe, setDeveloppe] = useState(false)
   const [pause, setPause] = useState(true)
+  const [progression, setProgression] = useState(0)
+  // Deplacement en cours sur la barre : la position chiffree ne s'affiche
+  // que pendant ce temps, elle encombrerait la video le reste du temps.
+  const [glisse, setGlisse] = useState(false)
+  // Duree totale, relevee par la video : la lire sur l'element pendant le
+  // rendu est interdit, et le minuteur en a besoin pour s'afficher.
+  const [duree, setDuree] = useState(0)
+  // Seconde visee, relevee pendant le glissement : `currentTime` de
+  // l'element ne declenche pas de rendu, il faut donc la garder ici.
+  const [visee, setVisee] = useState(0)
+  // Abscisse et ordonnee du doigt au debut du geste, pour reconnaitre un
+  // glissement franchement horizontal.
+  const depart = useRef<{ x: number; y: number } | null>(null)
 
   // Seule la carte visible lit : lire les autres en fond consommerait des
   // donnees pour rien, ce qui est le premier critere produit du projet.
@@ -101,6 +142,14 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
     if (actif) el.play().catch(() => undefined)
     else { el.pause(); el.currentTime = 0 }
   }, [actif])
+
+  // La vue part quand la carte devient celle qu'on regarde, et non a chaque
+  // rendu. L'echec est silencieux : rater un comptage ne doit pas
+  // interrompre le visionnage.
+  useEffect(() => {
+    if (!actif) return
+    apiVideos.vue(video.id).catch(() => { /* Compteur de vues indisponible. */ })
+  }, [actif, video.id])
 
   const [habillage] = useState(() => {
     const n = empreinte(video.id)
@@ -113,13 +162,46 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
     }
   })
 
-  const pseudo = video.profils?.pseudo ?? 'inconnu'
+  const pseudo = video.pseudo
+  const sienne = !!profil && profil.pseudo === pseudo
 
+  // Le serveur renvoie le decompte reel : on l'affiche d'abord de maniere
+  // optimiste, puis on se recale dessus, et on revient en arriere si la
+  // requete echoue.
   const basculerAime = () => {
-    const d = etatDemo.videos.find((v) => v.id === video.id)
-    if (d) { d.aime = !aime; d.nbAime += aime ? -1 : 1 }
-    setAime(!aime)
-    setNbAime((n) => n + (aime ? -1 : 1))
+    const vise = !aime
+    setAime(vise)
+    setNbAime(n => n + (vise ? 1 : -1))
+    const envoi = vise
+      ? apiInteractions.aimer(video.id)
+      : apiInteractions.retirerJaime(video.id)
+    envoi
+      .then(r => { setAime(r.aime); setNbAime(r.nbAime) })
+      .catch((e: Error) => {
+        setAime(!vise)
+        setNbAime(n => n + (vise ? -1 : 1))
+        onErreur(e.message)
+      })
+  }
+
+  const basculerFavori = () => {
+    const vise = !favori
+    setFavori(vise)
+    const envoi = vise
+      ? apiInteractions.mettreEnFavori(video.id)
+      : apiInteractions.retirerFavori(video.id)
+    envoi
+      .then(r => setFavori(r.favori))
+      .catch((e: Error) => { setFavori(!vise); onErreur(e.message) })
+  }
+
+  // Abonnement depuis le fil, sur le meme modele que le j'aime :
+  // affiche d'abord, confirme ensuite, defait si le serveur refuse.
+  const suivre = () => {
+    onSuivi(pseudo, true)
+    apiInteractions.suivre(pseudo)
+      .then(r => onSuivi(pseudo, r.suivi))
+      .catch((e: Error) => { onSuivi(pseudo, false); onErreur(e.message) })
   }
 
   const partager = async () => {
@@ -128,11 +210,29 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
       video.legende || 'Regarde cette vidéo sur TockTick',
       `${window.location.origin}/?v=${video.id}`,
     )
-    if (resultat === 'copie') alert('Lien copié')
+    if (resultat === 'copie') onErreur('Lien copié')
+  }
+
+  // Glissement vers la droite : le profil de l'auteur. Le fil defilant a
+  // la verticale, le geste n'est retenu que s'il est franchement
+  // horizontal, sans quoi il volerait le defilement d'une video a l'autre.
+  const auDebutLateral = (e: React.PointerEvent) => {
+    depart.current = { x: e.clientX, y: e.clientY }
+  }
+  const aLaFinLaterale = (e: React.PointerEvent) => {
+    const d = depart.current
+    depart.current = null
+    if (!d) return
+    const dx = e.clientX - d.x
+    const dy = e.clientY - d.y
+    if (dx > SEUIL_LATERAL && Math.abs(dx) > Math.abs(dy) * 2) onVisiter(pseudo)
   }
 
   return (
-    <div className="ami-carte">
+    <div className="ami-carte"
+      onPointerDown={auDebutLateral}
+      onPointerUp={aLaFinLaterale}
+      onPointerCancel={() => { depart.current = null }}>
       <div className={`ami-cadre${replie ? '' : ' ami-cadre-recule'}`}>
         <video
           ref={ref}
@@ -142,6 +242,17 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
           preload={actif ? 'auto' : 'none'}
           onPlay={() => setPause(false)}
           onPause={() => setPause(true)}
+          onLoadedMetadata={e => {
+            const d = e.currentTarget.duration
+            setDuree(Number.isFinite(d) ? d : 0)
+          }}
+          onTimeUpdate={e => {
+            // Pendant un glissement la barre appartient au doigt : la
+            // relever depuis la video la ferait sauter en arriere.
+            if (glisse) return
+            const v = e.currentTarget
+            setProgression(v.duration ? v.currentTime / v.duration * 100 : 0)
+          }}
           onClick={(e) => {
             const el = e.currentTarget
             if (el.paused) el.play().catch(() => undefined)
@@ -161,11 +272,23 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
         {/* Rail d'actions, de haut en bas : avatar et sa pastille d'envoi,
             j'aime, commentaires, favori, partage, disque. */}
         <div className="ami-actions">
-          <button className="ami-avatar-boite" onClick={() => onVisiter(pseudo)}
-            aria-label={`Profil de ${pseudo}`}>
-            <span className="ami-avatar">{pseudo.charAt(0).toUpperCase()}</span>
-            <span className="ami-pastille-envoi"><AvionEnvoi taille={13} /></span>
-          </button>
+          <span className="ami-avatar-boite">
+            <button className="ami-avatar" onClick={() => onVisiter(pseudo)}
+              aria-label={`Profil de ${pseudo}`}>
+              {pseudo.charAt(0).toUpperCase()}
+            </button>
+            {/* Le « + » occupe la place de la pastille d'envoi tant qu'on
+                ne suit pas l'auteur, et lui rend ensuite. Il ne parait
+                jamais sur ses propres videos. */}
+            {sienne || suivi ? (
+              <span className="ami-pastille-envoi"><AvionEnvoi taille={13} /></span>
+            ) : (
+              <button className="ami-pastille-suivre" onClick={suivre}
+                aria-label={`S'abonner à ${pseudo}`}>
+                <PlusStory taille={12} />
+              </button>
+            )}
+          </span>
 
           <button className={`ami-action${aime ? ' ami-aime' : ''}`} onClick={basculerAime}>
             <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
@@ -178,13 +301,14 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
             <svg width="32" height="32" viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
               <path fillRule="evenodd" d="M16 2C7.7 2 1 7.7 1 14.7c0 6.6 5.7 12 13 12.7V32l7.1-5.4C27 24.8 31 20.1 31 14.7 31 7.7 24.3 2 16 2ZM7 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm9 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Zm9 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4Z" />
             </svg>
-            <span>{abreger(video.nbCommentaires ?? 0)}</span>
+            <span>{abreger(nbCom)}</span>
           </button>
 
           <button className={`ami-action${favori ? ' ami-favori' : ''}`}
-            aria-pressed={favori} onClick={() => setFavori(!favori)}>
+            aria-label={favori ? 'Retirer des favoris' : 'Enregistrer en favori'}
+            aria-pressed={favori} onClick={basculerFavori}>
             <MarquePage taille={30} plein={favori} />
-            <span>{abreger(video.vues % 900)}</span>
+            <span>{favori ? 'Enregistré' : 'Favoris'}</span>
           </button>
 
           <button className="ami-action" onClick={partager}>
@@ -229,30 +353,125 @@ function Carte({ video, actif, replie, onCommenter, onVisiter }: {
           </span>
         </div>
 
+        {/* Barre de lecture : le curseur occupe toute la largeur et une
+            hauteur confortable au pouce, le trait visible restant fin. Un
+            simple appui ailleurs sur la barre y saute directement. */}
+        <input
+          className={`ami-progression${glisse ? ' ami-glisse' : ''}`}
+          style={{ '--progression': `${progression}%` } as CSSProperties}
+          type="range" aria-label="Position de lecture"
+          min="0" max="100" step="0.1" value={progression}
+          onPointerDown={() => setGlisse(true)}
+          onPointerUp={() => setGlisse(false)}
+          onPointerCancel={() => setGlisse(false)}
+          onKeyDown={() => setGlisse(true)}
+          onKeyUp={() => setGlisse(false)}
+          onBlur={() => setGlisse(false)}
+          onChange={e => {
+            const v = ref.current
+            const part = Number(e.target.value)
+            setProgression(part)
+            if (v && Number.isFinite(v.duration)) {
+              const seconde = part / 100 * v.duration
+              v.currentTime = seconde
+              setVisee(seconde)
+            }
+          }}
+        />
+
+        {/* Position atteinte, montree seulement pendant le deplacement. */}
+        {glisse && (
+          <span className="ami-minuteur">{horloge(visee)} / {horloge(duree)}</span>
+        )}
+
         {/* Barre pleine largeur de la liste de lecture, juste au-dessus de
             la barre de navigation. */}
         <button className="ami-barre-liste">
           <ListeLecture taille={17} />
           <span>Liste de lecture · {habillage.liste}</span>
-          <Chevron taille={18} className="ami-chevron-droit" />
+          <span className="ami-chevron-droit"><ChevronDroit taille={18} /></span>
         </button>
       </div>
     </div>
   )
 }
 
-export default function Amis({ onVisiter }: { onVisiter: (pseudo: string) => void }) {
+export default function Amis({ onVisiter, onRechercher }: {
+  onVisiter: (pseudo: string) => void
+  // La loupe de l'entete ouvre l'ecran « Découvrir », comme sur mobile.
+  onRechercher: () => void
+}) {
   const { profil } = useAuth()
   const pseudo = profil?.pseudo ?? 'moi'
-  const videos = etatDemo.videos
+  // DECOR LOCAL : bulles de demonstration ajoutees apres les vrais
+  // recits, que BandeStories charge elle-meme depuis /stories.
   const stories = etatDemo.stories
 
+  const [videos, setVideos] = useState<VideoApi[]>([])
+  const [chargement, setChargement] = useState(true)
+  const [erreur, setErreur] = useState('')
+  // Erreur d'une interaction, distincte de celle du chargement : elle
+  // s'affiche en bandeau sans vider le fil.
+  const [erreurAction, setErreurAction] = useState('')
+  // Incremente par « Réessayer » : l'effet de chargement repart, sans
+  // dupliquer la requete entre le montage et le bouton de reprise.
+  const [reprise, setReprise] = useState(0)
+  // Carte visible. Declaree avant le chargement, qui la ramene en tete
+  // des qu'un nouveau fil arrive.
   const [index, setIndex] = useState(0)
-  const [videoCom, setVideoCom] = useState<VideoDemo | null>(null)
-  // Vrai des que le fil a quitte le haut : la rangee de stories se tasse.
+
+  // Le retour a l'attente se fait dans « Réessayer » et non ici : l'etat
+  // de depart est deja « en chargement », et le poser dans l'effet
+  // relancerait un rendu a chaque montage pour rien.
+  const reessayer = () => {
+    setChargement(true)
+    setErreur('')
+    setReprise(n => n + 1)
+  }
+
+  useEffect(() => {
+    let valable = true
+    // Fil des abonnements, et non le fil general : l'onglet ne montre que
+    // les comptes que le lecteur suit, sans quoi son nom serait trompeur.
+    apiVideos.suivis()
+      .then(v => { if (valable) { setVideos(v); setIndex(0) } })
+      .catch((e: Error) => { if (valable) { setErreur(e.message); setVideos([]) } })
+      .finally(() => { if (valable) setChargement(false) })
+    return () => { valable = false }
+  }, [reprise])
+
+  // Comptes suivis, charges une fois pour tout le fil : la video de l'API
+  // ne porte pas la relation d'abonnement, et une requete par carte en
+  // ferait autant que de videos. L'onglet ne montrant que des comptes
+  // suivis, la pastille y est normalement absente ; elle reparait apres un
+  // desabonnement fait ailleurs, le fil n'etant pas recharge pour autant.
+  const [abonnes, setAbonnes] = useState<Set<string>>(() => new Set())
+  useEffect(() => {
+    const moi = profil?.pseudo
+    if (!moi) return
+    let valable = true
+    apiInteractions.abonnements(moi, { limite: 200 })
+      .then(c => { if (valable) setAbonnes(new Set(c.map(x => x.pseudo))) })
+      .catch(() => { /* Liste d'abonnements indisponible. */ })
+    return () => { valable = false }
+  }, [profil?.pseudo])
+
+  // L'abonnement se note par pseudo et non par video : le meme auteur peut
+  // tenir plusieurs cartes du fil, toutes doivent suivre.
+  const marquerSuivi = (p: string, suivi: boolean) =>
+    setAbonnes(anciens => {
+      const prochains = new Set(anciens)
+      if (suivi) prochains.add(p)
+      else prochains.delete(p)
+      return prochains
+    })
+
+  const [videoCom, setVideoCom] = useState<VideoApi | null>(null)
+  // Ecarts de commentaires par video, depuis l'ouverture de l'onglet : la
+  // feuille se ferme, son compteur doit rester juste sans recharger le fil.
+  const [ecartsCom, setEcartsCom] = useState<Record<string, number>>({})
+  // Vrai des que le fil a quitte le haut : la rangee de recits se tasse.
   const [replie, setReplie] = useState(false)
-  // La recherche recouvre l'ecran, ouverte par la loupe de l'entete.
-  const [recherche, setRecherche] = useState(false)
   const filRef = useRef<HTMLDivElement>(null)
   // Ordonnee du doigt au debut du geste, pour reconnaitre un glissement
   // vers le haut tant que le fil est encore fige.
@@ -278,31 +497,52 @@ export default function Amis({ onVisiter }: { onVisiter: (pseudo: string) => voi
   }
   const aLaFin = () => { depart.current = null }
 
-  if (recherche) return <Decouvrir onVisiter={(p) => { setRecherche(false); onVisiter(p) }} />
+  // Un fil vide et un fil en panne se ressemblent a l'ecran : le message du
+  // serveur distingue les deux. Vide sans erreur, la cause est connue : le
+  // lecteur ne suit encore personne, et les suggestions l'en sortent.
+  const corps = chargement ? (
+    <div className="ami-attente"><p>Chargement…</p></div>
+  ) : erreur ? (
+    <div className="ami-attente">
+      <p role="alert">{erreur}</p>
+      <button className="ami-reessayer" onClick={reessayer}>Réessayer</button>
+    </div>
+  ) : videos.length === 0 ? (
+    <div className="ami-attente">
+      <b>Aucune vidéo de tes abonnements</b>
+      <p>Abonne-toi à des comptes pour voir leurs vidéos ici.</p>
+      {/* Le fil vide devient actionnable : on suit depuis ici meme. */}
+      <Suggestions onVisiter={onVisiter} />
+    </div>
+  ) : (
+    <div
+      className={`ami-fil${replie ? '' : ' ami-fige'}`}
+      ref={filRef}
+      onScroll={auDefilement}
+      onPointerDown={replie ? undefined : auDebut}
+      onPointerMove={replie ? undefined : auDeplacement}
+      onPointerUp={replie ? undefined : aLaFin}
+      onPointerCancel={replie ? undefined : aLaFin}
+    >
+      {videos.map((v, i) => (
+        <Carte key={v.id} video={v} actif={i === index} replie={replie}
+          nbCom={Math.max(0, v.nbCommentaires + (ecartsCom[v.id] ?? 0))}
+          suivi={abonnes.has(v.pseudo)} onSuivi={marquerSuivi}
+          onErreur={setErreurAction}
+          onCommenter={setVideoCom} onVisiter={onVisiter} />
+      ))}
+    </div>
+  )
 
   return (
     <div className="ami-page">
-      <div
-        className={`ami-fil${replie ? '' : ' ami-fige'}`}
-        ref={filRef}
-        onScroll={auDefilement}
-        onPointerDown={replie ? undefined : auDebut}
-        onPointerMove={replie ? undefined : auDeplacement}
-        onPointerUp={replie ? undefined : aLaFin}
-        onPointerCancel={replie ? undefined : aLaFin}
-      >
-        {videos.map((v, i) => (
-          <Carte key={v.id} video={v} actif={i === index} replie={replie}
-            onCommenter={setVideoCom} onVisiter={onVisiter} />
-        ))}
-      </div>
+      {corps}
 
       {/* Entete : titre centre et loupe. Posee au-dessus de tout, elle
           recoit un voile sombre une fois la video passee dessous. */}
       <header className={`ami-entete${replie ? ' ami-voilee' : ''}`}>
         <h1>Amis</h1>
-        <button className="ami-loupe" aria-label="Rechercher"
-          onClick={() => setRecherche(true)}>
+        <button className="ami-loupe" aria-label="Rechercher" onClick={onRechercher}>
           <Loupe taille={24} />
         </button>
       </header>
@@ -311,8 +551,17 @@ export default function Amis({ onVisiter }: { onVisiter: (pseudo: string) => voi
         ? <div className="ami-grappe-boite"><Grappe pseudo={pseudo} stories={stories} /></div>
         : <div className="ami-rangee"><BandeStories pseudo={pseudo} stories={stories} onOuvrir={onVisiter} /></div>}
 
+      {/* Un j'aime ou un favori refuse par le serveur se signale ici : la
+          video continue de se lire, seul le bandeau apparait. */}
+      {erreurAction && (
+        <button className="ami-bandeau" onClick={() => setErreurAction('')}>
+          {erreurAction}
+        </button>
+      )}
+
       {videoCom && (
-        <Commentaires videoId={videoCom.id} onFermer={() => setVideoCom(null)} onVariation={() => undefined} />
+        <Commentaires videoId={videoCom.id} onFermer={() => setVideoCom(null)}
+          onVariation={n => setEcartsCom(e => ({ ...e, [videoCom.id]: (e[videoCom.id] ?? 0) + n }))} />
       )}
     </div>
   )

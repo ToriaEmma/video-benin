@@ -1,0 +1,122 @@
+/* Onglet « Amis » : fil video plein ecran sombre, surmonte d'une rangee
+   de recits qui se tasse en grappe des que le fil defile. */
+.ami-page{position:relative;height:100%;background:#000;color:#fff;color-scheme:dark;overflow:hidden;}
+
+/* --- Fil --- */
+/* Le fil occupe tout l'ecran des le premier rendu : l'entete et les
+   recits se posent par-dessus. Sa hauteur ne bouge donc pas quand la
+   rangee se tasse, et le pas du defilement reste juste. */
+.ami-fil{height:100%;overflow-y:auto;scroll-snap-type:y mandatory;scrollbar-width:none;overscroll-behavior:contain;}
+.ami-fil::-webkit-scrollbar{display:none;}
+/* Fige tant que la premiere video n'occupe pas tout l'ecran : le geste
+   sert alors a la deployer, pas a changer de video. */
+.ami-fige{overflow-y:hidden;touch-action:none;}
+.ami-carte{position:relative;height:100%;scroll-snap-align:start;background:#000;overflow:hidden;}
+/* Cadre de la video : il recule sous la rangee quand elle est deployee. */
+.ami-cadre{position:absolute;inset:0;overflow:hidden;}
+.ami-cadre-recule{top:170px;border-radius:14px 14px 0 0;}
+/* « contain » et non « cover » : une video tournee en paysage garderait
+   sinon ses bords coupes pour remplir le cadre. Le fond noir occupe la
+   place laissee libre. */
+.ami-cadre video{display:block;width:100%;height:100%;object-fit:contain;background:#000;}
+/* Voile du bas : il detache les textes blancs d'une video claire. */
+.ami-cadre:after{content:'';position:absolute;inset:48% 0 0;pointer-events:none;background:linear-gradient(transparent,#0000008c);}
+.ami-lecture{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;opacity:.65;}
+
+/* --- Entete --- */
+/* Toujours posee par-dessus le fil : seul le voile sombre apparait quand
+   la video remonte derriere elle. */
+.ami-entete{position:absolute;top:0;left:0;right:0;z-index:5;display:grid;place-items:center;padding:14px 0 10px;}
+.ami-voilee{background:#0000006b;}
+.ami-entete h1{margin:0;font-size:17px;font-weight:700;}
+.ami-loupe{position:absolute;right:6px;bottom:2px;width:40px;height:40px;display:grid;place-items:center;color:#fff;}
+
+/* --- Rangee de recits deployee --- */
+.ami-rangee{position:absolute;left:0;right:0;top:52px;z-index:4;}
+
+/* --- Grappe tassee --- */
+.ami-grappe-boite{position:absolute;top:50px;left:12px;z-index:6;}
+.ami-grappe{display:flex;align-items:center;}
+.ami-grappe-moi{position:relative;display:block;margin-right:6px;}
+/* Chaque avatar suivant recouvre le precedent sur la moitie. */
+.ami-chevauche{margin-left:-17px;}
+.ami-petit-anneau{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1.5px solid #3fd0e0;}
+.ami-vu{border-color:#ffffff42;}
+.ami-petit-avatar{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;border:1.5px solid #000000a6;background:#2c2c2e;color:#fff;font-size:13px;font-weight:700;}
+.ami-petite-pastille{position:absolute;right:-3px;bottom:-2px;display:grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1.5px solid #000;background:#1ec0f0;}
+
+/* --- Rail d'actions --- */
+.ami-actions{position:absolute;right:8px;bottom:74px;z-index:2;display:flex;flex-direction:column;align-items:center;gap:13px;}
+.ami-action{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:44px;color:#fff;font-size:13px;font-weight:500;text-shadow:0 1px 3px #00000066;}
+.ami-aime{color:#ff2856;}
+/* Seul le glyphe prend la couleur : le compteur reste lisible. */
+.ami-aime>span{color:#fff;}
+.ami-favori{color:#fcd116;}
+.ami-favori>span{color:#fff;}
+.ami-avatar-boite{position:relative;display:grid;place-items:center;margin-bottom:4px;}
+.ami-avatar{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;border:1.5px solid #fff;background:#555;color:#fff;font-size:19px;font-weight:700;}
+/* Pastille rose a cheval sur le bas de l'avatar : envoyer a un ami. */
+.ami-pastille-envoi{position:absolute;bottom:-4px;display:grid;place-items:center;width:23px;height:23px;border-radius:50%;background:#ff2856;color:#fff;}
+/* S'abonner sans quitter le fil : le « + » occupe la place de la
+   pastille d'envoi tant qu'on ne suit pas l'auteur. */
+.ami-pastille-suivre{position:absolute;bottom:-4px;display:grid;place-items:center;width:23px;height:23px;border:0;border-radius:50%;padding:0;background:#ff2856;color:#fff;}
+.ami-disque{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;border:7px solid #292929;background:#666;color:#fff;animation:ami-tour 8s linear infinite;animation-play-state:paused;}
+.ami-tourne{animation-play-state:running;}
+@keyframes ami-tour{to{transform:rotate(360deg)}}
+
+/* --- Bloc d'informations --- */
+.ami-infos{position:absolute;left:12px;right:72px;bottom:62px;z-index:2;}
+.ami-effet{display:inline-flex;align-items:center;gap:6px;margin-bottom:9px;border-radius:7px;padding:4px 8px;background:#0000006b;}
+.ami-effet-badge{display:grid;place-items:center;width:18px;height:18px;border-radius:5px;color:#fff;}
+.ami-effet-texte{font-size:12.5px;font-weight:500;}
+.ami-ligne-auteur{display:flex;align-items:baseline;margin:0 0 5px;}
+.ami-pseudo{color:#fff;font-size:15.5px;font-weight:700;text-shadow:0 1px 3px #00000066;}
+.ami-anciennete{color:#ffffffb8;font-size:13.5px;text-shadow:0 1px 3px #00000066;}
+/* Repliee a deux lignes : la legende ne doit pas manger la video. */
+.ami-legende{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#fff;font-size:14.5px;line-height:1.35;text-align:left;text-shadow:0 1px 3px #00000066;}
+.ami-developpee{display:block;max-height:26vh;overflow:auto;-webkit-line-clamp:none;}
+.ami-ligne-son{display:flex;align-items:center;gap:6px;margin-top:8px;}
+.ami-son-texte{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px;text-shadow:0 1px 3px #00000066;}
+
+/* --- Barre de lecture --- */
+/* Zone sensible de 28px pour s'attraper au pouce, le trait visible n'en
+   faisant que 2. Elle se tient au-dessus de la barre de liste de
+   lecture, qui occupe deja le bas du cadre. */
+.ami-progression{appearance:none;-webkit-appearance:none;position:absolute;left:12px;bottom:41px;width:calc(100% - 24px);height:28px;z-index:4;margin:0;padding:0;border:0;background:transparent;box-shadow:none;cursor:pointer;touch-action:none;}
+.ami-progression::-webkit-slider-runnable-track{height:2px;border-radius:2px;background:linear-gradient(to right,#fff9 var(--progression),#ffffff30 var(--progression));}
+.ami-progression::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:5px;height:5px;margin-top:-1.5px;border:0;border-radius:50%;background:#aaa;}
+.ami-progression::-moz-range-track{height:2px;border-radius:2px;background:#ffffff30;}
+.ami-progression::-moz-range-progress{height:2px;background:#fff9;}
+.ami-progression::-moz-range-thumb{width:5px;height:5px;border:0;border-radius:50%;background:#aaa;}
+.ami-progression:focus-visible{outline:1px solid #fff;outline-offset:2px;}
+/* Pendant le glissement le trait s'epaissit : le doigt masque la barre,
+   c'est le seul retour qui reste visible. */
+.ami-glisse::-webkit-slider-runnable-track{height:4px;border-radius:4px;background:linear-gradient(to right,#fff var(--progression),#ffffff40 var(--progression));}
+.ami-glisse::-webkit-slider-thumb{width:12px;height:12px;margin-top:-4px;background:#fff;}
+.ami-glisse::-moz-range-track{height:4px;border-radius:4px;background:#ffffff40;}
+.ami-glisse::-moz-range-progress{height:4px;background:#fff;}
+.ami-glisse::-moz-range-thumb{width:12px;height:12px;background:#fff;}
+/* Position atteinte, montree seulement pendant le glissement : le reste
+   du temps elle encombrerait la video. */
+.ami-minuteur{position:absolute;left:50%;bottom:80px;transform:translateX(-50%);z-index:5;border-radius:8px;padding:5px 11px;background:#000000e6;color:#fff;font-size:13.5px;font-weight:600;pointer-events:none;}
+
+/* --- Barre de la liste de lecture --- */
+.ami-barre-liste{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:center;gap:8px;height:41px;padding:0 12px;background:#000000a8;color:#fff;font-size:12.5px;font-weight:500;text-align:left;}
+.ami-barre-liste>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ami-chevron-droit{display:grid;place-items:center;color:#ffffffd9;flex-shrink:0;}
+
+/* --- Attente et pannes reseau --- */
+/* Le haut est reserve a l'entete et a la rangee de recits, toutes deux
+   posees par-dessus : sans cette marge le message passerait dessous. */
+.ami-attente{height:100%;display:grid;place-items:center;align-content:center;gap:14px;padding:186px 40px 40px;overflow-y:auto;text-align:center;color:#bbb;}
+.ami-attente p{margin:0;font-size:14.5px;}
+.ami-attente b{font-size:15px;color:#fff;}
+/* Bouton de reprise apres un echec reseau : il doit rester atteignable au pouce. */
+.ami-reessayer{min-height:40px;padding:0 22px;border:1px solid #ffffff59;border-radius:20px;background:none;color:#fff;font-size:14.5px;font-weight:600;}
+/* Les suggestions s'etirent et defilent a part : la liste depasse sinon
+   le bas de l'ecran, et son bouton d'abonnement devient inatteignable. */
+.ami-attente .suggestions{width:100%;max-width:420px;max-height:46vh;margin-top:6px;overflow-y:auto;text-align:left;}
+/* Un j'aime refuse par le serveur s'annonce ici, sans interrompre la lecture. */
+.ami-bandeau{position:absolute;left:16px;right:16px;bottom:96px;z-index:7;border:0;border-radius:10px;padding:12px 16px;background:#5a5a5aeb;color:#fff;font-size:13.5px;text-align:center;}
+@media(prefers-reduced-motion:reduce){.ami-disque{animation:none;}}
+@media(max-width:380px){.ami-actions{gap:10px;}.ami-infos{bottom:58px;}}
