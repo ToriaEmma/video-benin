@@ -216,7 +216,7 @@ app.patch('/moi', exigerSession, route(async (req, res) => {
 // entre comptes qui se suivent mutuellement, 'moi' pour l'auteur.
 // ------------------------------------------------------------
 
-const listerVideos = async ({ viewerId, auteurId, limite, avant, videoId }) => {
+const listerVideos = async ({ viewerId, auteurId, limite, avant, videoId, suivisSeuls = false }) => {
   const lignes = await sql`
     SELECT
       v.*,
@@ -237,6 +237,10 @@ const listerVideos = async ({ viewerId, auteurId, limite, avant, videoId }) => {
       AND (${videoId}::uuid IS NULL OR v.id = ${videoId}::uuid)
       AND (${auteurId}::uuid IS NULL OR v.auteur_id = ${auteurId}::uuid)
       AND (${avant}::timestamptz IS NULL OR v.publiee_le < ${avant}::timestamptz)
+      AND (NOT ${suivisSeuls} OR EXISTS (
+        SELECT 1 FROM abonnements a
+        WHERE a.suiveur_id = ${viewerId} AND a.suivi_id = v.auteur_id
+      ))
       AND (
         v.visibilite = 'monde'
         OR v.auteur_id = ${viewerId}
@@ -263,6 +267,20 @@ app.get('/videos', sessionFacultative, route(async (req, res) => {
     viewerId: req.profilId || null,
     auteurId: null,
     videoId: null,
+    limite: limiteDemandee(req.query.limite),
+    avant: req.query.avant || null,
+  })
+  res.json(videos)
+}))
+
+// Fil des abonnements : seules les publications des comptes suivis. Il
+// exige une session, n'ayant aucun sens pour un visiteur.
+app.get('/videos/suivis', exigerSession, route(async (req, res) => {
+  const videos = await listerVideos({
+    viewerId: req.profilId,
+    auteurId: null,
+    videoId: null,
+    suivisSeuls: true,
     limite: limiteDemandee(req.query.limite),
     avant: req.query.avant || null,
   })
