@@ -9,7 +9,8 @@ import Suggestions from '../components/Suggestions'
 import DirectLive from './DirectLive'
 import AnalyseVideo from './AnalyseVideo'
 import { Film } from '../components/Icones'
-import { Loupe, PlusStory } from '../components/Icones'
+import { Loupe, PlusStory, SonNote } from '../components/Icones'
+import { sonParId, libelleSon } from '../lib/sons'
 import './fil.css'
 
 export type Video = VideoApi
@@ -45,6 +46,10 @@ function Carte({ video, actif, onVisiter, onErreur, suivi, onSuivi }: {
 }) {
   const { profil } = useAuth()
   const ref = useRef<HTMLVideoElement>(null)
+  // Son attache a la publication, resolu dans le catalogue. Un son retire
+  // du catalogue laisse la carte sur « son original ».
+  const son = sonParId(video.sonId)
+  const refSon = useRef<HTMLAudioElement>(null)
   // Les compteurs arrivent deja dans la video : aucune requete de plus a
   // l'affichage d'une carte.
   const [aime, setAime] = useState(video.aime)
@@ -83,6 +88,25 @@ function Carte({ video, actif, onVisiter, onErreur, suivi, onSuivi }: {
       el.currentTime = 0
     }
   }, [actif])
+
+  // La musique est asservie a la video : elle s'arrete des que la carte
+  // quitte l'ecran, et revient au debut pour que la carte suivante ne
+  // reprenne pas le morceau au milieu. Un son qui continue apres le
+  // defilement est pire que pas de son du tout.
+  useEffect(() => {
+    const piste = refSon.current
+    if (!piste) return
+    if (actif && !pause) {
+      piste.play().catch(() => undefined)
+    } else {
+      piste.pause()
+      if (!actif) piste.currentTime = 0
+    }
+  }, [actif, pause])
+
+  // Quitter le fil ne doit pas laisser la musique derriere : le navigateur
+  // garde l'element vivant jusqu'au ramasse-miettes.
+  useEffect(() => () => { refSon.current?.pause() }, [])
 
   // La vue part quand la carte devient celle qu'on regarde, et non a chaque
   // rendu. L'echec est silencieux : rater un comptage ne doit pas
@@ -182,7 +206,7 @@ function Carte({ video, actif, onVisiter, onErreur, suivi, onSuivi }: {
         src={video.url}
         loop
         playsInline
-        muted={false}
+        muted={!!son}
         preload={actif ? 'auto' : 'none'}
         onPlay={() => setPause(false)}
         onPause={() => setPause(true)}
@@ -203,6 +227,12 @@ function Carte({ video, actif, onVisiter, onErreur, suivi, onSuivi }: {
           else el.pause()
         }}
       />
+      {/* Le son est joint a la publication, pas encode dans le fichier :
+          il se rejoue ici par-dessus la video. */}
+      {son && (
+        <audio ref={refSon} src={son.url} loop preload={actif ? 'auto' : 'none'} />
+      )}
+
       {pause && <button className="fil-play" aria-label="Lire la vidéo" onClick={() => ref.current?.play().catch(() => undefined)}><svg width="60" height="66" viewBox="0 0 60 66" aria-hidden="true"><path d="M8 4Q3 1 3 8v50q0 7 5 4l46-26q6-3 0-6Z" fill="white"/></svg></button>}
 
       <div className="actions">
@@ -235,12 +265,20 @@ function Carte({ video, actif, onVisiter, onErreur, suivi, onSuivi }: {
           <span>Partager</span>
         </button>
         <button className="action fil-favori" aria-label={favori ? 'Retirer des favoris' : 'Enregistrer en favori'} aria-pressed={favori} onClick={basculerFavori}><svg width="27" height="32" viewBox="0 0 24 28" fill={favori ? '#ffd15b' : 'white'} aria-hidden="true"><path d="M5 2h14a2 2 0 0 1 2 2v22l-9-6-9 6V4a2 2 0 0 1 2-2Z"/></svg><span>{favori ? 'Enregistré' : 'Favoris'}</span></button>
-        <span className={`fil-disque${actif && !pause ? ' tourne' : ''}`} role="img" aria-label={`Son de ${pseudo}`}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2" fill="currentColor"/><ellipse cx="17" cy="16" rx="3" ry="2" fill="currentColor"/></svg></span>
+        <span className={`fil-disque${actif && !pause ? ' tourne' : ''}`} role="img"
+          aria-label={`Son : ${libelleSon(son, pseudo)}`}><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M9 17V5l11-2v12M9 8l11-2"/><ellipse cx="6" cy="18" rx="3" ry="2" fill="currentColor"/><ellipse cx="17" cy="16" rx="3" ry="2" fill="currentColor"/></svg></span>
       </div>
 
       <div className="infos">
         <button className="pseudo" onClick={() => onVisiter(pseudo)}>@{pseudo}</button>
         {video.legende && <button className={`legende ${developpe ? 'developpee' : ''}`} onClick={() => setDeveloppe(!developpe)} aria-expanded={developpe}>{video.legende}{!developpe && <span>… plus</span>}</button>}
+
+        {/* Son de la publication, ou le compte de l'auteur quand la video
+            part avec sa propre piste. */}
+        <span className="fil-ligne-son">
+          <SonNote taille={14} />
+          <span className="fil-son-texte">{libelleSon(son, pseudo)}</span>
+        </span>
       </div>
       {/* Barre de lecture : le curseur occupe toute la largeur et une
           hauteur confortable au pouce, le trait visible restant fin. Le

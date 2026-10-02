@@ -42,7 +42,9 @@ type Clip = { url: string; fin: number }
 
 export default function Camera({ onFermer, onChoisir }: {
   onFermer: () => void
-  onChoisir: (url: string) => void
+  // Le son retenu voyage avec la video : sans lui, le choix fait ici
+  // serait perdu entre le viseur et la publication.
+  onChoisir: (url: string, son?: Son | null) => void
 }) {
   const apercu = useRef<HTMLVideoElement>(null)
   const flux = useRef<MediaStream | null>(null)
@@ -251,7 +253,7 @@ export default function Camera({ onFermer, onChoisir }: {
       && !window.confirm(
         `Seule la dernière prise sera publiée : ${clips.length - 1} prise(s) précédente(s) seront abandonnées. Continuer ?`)) return
     clips.slice(0, -1).forEach(c => URL.revokeObjectURL(c.url))
-    onChoisir(dernier.url)
+    onChoisir(dernier.url, son)
   }
 
   const reinitialiser = () => {
@@ -314,7 +316,7 @@ export default function Camera({ onFermer, onChoisir }: {
       </div>
       <input hidden ref={importer} type="file" accept="video/*" onChange={e => {
         const f = e.target.files?.[0]
-        if (f) onChoisir(URL.createObjectURL(f))
+        if (f) onChoisir(URL.createObjectURL(f), son)
       }} />
     </div>
   )
@@ -537,7 +539,7 @@ export default function Camera({ onFermer, onChoisir }: {
 
       <input hidden ref={importer} type="file" accept="video/*" onChange={e => {
         const f = e.target.files?.[0]
-        if (f) onChoisir(URL.createObjectURL(f))
+        if (f) onChoisir(URL.createObjectURL(f), son)
       }} />
 
       <ChoixSon visible={choixSon} onFermer={() => setChoixSon(false)} onChoisir={setSon} />

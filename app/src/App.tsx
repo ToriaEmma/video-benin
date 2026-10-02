@@ -12,6 +12,7 @@ import Decouvrir from './pages/Decouvrir'
 import AmisEcran from './pages/Amis'
 import Messages from './pages/Messages'
 import { Accueil, Amis, Messages as IconeMessages, Plus, Personne } from './components/Icones'
+import type { Son } from './lib/sons'
 
 type Onglet = 'fil' | 'decouvrir' | 'publier' | 'profil' | 'messages'
 
@@ -30,6 +31,9 @@ function Application() {
   // Video filmee ou importee a la camera, passee au montage puis a la
   // publication. Null = on est encore sur l'ecran de tournage.
   const [videoChoisie, setVideoChoisie] = useState<string | null>(null)
+  // Son retenu au viseur ou au montage, qui accompagne cette video
+  // jusqu'a la publication : le fichier video ne le porte pas.
+  const [sonChoisi, setSonChoisi] = useState<Son | null>(null)
   // Vrai tant qu'on est sur l'ecran de montage, avant la publication.
   const [montage, setMontage] = useState(false)
   // Pseudo du profil consulte. Null = on est sur son propre profil.
@@ -68,26 +72,33 @@ function Application() {
               ? <Montage
                   url={videoChoisie}
                   pseudo={profil?.pseudo ?? 'vous'}
-                  onRetour={() => { setMontage(false); setVideoChoisie(null) }}
-                  onSuivant={() => setMontage(false)}
+                  sonInitial={sonChoisi}
+                  onRetour={() => {
+                    setMontage(false); setVideoChoisie(null); setSonChoisi(null)
+                  }}
+                  onSuivant={(son) => { setSonChoisi(son ?? null); setMontage(false) }}
                 />
               : <Publier
                   urlInitiale={videoChoisie}
-                  onAnnuler={() => setVideoChoisie(null)}
+                  sonInitial={sonChoisi}
+                  onAnnuler={() => { setVideoChoisie(null); setSonChoisi(null) }}
                   onPublie={() => {
                     setVideoChoisie(null)
+                    setSonChoisi(null)
                     setCleFil((n) => n + 1)
                     setOnglet('fil')
                   }}
                   onBrouillon={() => {
-                    setVideoChoisie(null); setProfilVisite(null)
+                    setVideoChoisie(null); setSonChoisi(null); setProfilVisite(null)
                     setMessageProfil('Brouillon enregistré')
                     setOnglet('profil')
                   }}
                 />
             : <Camera
                 onFermer={() => setOnglet('fil')}
-                onChoisir={(url) => { setVideoChoisie(url); setMontage(true) }}
+                onChoisir={(url, son) => {
+                  setVideoChoisie(url); setSonChoisi(son ?? null); setMontage(true)
+                }}
               />
         )}
         {onglet === 'profil' && (
@@ -96,7 +107,7 @@ function Application() {
                 onRetour={() => setBrouillons(false)}
                 onPublier={b => {
                   setBrouillons(false); setVideoChoisie(b.url)
-                  setMontage(false); setOnglet('publier')
+                  setSonChoisi(null); setMontage(false); setOnglet('publier')
                 }}
               />
             : <Profil
@@ -124,7 +135,7 @@ function Application() {
           <span>Amis</span>
         </button>
 
-        <button className="nav-creer" aria-label="Créer une publication" onClick={() => { setVideoChoisie(null); setMontage(false); setOnglet('publier') }}>
+        <button className="nav-creer" aria-label="Créer une publication" onClick={() => { setVideoChoisie(null); setSonChoisi(null); setMontage(false); setOnglet('publier') }}>
           <span className="pastille"><Plus taille={24} /></span>
         </button>
 

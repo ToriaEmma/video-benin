@@ -110,3 +110,14 @@ export const dureeLisible = (secondes: number) =>
 // Classement « Populaire » : les plus utilises en tete.
 export const parPopularite = (liste: Son[]) =>
   [...liste].sort((a, b) => b.publications - a.publications)
+
+// Retrouve un son du catalogue par l'identifiant stocke sur la
+// publication. Un son retire du catalogue laisse une publication qui
+// renvoie `son_id` : le fil doit alors retomber sur « son original ».
+export const sonParId = (id: string | null | undefined) =>
+  id ? SONS.find(x => x.id === id) ?? null : null
+
+// Ligne de son d'une carte du fil. Sans son attache, c'est le compte de
+// l'auteur qui s'affiche : la piste est alors celle de la video elle-meme.
+export const libelleSon = (son: Son | null, pseudo: string) =>
+  son ? `${son.titre} - ${son.artiste}` : `son original - ${pseudo}`

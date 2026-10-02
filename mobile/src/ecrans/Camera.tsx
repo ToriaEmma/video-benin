@@ -170,7 +170,9 @@ const DisqueEnregistrement = React.memo(function DisqueEnregistrement({
 
 export default function Camera({ onFermer, onChoisir }: {
   onFermer: () => void
-  onChoisir: (uri: string) => void
+  // Le son retenu voyage avec la video : sans lui, le choix fait ici
+  // serait perdu entre le viseur et la publication.
+  onChoisir: (uri: string, son?: Son | null) => void
 }) {
   // Mesure reactive plutot que lue au chargement du module : la vignette
   // suit ainsi la largeur reelle, y compris a la rotation.
@@ -265,7 +267,7 @@ export default function Camera({ onFermer, onChoisir }: {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       videoMaxDuration: 90, quality: 0.7,
     })
-    if (!r.canceled && r.assets[0]) onChoisir(r.assets[0].uri)
+    if (!r.canceled && r.assets[0]) onChoisir(r.assets[0].uri, son)
   }
 
   const filmer = async () => {
@@ -304,7 +306,7 @@ export default function Camera({ onFermer, onChoisir }: {
   // La coche valide le montage et passe a la publication.
   const valider = () => {
     const dernier = clips[clips.length - 1]
-    if (dernier) onChoisir(dernier.uri)
+    if (dernier) onChoisir(dernier.uri, son)
   }
 
   if (!permission?.granted) {

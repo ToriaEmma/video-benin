@@ -17,6 +17,9 @@ export type Video = {
   publieeLe?: string
   // Departement du Benin choisi au moment de la publication.
   departement?: string
+  // Son du catalogue joint a la publication, resolu par le fil. Absent
+  // des listes de demonstration, qui n'en portent pas.
+  sonId?: string | null
 }
 
 // Video mise de cote avant publication. Le poids sert a l'etiquette de la

@@ -69,6 +69,28 @@
 .pub-ligne-texte { flex: 1; min-width: 0; font-size: 15px; }
 .pub-ligne-valeur { color: #8e8e93; font-size: 15px; }
 
+/* Ligne du son : meme gabarit que les autres reglages, la croix de
+   retrait occupant la place du chevron. */
+.pub-ligne-son {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; min-height: 56px; padding: 16px 0; color: #111;
+}
+.pub-ligne-son > svg:last-child { color: #c4c4c6; flex-shrink: 0; }
+.pub-son-corps {
+  display: flex; align-items: center; gap: 14px;
+  flex: 1; min-width: 0; color: #111; text-align: left;
+}
+.pub-son-corps > svg { flex-shrink: 0; }
+.pub-son-bloc { display: grid; gap: 2px; min-width: 0; }
+.pub-son-meta {
+  color: #8e8e93; font-size: 12.5px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pub-son-retirer { color: #8e8e93; flex-shrink: 0; min-height: 44px; padding: 0 4px; }
+.pub-son-note {
+  color: #8e8e93; font-size: 12.5px; line-height: 17px; margin: -6px 0 8px;
+}
+
 .pub-erreur { color: #ff2856; font-size: 13px; margin: 10px 0 0; }
 
 /* ---------- Pied : « Brouillons » et « Publier » ---------- */

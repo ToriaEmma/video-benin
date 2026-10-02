@@ -149,11 +149,18 @@ function CalquePose({ calque, onDeplacer, onOuvrir }: {
   )
 }
 
-export default function Montage({ url, pseudo, onRetour, onSuivant }: {
+export default function Montage({
+  url, pseudo, sonInitial, onRetour, onSuivant,
+}: {
   url: string
   pseudo: string
   onRetour: () => void
-  onSuivant: () => void
+  // Son deja retenu au viseur : le montage le reprend plutot que de
+  // repartir a vide, et peut encore le changer ou le retirer.
+  sonInitial?: Son | null
+  // Le son suit la video vers la publication : c'est la seule etape qui
+  // le transmet, le fichier ne le portant pas.
+  onSuivant: (son?: Son | null) => void
 }) {
   const lecteur = useRef<HTMLVideoElement>(null)
   const [menuSortie, setMenuSortie] = useState(false)
@@ -164,7 +171,7 @@ export default function Montage({ url, pseudo, onRetour, onSuivant }: {
   // Feuille ouverte : reglages, stickers ou effets vocaux.
   const [feuille, setFeuille] = useState<'reglages' | 'stickers' | 'voix' | null>(null)
   const [choixSon, setChoixSon] = useState(false)
-  const [son, setSon] = useState<Son | null>(null)
+  const [son, setSon] = useState<Son | null>(sonInitial ?? null)
   // Televersement du brouillon en cours : garde contre un double appui.
   const [envoiBrouillon, setEnvoiBrouillon] = useState(false)
 
@@ -434,7 +441,7 @@ export default function Montage({ url, pseudo, onRetour, onSuivant }: {
           <span className="mont-story-avatar">{pseudo.charAt(0).toUpperCase()}</span>
           <span>Ta Story</span>
         </button>
-        <button className="mont-suivant" onClick={onSuivant}>Suivant</button>
+        <button className="mont-suivant" onClick={() => onSuivant(son)}>Suivant</button>
       </footer>
 
       {feuille === 'reglages' && (

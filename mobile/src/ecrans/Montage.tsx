@@ -138,11 +138,18 @@ function CalquePose({ calque, onOuvrir }: {
   )
 }
 
-export default function Montage({ uri, pseudo, onRetour, onSuivant, onOutil }: {
+export default function Montage({
+  uri, pseudo, sonInitial, onRetour, onSuivant, onOutil,
+}: {
   uri: string
   pseudo: string
+  // Son deja retenu au viseur : le montage le reprend plutot que de
+  // repartir a vide, et peut encore le changer ou le retirer.
+  sonInitial?: Son | null
   onRetour: () => void
-  onSuivant: () => void
+  // Le son suit la video vers la publication : c'est la seule etape qui
+  // le transmet, le fichier ne le portant pas.
+  onSuivant: (son?: Son | null) => void
   // Reserve aux actions qui sortent du montage ; le reste est traite ici.
   onOutil?: (nom: string) => void
 }) {
@@ -159,7 +166,7 @@ export default function Montage({ uri, pseudo, onRetour, onSuivant, onOutil }: {
   // Feuille ouverte : reglages, stickers ou effets vocaux.
   const [feuilleOuverte, setFeuilleOuverte] = useState<'reglages' | 'stickers' | 'voix' | null>(null)
   const [choixSon, setChoixSon] = useState(false)
-  const [son, setSon] = useState<Son | null>(null)
+  const [son, setSon] = useState<Son | null>(sonInitial ?? null)
 
   const [filtre, setFiltre] = useState(0)
   const [vitesse, setVitesse] = useState(1)
@@ -486,7 +493,7 @@ export default function Montage({ uri, pseudo, onRetour, onSuivant, onOutil }: {
           </View>
           <Text style={s.storyTexte}>Ta Story</Text>
         </Pressable>
-        <Pressable style={s.suivant} onPress={onSuivant}>
+        <Pressable style={s.suivant} onPress={() => onSuivant(son)}>
           <Text style={s.suivantTexte}>Suivant</Text>
         </Pressable>
       </View>

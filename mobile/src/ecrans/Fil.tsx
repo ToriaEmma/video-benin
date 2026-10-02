@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, FlatList, Pressable, StyleSheet, ActivityIndicator, PanResponder,
+  Animated, Easing,
 } from 'react-native'
 import { Text } from '../composants/Texte'
 import { useVideoPlayer, VideoView } from 'expo-video'
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEvent } from 'expo'
 import { abreger, type Video } from '../lib/demo'
+import { sonParId, libelleSon } from '../lib/sons'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Suggestions from '../composants/Suggestions'
 import Commentaires from '../composants/Commentaires'
 import {
   CoeurFil, BulleFil, PartageFil, Favori, LecturePleine, LiveEntete,
-  LoupeEntete, NoteDisque, Chevron, Loupe, TroisPoints, PlusStory,
+  LoupeEntete, NoteDisque, Chevron, Loupe, TroisPoints, PlusStory, SonNote,
 } from '../composants/Icones'
 import EnvoyerA from '../composants/EnvoyerA'
 import AnalyseVideo from './AnalyseVideo'
@@ -58,7 +61,22 @@ function Carte({
   nbCommentaires: number
   onErreur: (message: string) => void
 }) {
-  const lecteur = useVideoPlayer(item.url, p => { p.loop = true; p.timeUpdateEventInterval = 0.25 })
+  // Son attache a la publication, resolu dans le catalogue. Un son retire
+  // du catalogue laisse la carte sur « son original ».
+  const son = sonParId(item.sonId)
+
+  const lecteur = useVideoPlayer(item.url, p => {
+    p.loop = true; p.timeUpdateEventInterval = 0.25
+    // La piste de la video ne se coupe que s'il y a une musique a mettre
+    // a sa place : sans son attache, c'est elle qu'on entend.
+    p.muted = !!son
+  })
+
+  // Musique jouee par-dessus la video. `expo-audio` n'accepte pas une
+  // source nulle au montage sans la remplacer ensuite : la carte etant
+  // reconstruite par video, la source ne change jamais de son vivant.
+  const musique = useAudioPlayer(son ? { uri: son.url } : null)
+  const etatMusique = useAudioPlayerStatus(musique)
 
   const [aime, setAime] = useState(item.aime)
   const [nbAime, setNbAime] = useState(item.nbAime)
@@ -106,6 +124,35 @@ function Carte({
     if (actif) { setPauseVoulue(false); lecteur.play() }
     else { lecteur.pause(); lecteur.currentTime = 0; setProgression(0) }
   }, [actif, lecteur])
+
+  // La musique est asservie a la video : elle part avec elle, s'arrete des
+  // que la carte quitte l'ecran ou que la lecture est mise en pause, et se
+  // tait au demontage. Un son qui continue apres le defilement est pire
+  // que pas de son du tout.
+  useEffect(() => {
+    if (!son) return
+    if (actif && isPlaying) {
+      musique.play()
+    } else {
+      musique.pause()
+      // Revenue au debut : la carte suivante ne doit pas reprendre la
+      // musique au milieu du morceau.
+      if (!actif) musique.seekTo(0).catch(() => { /* Position refusee. */ })
+    }
+  }, [actif, isPlaying, musique, son])
+
+  // Morceau fini avant la video : on le reprend au debut. `loop` ferait
+  // la meme chose, mais muter ce que rend un hook est proscrit ici.
+  useEffect(() => {
+    if (!son || !etatMusique.didJustFinish) return
+    musique.seekTo(0)
+      .then(() => musique.play())
+      .catch(() => { /* Reprise refusee : la video continue en silence. */ })
+  }, [son, etatMusique.didJustFinish, musique])
+
+  useEffect(() => () => {
+    try { musique.pause() } catch { /* Lecteur deja libere. */ }
+  }, [musique])
 
   // La vue part quand la carte devient celle qu'on regarde, et non a
   // chaque rendu. L'echec est silencieux : rater un comptage ne doit pas
@@ -190,6 +237,20 @@ function Carte({
     })
   })
 
+  // Le disque tourne tant que la video avance, et se fige des qu'elle
+  // s'arrete. L'animation est tenue hors du rendu : elle ne doit pas
+  // provoquer de nouveau rendu a chaque tour.
+  const [tour] = useState(() => new Animated.Value(0))
+  const enLecture = actif && isPlaying
+  useEffect(() => {
+    if (!enLecture) return
+    const boucle = Animated.loop(Animated.timing(tour, {
+      toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true,
+    }))
+    boucle.start()
+    return () => { boucle.stop() }
+  }, [enLecture, tour])
+
   // Glissement vers la droite : le profil de l'auteur. Le fil paginant a
   // la verticale, le geste n'est retenu que s'il est franchement
   // horizontal, sans quoi il volerait le defilement d'une video a l'autre.
@@ -268,9 +329,15 @@ function Carte({
           <Text style={s.compteur}>{sienne ? 'Plus' : 'Partager'}</Text>
         </Pressable>
 
-        <View style={s.disque}>
+        <Animated.View style={[s.disque, {
+          transform: [{
+            rotate: tour.interpolate({
+              inputRange: [0, 1], outputRange: ['0deg', '360deg'],
+            }),
+          }],
+        }]}>
           <NoteDisque taille={24} couleur="#fff" />
-        </View>
+        </Animated.View>
       </View>
 
       <View style={s.infos}>
@@ -284,6 +351,15 @@ function Carte({
             </Text>
           </Pressable>
         )}
+
+        {/* Son de la publication, ou le compte de l'auteur quand la video
+            part avec sa propre piste. */}
+        <View style={s.ligneSon}>
+          <SonNote taille={14} couleur="#fff" />
+          <Text style={s.sonTexte} numberOfLines={1}>
+            {libelleSon(son, item.pseudo)}
+          </Text>
+        </View>
       </View>
 
       {/* Barre de lecture : la zone sensible est haute pour s'attraper au
@@ -643,6 +719,11 @@ const s = StyleSheet.create({
 
   // .fil-ecran .infos : left 12px, right 68px, bottom 24px.
   infos: { position: 'absolute', left: 12, right: 68, bottom: 24, zIndex: 2 },
+  ligneSon: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  sonTexte: {
+    flex: 1, color: '#fff', fontSize: 14,
+    textShadowColor: 'rgba(0,0,0,.4)', textShadowRadius: 3,
+  },
   pseudo: {
     color: '#fff', fontSize: 17, fontWeight: '600', marginBottom: 6,
     textShadowColor: 'rgba(0,0,0,.33)', textShadowRadius: 3,

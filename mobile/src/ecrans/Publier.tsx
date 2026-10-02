@@ -15,8 +15,10 @@ import {
   type Audience, type Options, type Application, type Departement,
 } from './FeuillesPublication'
 import { apiBrouillons, apiVideos, televerser, type NouvelleVideo } from '../lib/api'
+import ChoixSon from './ChoixSon'
+import { dureeLisible, type Son } from '../lib/sons'
 import {
-  Camera, Chevron, ChevronDroit, Brouillon,
+  Camera, Chevron, ChevronDroit, Brouillon, Croix, SonNote,
   PubLien, PubMonde, PubOptions, PubPublier, MontagePartage, PubLieu,
 } from '../composants/Icones'
 
@@ -30,8 +32,12 @@ const VISIBILITES: Record<Audience, NonNullable<NouvelleVideo['visibilite']>> = 
   moi: 'moi',
 }
 
-export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon }: {
+export default function Publier({
+  onPublie, uriInitiale, sonInitial, onAnnuler, onBrouillon,
+}: {
   onPublie: () => void; uriInitiale?: string; onAnnuler?: () => void
+  // Son retenu au viseur ou au montage : il est joint a la publication.
+  sonInitial?: Son | null
   // Brouillon enregistre : la page appelante bascule sur le profil.
   onBrouillon?: () => void
 }) {
@@ -57,6 +63,9 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
   // la version web, ou il est pre-rempli sur « Littoral ».
   const [departement, setDepartement] = useState<Departement>('Littoral')
   const [options, setOptions] = useState<Options>(OPTIONS_PAR_DEFAUT)
+  // Son joint a la publication, encore modifiable ici.
+  const [son, setSon] = useState<Son | null>(sonInitial ?? null)
+  const [choixSon, setChoixSon] = useState(false)
 
   const choisir = async (source: 'camera' | 'galerie') => {
     // Les autorisations sont demandees au moment du besoin : c'est ce
@@ -115,6 +124,9 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
         // seuls que l'API connaisse ; les autres restent locaux a l'ecran.
         commentaires_autorises: options.commentaires,
         reutilisation_autorisee: options.reutilisation,
+        // Le son est joint a la publication, pas melange au fichier :
+        // le fil le rejoue par-dessus la video.
+        son_id: son?.id ?? null,
       })
       setUri(null)
       setLegende('')
@@ -221,6 +233,40 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
 
         <View style={s.separateur} />
 
+        {/* Son joint : le libelle ouvre la bibliotheque, la croix le
+            retire. Sans son, la video part avec sa piste d'origine. */}
+        <View style={s.ligneSon}>
+          <Pressable style={s.ligneSonCorps} onPress={() => setChoixSon(true)}>
+            <SonNote taille={22} couleur="#111" />
+            <View style={s.sonBloc}>
+              <Text style={s.ligneTexte} numberOfLines={1}>
+                {son ? son.titre : 'Ajouter un son'}
+              </Text>
+              {son && (
+                <Text style={s.sonMeta} numberOfLines={1}>
+                  {son.artiste} · {dureeLisible(son.duree)} · {son.licence}
+                </Text>
+              )}
+            </View>
+          </Pressable>
+          {son
+            ? <Pressable hitSlop={10} onPress={() => setSon(null)}
+                accessibilityLabel="Retirer le son">
+                <Croix taille={18} couleur="#8e8e93" />
+              </Pressable>
+            : <ChevronDroit taille={18} couleur="#c4c4c6" />}
+        </View>
+
+        {/* Le son n'est pas encode dans le fichier : il est joint a la
+            publication et rejoue par-dessus dans le fil. Le dire ici
+            evite de laisser croire que la video emporte la musique. */}
+        {!!son && (
+          <Text style={s.sonNote}>
+            Le son est joint à la publication et joué par-dessus la vidéo ;
+            le fichier conserve sa piste d’origine.
+          </Text>
+        )}
+
         <Pressable style={s.ligne} onPress={() => setFeuille('lien')}>
           <PubLien taille={22} couleur="#111" />
           <Text style={s.ligneTexte}>Ajouter un lien</Text>
@@ -268,6 +314,9 @@ export default function Publier({ onPublie, uriInitiale, onAnnuler, onBrouillon 
           </>}
         </Pressable>
       </View>
+
+      <ChoixSon visible={choixSon} onFermer={() => setChoixSon(false)}
+        onChoisir={setSon} />
 
       <FeuilleLien visible={feuille === 'lien'} onFermer={() => setFeuille(null)} />
       <FeuilleAudience visible={feuille === 'audience'} audience={audience}
@@ -341,6 +390,16 @@ const s = StyleSheet.create({
   ligne: { flexDirection: 'row', alignItems: 'center', gap: 14,
     paddingVertical: 16, minHeight: 56 },
   ligneTexte: { flex: 1, color: '#111', fontSize: 15 },
+
+  // Ligne du son : meme gabarit que les autres reglages, la croix de
+  // retrait occupant la place du chevron.
+  ligneSon: { flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingVertical: 16, minHeight: 56 },
+  ligneSonCorps: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14 },
+  sonBloc: { flex: 1, gap: 2 },
+  sonMeta: { color: '#8e8e93', fontSize: 12.5 },
+  sonNote: { color: '#8e8e93', fontSize: 12.5, lineHeight: 17,
+    marginTop: -6, marginBottom: 8 },
   ligneValeur: { color: '#8e8e93', fontSize: 15 },
 
   piedPub: { flexDirection: 'row', gap: 12, paddingHorizontal: 16,

@@ -20,8 +20,10 @@ import {
   AUDIENCES, OPTIONS_PAR_DEFAUT,
   type Audience, type Options, type Application, type Departement,
 } from '../lib/publication'
+import ChoixSon from './ChoixSon'
+import { dureeLisible, type Son } from '../lib/sons'
 import {
-  Chevron, ChevronDroit, Brouillon,
+  Chevron, ChevronDroit, Brouillon, Croix, SonNote,
   PubLien, PubMonde, PubOptions, PubPublier, MontagePartage, PubLieu,
 } from '../components/Icones'
 import './publier.css'
@@ -39,7 +41,9 @@ const VISIBILITES: Record<Audience, NonNullable<NouvelleVideo['visibilite']>> = 
 // Seule une source locale (blob:) demande un televersement.
 const dejaHebergee = (url: string) => /^https?:/i.test(url)
 
-export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale }: {
+export default function Publier({
+  onPublie, onAnnuler, onBrouillon, urlInitiale, sonInitial,
+}: {
   onPublie: () => void
   // Retour a l'ecran de tournage, sans rien enregistrer.
   onAnnuler: () => void
@@ -47,6 +51,8 @@ export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale 
   onBrouillon?: () => void
   // Video arrivant du montage : elle existe deja en blob local.
   urlInitiale: string
+  // Son retenu au viseur ou au montage : il est joint a la publication.
+  sonInitial?: Son | null
 }) {
   const [legende, setLegende] = useState('')
   const [envoi, setEnvoi] = useState(false)
@@ -65,6 +71,9 @@ export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale 
   // Departement du Benin ou la video a ete filmee, pre-rempli sur « Littoral ».
   const [departement, setDepartement] = useState<Departement>('Littoral')
   const [options, setOptions] = useState<Options>(OPTIONS_PAR_DEFAUT)
+  // Son joint a la publication, encore modifiable ici.
+  const [son, setSon] = useState<Son | null>(sonInitial ?? null)
+  const [choixSon, setChoixSon] = useState(false)
 
   // La video est televersee avant l'enregistrement : publier l'adresse
   // locale ne donnerait une video lisible que dans cet onglet.
@@ -91,6 +100,9 @@ export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale 
         // seuls que l'API connaisse ; les autres restent locaux a l'ecran.
         commentaires_autorises: options.commentaires,
         reutilisation_autorisee: options.reutilisation,
+        // Le son est joint a la publication, pas melange au fichier :
+        // le fil le rejoue par-dessus la video.
+        son_id: son?.id ?? null,
       })
       setLegende('')
       onPublie()
@@ -171,6 +183,40 @@ export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale 
 
         <hr className="pub-separateur" />
 
+        {/* Son joint : le libelle ouvre la bibliotheque, la croix le
+            retire. Sans son, la video part avec sa piste d'origine. */}
+        <div className="pub-ligne-son">
+          <button className="pub-son-corps" onClick={() => setChoixSon(true)}>
+            <SonNote taille={22} />
+            <span className="pub-son-bloc">
+              <span className="pub-ligne-texte">
+                {son ? son.titre : 'Ajouter un son'}
+              </span>
+              {son && (
+                <span className="pub-son-meta">
+                  {son.artiste} · {dureeLisible(son.duree)} · {son.licence}
+                </span>
+              )}
+            </span>
+          </button>
+          {son
+            ? <button className="pub-son-retirer" aria-label="Retirer le son"
+                onClick={() => setSon(null)}>
+                <Croix taille={18} />
+              </button>
+            : <ChevronDroit taille={18} />}
+        </div>
+
+        {/* Le son n'est pas encode dans le fichier : il est joint a la
+            publication et rejoue par-dessus dans le fil. Le dire ici
+            evite de laisser croire que la video emporte la musique. */}
+        {!!son && (
+          <p className="pub-son-note">
+            Le son est joint à la publication et joué par-dessus la vidéo ;
+            le fichier conserve sa piste d’origine.
+          </p>
+        )}
+
         <button className="pub-ligne" onClick={() => setFeuille('lien')}>
           <PubLien taille={22} />
           <span className="pub-ligne-texte">Ajouter un lien</span>
@@ -223,6 +269,9 @@ export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale 
           </button>
         </div>
       </footer>
+
+      <ChoixSon visible={choixSon} onFermer={() => setChoixSon(false)}
+        onChoisir={setSon} />
 
       <FeuilleLien visible={feuille === 'lien'} onFermer={() => setFeuille(null)} />
       <FeuilleAudience visible={feuille === 'audience'} audience={audience}
