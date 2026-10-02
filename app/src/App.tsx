@@ -7,6 +7,7 @@ import Publier from './pages/Publier'
 import Camera from './pages/Camera'
 import Montage from './pages/Montage'
 import Profil from './pages/Profil'
+import Brouillons from './pages/Brouillons'
 import Decouvrir from './pages/Decouvrir'
 import Messages from './pages/Messages'
 import { Accueil, Amis, Messages as IconeMessages, Plus, Personne } from './components/Icones'
@@ -32,6 +33,10 @@ function Application() {
   const [montage, setMontage] = useState(false)
   // Pseudo du profil consulte. Null = on est sur son propre profil.
   const [profilVisite, setProfilVisite] = useState<string | null>(null)
+  // Message a montrer en arrivant sur le profil, apres un enregistrement.
+  const [messageProfil, setMessageProfil] = useState<string | undefined>()
+  // Vrai quand la liste des brouillons recouvre le profil.
+  const [brouillons, setBrouillons] = useState(false)
 
   const visiter = (pseudo: string) => {
     setProfilVisite(pseudo)
@@ -58,11 +63,16 @@ function Application() {
                 />
               : <Publier
                   urlInitiale={videoChoisie}
-                  onFermer={() => setVideoChoisie(null)}
+                  onAnnuler={() => setVideoChoisie(null)}
                   onPublie={() => {
                     setVideoChoisie(null)
                     setCleFil((n) => n + 1)
                     setOnglet('fil')
+                  }}
+                  onBrouillon={() => {
+                    setVideoChoisie(null); setProfilVisite(null)
+                    setMessageProfil('Brouillon enregistré')
+                    setOnglet('profil')
                   }}
                 />
             : <Camera
@@ -71,13 +81,23 @@ function Application() {
               />
         )}
         {onglet === 'profil' && (
-          <Profil
-            pseudoVisite={profilVisite ?? undefined}
-            onRetour={() => {
-              setProfilVisite(null)
-              setOnglet('fil')
-            }}
-          />
+          brouillons
+            ? <Brouillons
+                onRetour={() => setBrouillons(false)}
+                onPublier={b => {
+                  setBrouillons(false); setVideoChoisie(b.url)
+                  setMontage(false); setOnglet('publier')
+                }}
+              />
+            : <Profil
+                pseudoVisite={profilVisite ?? undefined}
+                messageArrivee={messageProfil}
+                onBrouillons={() => setBrouillons(true)}
+                onRetour={() => {
+                  setProfilVisite(null)
+                  setOnglet('fil')
+                }}
+              />
         )}
       </div>
 
@@ -101,8 +121,8 @@ function Application() {
         <button
           className={onglet === 'profil' ? 'actif' : ''}
           onClick={() => {
-            setProfilVisite(null)
-            setOnglet('profil')
+            setProfilVisite(null); setMessageProfil(undefined)
+            setBrouillons(false); setOnglet('profil')
           }}
         >
           <Personne taille={26} plein={onglet === 'profil'} />

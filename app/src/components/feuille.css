@@ -1,0 +1,81 @@
+/* ============================================================
+   Feuilles de publication : la coquille commune.
+
+   L'echelle de tailles est celle de mobile/src/lib/theme.ts (`feuille`) :
+   titre 16.5, intro 12.5, entree 15, description 11.5, section 13.
+   Toute nouvelle feuille se cale dessus, jamais sur des nombres ecrits
+   a la main.
+   ============================================================ */
+
+.fle-fond {
+  position: fixed; inset: 0; z-index: 90;
+  background: rgba(0, 0, 0, .42);
+  display: flex; flex-direction: column; justify-content: flex-end;
+  color-scheme: light;
+}
+.fle-voile { flex: 1; width: 100%; }
+
+.fle-feuille {
+  background: #fff; color: #111;
+  border-radius: 16px 16px 0 0;
+  max-height: 72dvh;
+  display: flex; flex-direction: column;
+  animation: fle-monte .22s ease-out;
+}
+.fle-grise { background: #f4f4f5; }
+
+@keyframes fle-monte { from { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) { .fle-feuille { animation: none; } }
+
+.fle-entete {
+  position: relative; flex-shrink: 0;
+  min-height: 54px; display: grid; place-items: center;
+  padding: 0 16px;
+}
+.fle-entete h2 { font-size: 16.5px; font-weight: 700; margin: 0; text-align: center; }
+.fle-fermer {
+  position: absolute; right: 16px; top: 0; bottom: 0;
+  display: grid; place-items: center; color: #111; min-width: 32px;
+}
+.fle-cercle::before {
+  content: ''; position: absolute;
+  width: 27px; height: 27px; border-radius: 50%; background: #f1f1f2;
+}
+.fle-cercle svg { position: relative; }
+
+.fle-corps { overflow-y: auto; padding-bottom: 30px; }
+
+/* ---------- Lignes communes aux feuilles ---------- */
+
+.fle-ligne {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 13px 16px; text-align: left; color: #111;
+}
+.fle-ligne > svg { flex-shrink: 0; }
+.fle-ligne-corps { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.fle-ligne-titre { font-size: 15px; line-height: 20px; }
+.fle-ligne-detail { color: #8e8e93; font-size: 11.5px; line-height: 15px; }
+.fle-ligne-detail b { color: #111; font-weight: 700; }
+.fle-valeur { color: #9a9a9c; font-size: 13px; flex-shrink: 0; }
+
+/* Rond de choix a droite : plein et rouge pour l'entree retenue. */
+.fle-rond {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  border: 1.8px solid #d1d1d6; box-sizing: border-box;
+  display: grid; place-items: center;
+}
+.fle-rond-choisi { background: #ff2856; border-color: #ff2856; }
+.fle-rond-choisi::after {
+  content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff;
+}
+
+/* Blocs gris clair sous un titre de section (« Plus d'options »). */
+.fle-section { color: #8e8e93; font-size: 13px; padding: 15px 16px 8px; }
+.fle-bloc { background: #f7f7f8; border-radius: 12px; margin: 0 12px; }
+.fle-bloc .fle-ligne + .fle-ligne { border-top: 1px solid #ececed; }
+
+/* Paragraphe d'introduction (« Partager sur », « Choisir un departement »). */
+.fle-intro {
+  color: #8e8e93; font-size: 12.5px; line-height: 18px;
+  padding: 6px 16px 16px; margin: 0;
+}

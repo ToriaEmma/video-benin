@@ -122,3 +122,10 @@
 .profil-echec button{min-height:40px;padding:0 22px;border:1px solid var(--bordure);border-radius:20px;color:var(--texte);font-size:14px;font-weight:600;}
 /* Confirmation d'ouverture d'une conversation. */
 .profil-avis{margin:8px 16px 0;font-size:13px;color:var(--texte-attenue);text-align:center;}
+
+/* Tuile des brouillons : premiere case de la grille, chez soi seulement. */
+.prf-case-brouillons{padding:0;display:block;}
+.prf-brouillons-titre{position:absolute;left:8px;top:7px;color:#fff;font-size:15px;font-weight:600;text-shadow:0 0 4px rgba(0,0,0,.45);}
+
+/* Bandeau « Brouillon enregistré », a l'arrivee sur le profil. */
+.prf-toast{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(90,90,90,.92);color:#fff;border-radius:8px;padding:12px 20px;font-size:15px;font-weight:500;text-align:center;max-width:85%;pointer-events:none;z-index:40;margin:0;}

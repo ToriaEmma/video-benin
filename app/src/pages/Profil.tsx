@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  apiInteractions, apiMessagerie, apiVideos,
-  type ProfilDetaille, type VideoApi,
+  apiBrouillons, apiInteractions, apiMessagerie, apiVideos,
+  type BrouillonApi, type ProfilDetaille, type VideoApi,
 } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { poidsLisible } from '../lib/demo'
 import {
   Chevron, Cloche, Fleche, Crayon, Menu, AjoutPersonne,
   Grille, Cadenas, Coeur, Repartage, Studio, Lecture,
-  Plus,
+  Plus, Brouillon,
 } from '../components/Icones'
 import './profil.css'
 import MenuProfil from '../components/MenuProfil'
@@ -22,6 +23,10 @@ type Props = {
   // superieure, leurs boutons d'action et leurs onglets.
   pseudoVisite?: string
   onRetour?: () => void
+  // Message affiche brievement en arrivant, apres un enregistrement.
+  messageArrivee?: string
+  // Ouvre la page qui liste les brouillons.
+  onBrouillons?: () => void
 }
 
 const abreger = (n: number) =>
@@ -29,9 +34,20 @@ const abreger = (n: number) =>
   : n >= 1_000 ? `${(n / 1_000).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} K`
   : String(n)
 
-export default function Profil({ pseudoVisite, onRetour }: Props) {
+export default function Profil({
+  pseudoVisite, onRetour, messageArrivee, onBrouillons,
+}: Props) {
   const { profil, deconnecter } = useAuth()
   const monProfil = !pseudoVisite || pseudoVisite === profil?.pseudo
+
+  // Le bandeau gris « Brouillon enregistré » s'efface au bout de 2 secondes.
+  const [efface, setEfface] = useState(false)
+  useEffect(() => {
+    if (!messageArrivee) return
+    const minuterie = setTimeout(() => setEfface(true), 2000)
+    return () => clearTimeout(minuterie)
+  }, [messageArrivee])
+  const message = efface ? undefined : messageArrivee
 
   const [videos, setVideos] = useState<VideoApi[]>([])
   const [entete, setEntete] = useState<ProfilDetaille | null>(null)
@@ -96,6 +112,22 @@ export default function Profil({ pseudoVisite, onRetour }: Props) {
       .finally(() => { if (valable) setChargementOnglet(false) })
     return () => { valable = false }
   }, [monProfil, onglet, repriseOnglet])
+
+  // Les brouillons sont prives : on ne les demande que sur son profil.
+  const [brouillons, setBrouillons] = useState<BrouillonApi[]>([])
+  useEffect(() => {
+    if (!monProfil || onglet !== 'videos') return
+    let valable = true
+    apiBrouillons.liste()
+      .then(b => { if (valable) setBrouillons(b) })
+      .catch(() => { /* Brouillons indisponibles : la tuile reste absente. */ })
+    return () => { valable = false }
+  }, [monProfil, onglet, reprise])
+
+  // L'onglet « videos » de son propre profil est le seul a montrer la
+  // tuile des brouillons, en tete de grille.
+  const tuileBrouillons = monProfil && onglet === 'videos' ? brouillons : []
+  const poidsBrouillons = tuileBrouillons.reduce((t, b) => t + b.octets, 0)
 
   // Le total des j'aime recus se somme sur les publications affichees : le
   // serveur ne renvoie pas d'agregat par compte.
@@ -313,10 +345,23 @@ export default function Profil({ pseudoVisite, onRetour }: Props) {
           <p role="alert">{erreurOnglet}</p>
           <button onClick={() => setRepriseOnglet(n => n + 1)}>Réessayer</button>
         </div>
-      ) : grille.length === 0 ? (
+      ) : grille.length === 0 && tuileBrouillons.length === 0 ? (
         <p className="profil-etat">{videsOnglet}</p>
       ) : (
         <div className="grille">
+          {/* La tuile des brouillons occupe la premiere case, devant les
+              videos : c'est de la qu'on atteint la liste des brouillons. */}
+          {tuileBrouillons.length > 0 && (
+            <button className="case prf-case-brouillons" onClick={onBrouillons}>
+              <video src={tuileBrouillons[0].url} preload="metadata" muted playsInline />
+              <span className="prf-brouillons-titre">
+                Brouillons: {tuileBrouillons.length}
+              </span>
+              <span className="vues">
+                <Brouillon taille={12} /> {poidsLisible(poidsBrouillons)}
+              </span>
+            </button>
+          )}
           {grille.map((v) => (
             <div className="case" key={v.id}
               onClick={() => { if (supprimable) supprimer(v.id) }}>
@@ -326,6 +371,8 @@ export default function Profil({ pseudoVisite, onRetour }: Props) {
           ))}
         </div>
       )}
+
+      {!!message && <p className="prf-toast">{message}</p>}
 
       {supprimable && grille.length > 0 && (
         <p style={{ fontSize: 12, color: 'var(--texte-attenue)', marginTop: 12, textAlign: 'center' }}>

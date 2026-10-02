@@ -1,0 +1,27 @@
+/* ============================================================
+   Les quatre feuilles de publication : ce qui leur est propre.
+   Les lignes, blocs et ronds communs sont dans components/feuille.css.
+   ============================================================ */
+
+/* « Ajouter un lien » : une seule entree, avec sa vignette rouge. */
+.fpu-lien {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 8px 16px; text-align: left; color: #111;
+}
+.fpu-lien b { font-size: 15px; font-weight: 700; }
+
+/* « Qui peut voir » : espace avant la premiere ligne. */
+.fpu-haut { height: 10px; }
+.fpu-amis-detail { display: flex; align-items: center; gap: 3px; }
+.fpu-amis-detail svg { flex-shrink: 0; color: #9a9a9c; }
+
+/* « Partager sur » : les applications sur fond blanc, par-dessus le gris. */
+.fpu-bloc-blanc {
+  background: #fff; border-radius: 14px; margin: 0 12px; padding: 0 4px;
+}
+.fpu-partage {
+  display: flex; align-items: center; gap: 14px;
+  width: 100%; padding: 14px 12px; text-align: left; color: #111;
+}
+.fpu-partage + .fpu-partage { border-top: 1px solid #f0f0f1; }
+.fpu-partage b { flex: 1; font-size: 15px; font-weight: 700; }

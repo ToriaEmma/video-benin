@@ -146,8 +146,10 @@ export default function Brouillons({ onRetour, onPublier }: {
       </header>
 
       <h1 className="brl-titre">
-        {brouillons.length} brouillon{brouillons.length > 1 ? 's' : ''}
-        {' · '}{poidsLisible(poidsTotal)}
+        {chargement ? 'Chargement…' : <>
+          {brouillons.length} brouillon{brouillons.length > 1 ? 's' : ''}
+          {' · '}{poidsLisible(poidsTotal)}
+        </>}
       </h1>
 
       <div className="brl-filtres">

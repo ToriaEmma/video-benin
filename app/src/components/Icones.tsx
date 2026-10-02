@@ -887,3 +887,169 @@ export const Appareil = ({ taille = 21 }: Props) => (
 export const CocheChoix = ({ taille = 20 }: Props) => (
   <svg {...base(taille)} strokeWidth={2.2}><path d="m4.5 12.6 4.8 5L19.5 6.6" /></svg>
 )
+
+/* ---------- Ecran de publication et ses feuilles ---------- */
+
+// Ajouter un lien : un carre au signe plus.
+export const PubLien = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="3" width="18" height="18" rx="3" />
+    <path d="M12 8v8m-4-4h8" />
+  </svg>
+)
+
+// Globe : « Tout le monde peut voir cette publication ».
+export const PubMonde = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="12" cy="12" r="9.5" />
+    <path d="M2.5 12h19M12 2.5c2.5 3 2.5 16 0 19M12 2.5c-2.5 3-2.5 16 0 19" />
+  </svg>
+)
+
+// Roue crantee : « Plus d'options ».
+export const PubOptions = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v3m0 14v3M2 12h3m14 0h3M5 5l2 2m10 10 2 2M19 5l-2 2M7 17l-2 2" />
+  </svg>
+)
+
+// Fleche montante cerclee : le bouton « Publier ».
+export const PubPublier = ({ taille = 20 }: Props) => (
+  <svg {...base(taille)} strokeWidth={2}>
+    <circle cx="12" cy="12" r="9.5" />
+    <path d="M12 16V8m-3.5 3.5L12 8l3.5 3.5" />
+  </svg>
+)
+
+// Epingle de lieu : le departement de tournage.
+export const PubLieu = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M12 21.3s7-6.5 7-11.3a7 7 0 1 0-14 0c0 4.8 7 11.3 7 11.3Z" />
+    <circle cx="12" cy="10" r="2.6" />
+  </svg>
+)
+
+// Vignette rouge de « LIVE Events », dans la feuille « Ajouter un lien ».
+export const LiveEvents = ({ taille = 33 }: Props) => (
+  <svg width={taille} height={taille} viewBox="0 0 24 24" aria-hidden>
+    <rect x="2" y="2" width="20" height="20" rx="6" fill="#ff2856" />
+    <path d="m12 6.4 1.76 3.57 3.94.57-2.85 2.78.67 3.92L12 15.4l-3.52 1.85.67-3.92L6.3 10.54l3.94-.57Z"
+      fill="#fff" />
+  </svg>
+)
+
+// Silhouette avec deux fleches : l'audience « Ami(e)s ».
+export const Amies = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <circle cx="9" cy="7" r="3.4" />
+    <path d="M3 20v-1.2c0-2.8 2.7-4.3 6-4.3h.6" />
+    <path d="M14 16.2h6.5l-2-2M20.5 20H14l2-2" />
+  </svg>
+)
+
+// Bulle : « Autoriser les commentaires ».
+export const PubCommentaire = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M4 4h16a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H9l-5 4V5a1 1 0 0 1 1-1Z" />
+  </svg>
+)
+
+// Cadre scinde : « Autoriser la réutilisation du contenu ».
+export const PubReutilisation = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="4.5" width="18" height="15" rx="3" />
+    <path d="M15 4.5v15" />
+    <path d="m8.2 9.8 3.4 2.2-3.4 2.2Z" fill="currentColor" />
+    <path d="M18 9.6v4.8m-2.4-2.4h4.8" />
+  </svg>
+)
+
+// Deux etincelles : « Contenu généré par IA ».
+export const PubIA = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M11 3.5 12.6 8 17 9.6 12.6 11.2 11 15.6 9.4 11.2 5 9.6 9.4 8Z" />
+    <path d="M17.5 14.5 18.3 16.7 20.5 17.5 18.3 18.3 17.5 20.5 16.7 18.3 14.5 17.5 16.7 16.7Z" />
+  </svg>
+)
+
+// Mallette etoilee : « Divulgation de contenu et publicités ».
+export const PubDivulgation = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M3 7.5h18v11a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z" />
+    <path d="M6 7.5V5.5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2" />
+    <path d="m12 10.6 1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3Z"
+      fill="currentColor" stroke="none" />
+  </svg>
+)
+
+// Note de musique a la loupe : la verification des droits d'auteur du son.
+export const PubDroitsSon = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M8 15.5V4.8l7-1.3v8.2" />
+    <circle cx="5.8" cy="16" r="2.3" />
+    <circle cx="16" cy="16.6" r="3.1" />
+    <path d="m18.3 18.9 2.2 2.2" />
+  </svg>
+)
+
+// Cadre de visee : « Autoriser la recherche visuelle ».
+export const PubRechercheVisuelle = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M3 8.5V5.5a2.5 2.5 0 0 1 2.5-2.5h3M15.5 3h3A2.5 2.5 0 0 1 21 5.5v3M21 15.5v3a2.5 2.5 0 0 1-2.5 2.5h-3M8.5 21h-3A2.5 2.5 0 0 1 3 18.5v-3" />
+    <circle cx="12" cy="12" r="3.2" />
+  </svg>
+)
+
+// Ecran de lecture etoile : « Autoriser les importations de haute qualité ».
+export const PubHauteQualite = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="4" width="18" height="16" rx="3" />
+    <path d="m8 9.5 4 2.5-4 2.5Z" fill="currentColor" />
+    <path d="M18 3.5 18.7 5.8 21 6.5 18.7 7.2 18 9.5 17.3 7.2 15 6.5 17.3 5.8Z"
+      fill="currentColor" stroke="none" />
+  </svg>
+)
+
+// Fleche descendante encadree : « Enregistrer sur l'appareil ».
+export const PubTelecharger = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="3" width="18" height="18" rx="4" />
+    <path d="M12 7v8m-3.2-3.2L12 15l3.2-3.2M8 17.5h8" />
+  </svg>
+)
+
+// Note dans un cadre : « Enregistrer les publications avec filigrane ».
+export const PubFiligrane = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="3" width="18" height="18" rx="5" />
+    <path d="M11.2 15.4V7.6l4 1" />
+    <circle cx="9.4" cy="15.6" r="1.9" />
+  </svg>
+)
+
+// « A » encadre : « Sélectionner la langue de la vidéo ».
+export const PubLangue = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <rect x="3" y="3" width="18" height="18" rx="4" />
+    <path d="M8.5 16 12 7.5 15.5 16M9.8 13.4h4.4" />
+  </svg>
+)
+
+// Oeil barre : « Contrôles du public ».
+export const PubOeilBarre = ({ taille = 22 }: Props) => (
+  <svg {...base(taille)}>
+    <path d="M9.6 5.4A9.6 9.6 0 0 1 12 5.1c5.5 0 9 5.9 9 5.9a16 16 0 0 1-2.6 3.3" />
+    <path d="M15.5 14.8A4.5 4.5 0 0 1 12 16.9c-5.5 0-9-5.9-9-5.9a16 16 0 0 1 4.2-4.5" />
+    <path d="M10.4 9.4a2.8 2.8 0 0 0 3.3 3.3" />
+    <path d="M4.5 19.5 19.5 4.5" />
+  </svg>
+)
+
+// Pastille de marque, comme LogoWhatsApp : couleurs propres, hors currentColor.
+export const LogoFacebook = ({ taille = 33 }: Props) => (
+  <svg width={taille} height={taille} viewBox="0 0 48 48" aria-hidden>
+    <circle cx="24" cy="24" r="24" fill="#1877f2" />
+    <path fill="#fff" d="M30.9 30.9 32 24h-6.6v-4.5c0-1.9.9-3.7 3.9-3.7H32v-5.9a36.6 36.6 0 0 0-5.3-.5c-5.4 0-9 3.3-9 9.2V24h-6v6.9h6V47a24 24 0 0 0 7.6 0V30.9Z" />
+  </svg>
+)

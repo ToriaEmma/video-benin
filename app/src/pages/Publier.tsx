@@ -1,88 +1,76 @@
-import { useRef, useState } from 'react'
+// ============================================================
+// Ecran de publication : description a gauche, apercu a droite, puis
+// la liste des reglages et le pied « Brouillons / Publier ».
+//
+// Jumeau de mobile/src/ecrans/Publier.tsx : memes lignes, meme ordre,
+// memes libelles. Les cinq feuilles vivent dans FeuillesPublication.tsx.
+// ============================================================
+
+import { useState } from 'react'
 import {
   apiBrouillons, apiVideos, televerser, fichierDepuisUrl,
-  type BrouillonApi,
+  type NouvelleVideo,
 } from '../lib/api'
-import { useAuth } from '../lib/auth'
-import { Camera } from '../components/Icones'
-import CreationCamera from '../components/CreationCamera'
 import Couverture from './Couverture'
-import Brouillons from './Brouillons'
+import {
+  FeuilleLien, FeuilleAudience, FeuilleOptions, FeuillePartage,
+  FeuilleDepartement,
+} from './FeuillesPublication'
+import {
+  AUDIENCES, OPTIONS_PAR_DEFAUT,
+  type Audience, type Options, type Application, type Departement,
+} from '../lib/publication'
+import {
+  Chevron, ChevronDroit, Brouillon,
+  PubLien, PubMonde, PubOptions, PubPublier, MontagePartage, PubLieu,
+} from '../components/Icones'
+import './publier.css'
 
-const TAILLE_MAX = 50 * 1024 * 1024 // 50 Mo
-const DUREE_MAX = 90 // secondes
+// L'ecran parle d'audience, l'API de visibilite : « tous » y devient
+// « monde », les deux autres valeurs portent le meme nom.
+const VISIBILITES: Record<Audience, NonNullable<NouvelleVideo['visibilite']>> = {
+  tous: 'monde',
+  amis: 'amis',
+  moi: 'moi',
+}
 
-const DEPARTEMENTS = [
-  'Alibori', 'Atacora', 'Atlantique', 'Borgou', 'Collines', 'Couffo',
-  'Donga', 'Littoral', 'Mono', 'Ouémé', 'Plateau', 'Zou',
-]
-
-export default function Publier({ onPublie, onFermer, urlInitiale }: {
+export default function Publier({ onPublie, onAnnuler, onBrouillon, urlInitiale }: {
   onPublie: () => void
-  onFermer: () => void
-  // Video arrivant du montage : elle existe deja en blob, il n'y a donc plus
-  // de fichier a choisir et le formulaire s'ouvre directement.
-  urlInitiale?: string
+  // Retour a l'ecran de tournage, sans rien enregistrer.
+  onAnnuler: () => void
+  // Brouillon enregistre : la page appelante bascule sur le profil.
+  onBrouillon?: () => void
+  // Video arrivant du montage : elle existe deja en blob local.
+  urlInitiale: string
 }) {
-  const { session } = useAuth()
-  const champFichier = useRef<HTMLInputElement>(null)
-  const [fichier, setFichier] = useState<File | null>(null)
-  const [apercu, setApercu] = useState(urlInitiale ?? '')
-  // Editeur de couverture, ouvert depuis l'apercu.
-  const [couverture, setCouverture] = useState(false)
-  // Grille des brouillons, atteinte depuis l'ecran de tournage : le profil
-  // ne propose pas encore de tuile.
-  const [brouillons, setBrouillons] = useState(false)
   const [legende, setLegende] = useState('')
-  const [departement, setDepartement] = useState('Littoral')
-  const [progression, setProgression] = useState(0)
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState('')
-  // Etape en cours, affichee pendant l'envoi : un ecran figé pendant le
-  // televersement d'une video laisse croire a une panne.
+  // Libelle de l'etape en cours : le televersement d'une video peut durer
+  // sur un reseau mobile, et un bouton muet laisse croire a un blocage.
   const [etape, setEtape] = useState('')
+  const [progression, setProgression] = useState(0)
+  const [couverture, setCouverture] = useState(false)
+  // Feuille ouverte depuis la liste d'options, s'il y en a une.
+  const [feuille, setFeuille] =
+    useState<'lien' | 'audience' | 'departement' | 'options' | 'partage' | null>(null)
+  // Applications vers lesquelles relayer la publication, une fois publiee.
+  const [partages, setPartages] = useState<Application[]>([])
+  const [audience, setAudience] = useState<Audience>('tous')
+  // Departement du Benin ou la video a ete filmee, pre-rempli sur « Littoral ».
+  const [departement, setDepartement] = useState<Departement>('Littoral')
+  const [options, setOptions] = useState<Options>(OPTIONS_PAR_DEFAUT)
 
-  const choisir = (f: File | null) => {
-    setErreur('')
-    if (!f) return
-
-    if (!f.type.startsWith('video/')) return setErreur('Choisissez un fichier vidéo')
-    if (f.size > TAILLE_MAX)
-      return setErreur(`Vidéo trop lourde (${Math.round(f.size / 1024 / 1024)} Mo). Maximum 50 Mo.`)
-
-    // La duree est verifiee sur les metadonnees avant tout envoi : rejeter
-    // apres un televersement de 50 Mo gaspillerait le forfait de l'utilisateur.
-    const url = URL.createObjectURL(f)
-    const v = document.createElement('video')
-    v.preload = 'metadata'
-    v.onloadedmetadata = () => {
-      if (v.duration > DUREE_MAX) {
-        setErreur(`Vidéo trop longue (${Math.round(v.duration)} s). Maximum ${DUREE_MAX} s.`)
-        URL.revokeObjectURL(url)
-        return
-      }
-      setFichier(f)
-      setApercu(url)
-    }
-    v.onerror = () => {
-      setErreur('Fichier vidéo illisible')
-      URL.revokeObjectURL(url)
-    }
-    v.src = url
-  }
-
-  // Le fichier part vers le stockage avant l'enregistrement : une video
-  // ne doit jamais etre publiee sur une adresse locale, illisible
-  // ailleurs que dans cet onglet.
+  // La video est televersee avant l'enregistrement : publier l'adresse
+  // locale ne donnerait une video lisible que dans cet onglet.
   const publier = async () => {
-    if ((!fichier && !apercu) || !session) return
+    if (envoi) return
     setEnvoi(true)
     setErreur('')
     setProgression(0)
     setEtape('Envoi de la vidéo…')
-
     try {
-      const aEnvoyer = fichier ?? await fichierDepuisUrl(apercu)
+      const aEnvoyer = await fichierDepuisUrl(urlInitiale)
       const url = await televerser(aEnvoyer, setProgression)
 
       setEtape('Publication…')
@@ -90,15 +78,17 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
         url,
         legende: legende.trim(),
         departement,
+        visibilite: VISIBILITES[audience],
+        // Les deux premiers interrupteurs de « Plus d'options » sont les
+        // seuls que l'API connaisse ; les autres restent locaux a l'ecran.
+        commentaires_autorises: options.commentaires,
+        reutilisation_autorisee: options.reutilisation,
       })
-      setProgression(100)
-      setFichier(null)
-      setApercu('')
       setLegende('')
       onPublie()
     } catch (e) {
-      // L'echec est annonce tel quel et aucune video n'est creee : mieux
-      // vaut pas de publication qu'une publication illisible.
+      // Aucune video n'est creee si l'envoi echoue : la raison reelle est
+      // montree telle quelle.
       setErreur(e instanceof Error ? e.message : "L'envoi a échoué")
       setProgression(0)
     } finally {
@@ -107,23 +97,23 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
     }
   }
 
-  // Mise de cote : la video rejoint les brouillons du compte, avec son
-  // poids quand le fichier est connu.
+  // « Brouillons » : la video est mise de cote avec sa description, puis
+  // on repart sur le profil ou la tuile des brouillons l'affiche.
   const enregistrerBrouillon = async () => {
-    if (!apercu || envoi) return
+    if (envoi) return
     setEnvoi(true)
     setErreur('')
+    setProgression(0)
     setEtape('Envoi de la vidéo…')
     try {
-      // Un brouillon porte aussi un fichier : il doit survivre a la
-      // fermeture de l'onglet pour etre repris plus tard.
-      const aEnvoyer = fichier ?? await fichierDepuisUrl(apercu)
+      // Un brouillon porte lui aussi un fichier : sans televersement il
+      // serait perdu a la fermeture de l'onglet.
+      const aEnvoyer = await fichierDepuisUrl(urlInitiale)
       const url = await televerser(aEnvoyer, setProgression)
       await apiBrouillons.creer(url, legende.trim(), aEnvoyer.size)
-      setFichier(null)
-      setApercu('')
       setLegende('')
-      setBrouillons(true)
+      if (onBrouillon) onBrouillon()
+      else onAnnuler()
     } catch (e) {
       setErreur(e instanceof Error ? e.message : "L'enregistrement a échoué")
     } finally {
@@ -133,115 +123,104 @@ export default function Publier({ onPublie, onFermer, urlInitiale }: {
     }
   }
 
-  const reprendre = (b: BrouillonApi) => {
-    setApercu(b.url)
-    setLegende(b.legende)
-    setBrouillons(false)
-  }
-
-  if (brouillons) return <Brouillons onRetour={() => setBrouillons(false)}
-    onPublier={reprendre} />
-  if (couverture) return <Couverture url={apercu}
+  if (couverture) return <Couverture url={urlInitiale}
     onAnnuler={() => setCouverture(false)}
     onEnregistrer={() => setCouverture(false)} />
-  // Le nombre de brouillons n'est plus affiche ici : il faudrait une
-  // requete pour un simple libelle, la grille le compte elle-meme.
-  if (!fichier && !urlInitiale && !apercu) return <><CreationCamera onChoisir={choisir} onFermer={onFermer}/><button className="pub-brouillons" onClick={() => setBrouillons(true)}>Brouillons</button>{erreur && <p role="alert" style={{position:'absolute',bottom:100,left:20,right:20,background:'#111',color:'white',padding:12,zIndex:5}}>{erreur}</p>}</>
+
   return (
-    <div className="page">
-      <h1 className="titre">Publier une vidéo</h1>
-      <p className="sous-titre">90 secondes maximum, 50 Mo maximum</p>
+    <section className="pub-page">
+      <div className="pub-corps">
+        <button className="pub-retour" aria-label="Retour" onClick={onAnnuler}>
+          <Chevron taille={24} />
+        </button>
 
-      {erreur && <div className="erreur">{erreur}</div>}
-
-      <input
-        ref={champFichier}
-        type="file"
-        accept="video/*"
-        capture="environment"
-        hidden
-        onChange={(e) => choisir(e.target.files?.[0] ?? null)}
-      />
-
-      {!apercu ? (
-        <div className="depot" onClick={() => champFichier.current?.click()}>
-          <span className="glyphe"><Camera taille={42} /></span>
-          <b>Choisir ou filmer une vidéo</b>
-          <div style={{ fontSize: 13, marginTop: 6 }}>
-            Appuyez ici pour ouvrir la caméra ou la galerie
+        {/* Description a gauche, apercu de la video a droite */}
+        <div className="pub-entete">
+          <textarea className="pub-description" maxLength={2200}
+            placeholder="Ajouter une description…" aria-label="Description"
+            value={legende} onChange={e => setLegende(e.target.value)} />
+          <div className="pub-apercu">
+            <video src={urlInitiale} muted loop autoPlay playsInline />
+            <span className="pub-apercu-titre">Aperçu</span>
+            <button className="pub-couverture" onClick={() => setCouverture(true)}>
+              Modifier la couverture
+            </button>
           </div>
         </div>
-      ) : (
-        <>
-          <video className="apercu" src={apercu} controls playsInline />
-          <button className="bouton secondaire" style={{ marginTop: 10 }}
-            onClick={() => setCouverture(true)}>Modifier la couverture</button>
-        </>
-      )}
 
-      {apercu && (
-        <>
-          <div className="champ">
-            <label htmlFor="legende">Légende</label>
-            <textarea
-              id="legende"
-              rows={3}
-              maxLength={150}
-              placeholder="Décrivez votre vidéo…"
-              value={legende}
-              onChange={(e) => setLegende(e.target.value)}
-            />
-            <div style={{ fontSize: 12, color: 'var(--texte-attenue)', textAlign: 'right' }}>
-              {legende.length}/150
-            </div>
-          </div>
+        <div className="pub-etiquettes">
+          <button onClick={() => setLegende(l => l + '#')}># Hashtags</button>
+          <button onClick={() => setLegende(l => l + '@')}>@ Mention</button>
+        </div>
 
-          <div className="champ">
-            <label htmlFor="dep">Département</label>
-            <select
-              id="dep"
-              value={departement}
-              onChange={(e) => setDepartement(e.target.value)}
-              style={{
-                width: '100%', background: 'var(--surface)', color: 'var(--texte)',
-                border: '1px solid var(--bordure)', borderRadius: 10, padding: 14, fontSize: 16,
-              }}
-            >
-              {DEPARTEMENTS.map((d) => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
+        <hr className="pub-separateur" />
 
-          {envoi && (
-            <div className="barre-progression">
-              <div style={{ width: `${progression}%` }} />
-            </div>
-          )}
+        <button className="pub-ligne" onClick={() => setFeuille('lien')}>
+          <PubLien taille={22} />
+          <span className="pub-ligne-texte">Ajouter un lien</span>
+          <ChevronDroit taille={18} />
+        </button>
 
-          <button className="bouton" onClick={publier} disabled={envoi}>
-            {envoi ? `${etape} ${progression}%` : 'Publier'}
+        <button className="pub-ligne" onClick={() => setFeuille('audience')}>
+          <PubMonde taille={22} />
+          <span className="pub-ligne-texte">{AUDIENCES[audience]}</span>
+          <ChevronDroit taille={18} />
+        </button>
+
+        <button className="pub-ligne" onClick={() => setFeuille('departement')}>
+          <PubLieu taille={22} />
+          <span className="pub-ligne-texte">Département</span>
+          <span className="pub-ligne-valeur">{departement}</span>
+          <ChevronDroit taille={18} />
+        </button>
+
+        <button className="pub-ligne" onClick={() => setFeuille('options')}>
+          <PubOptions taille={22} />
+          <span className="pub-ligne-texte">Plus d&apos;options</span>
+          <ChevronDroit taille={18} />
+        </button>
+
+        <button className="pub-ligne" onClick={() => setFeuille('partage')}>
+          <MontagePartage taille={22} />
+          <span className="pub-ligne-texte">Partager sur</span>
+          <ChevronDroit taille={18} />
+        </button>
+
+        {erreur && <p className="pub-erreur" role="alert">{erreur}</p>}
+      </div>
+
+      <footer className="pub-pied">
+        {envoi && (
+          <div className="pub-progression"><div style={{ width: `${progression}%` }} /></div>
+        )}
+        <div className="pub-boutons">
+          <button className="pub-brouillons" disabled={envoi}
+            onClick={enregistrerBrouillon}>
+            <Brouillon taille={20} />
+            <span>Brouillons</span>
           </button>
-
-          <button className="bouton secondaire" style={{ marginTop: 10 }}
-            disabled={envoi} onClick={enregistrerBrouillon}>
-            Enregistrer en brouillon
+          <button className="pub-publier" disabled={envoi} onClick={publier}>
+            {envoi ? <span>{etape || 'Envoi…'}</span> : <>
+              <PubPublier taille={20} />
+              <span>Publier</span>
+            </>}
           </button>
+        </div>
+      </footer>
 
-          <button
-            className="bouton secondaire"
-            style={{ marginTop: 10 }}
-            disabled={envoi}
-            onClick={() => {
-              setFichier(null)
-              setApercu('')
-              setErreur('')
-            }}
-          >
-            Choisir une autre vidéo
-          </button>
-        </>
-      )}
-    </div>
+      <FeuilleLien visible={feuille === 'lien'} onFermer={() => setFeuille(null)} />
+      <FeuilleAudience visible={feuille === 'audience'} audience={audience}
+        onChoisir={a => { setAudience(a); setFeuille(null) }}
+        onFermer={() => setFeuille(null)} />
+      <FeuilleDepartement visible={feuille === 'departement'} departement={departement}
+        onChoisir={d => { setDepartement(d); setFeuille(null) }}
+        onFermer={() => setFeuille(null)} />
+      <FeuilleOptions visible={feuille === 'options'} options={options}
+        onChange={setOptions} onFermer={() => setFeuille(null)} />
+      <FeuillePartage visible={feuille === 'partage'} choisies={partages}
+        onBasculer={a => setPartages(l =>
+          l.includes(a) ? l.filter(x => x !== a) : [...l, a])}
+        onFermer={() => setFeuille(null)} />
+    </section>
   )
 }
