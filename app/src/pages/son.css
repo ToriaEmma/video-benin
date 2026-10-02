@@ -41,9 +41,15 @@
 .son-ligne.actif .son-titre-ligne b{color:#ff2856;}
 .son-meta{font-size:12.5px;color:#9a9a9c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .son-licence{font-size:11px;color:#b4b4b6;}
+.son-chargement{font-size:11.5px;color:#9a9a9c;}
+.son-echec{font-size:11.5px;color:#ff2856;}
+
+/* Rouet d'attente, dans la pochette du son en cours de chargement. */
+.son-rouet{width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;animation:son-rotation .7s linear infinite;}
+@keyframes son-rotation{to{transform:rotate(360deg);}}
 
 .son-actions{display:flex;align-items:center;gap:18px;flex-shrink:0;color:#111;}
 .son-actions button{display:grid;place-items:center;min-width:32px;min-height:40px;}
 .son-feuille button:focus-visible{outline:2px solid #555;outline-offset:2px;}
 
-@media(prefers-reduced-motion:reduce){.son-feuille{transition:none;}}
+@media(prefers-reduced-motion:reduce){.son-feuille{transition:none;}.son-rouet{animation-duration:2.4s;}}

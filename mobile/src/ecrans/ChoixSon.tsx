@@ -3,12 +3,12 @@
 // se deploie quand on tire la poignee vers le haut.
 // ============================================================
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, FlatList, Modal, Animated, PanResponder,
-  useWindowDimensions, ScrollView,
+  useWindowDimensions, ScrollView, ActivityIndicator,
 } from 'react-native'
-import { useAudioPlayer } from 'expo-audio'
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { Text } from '../composants/Texte'
 import {
   Loupe, Egaliseur, Ciseaux, MarquePage,
@@ -19,28 +19,42 @@ import {
 
 const ONGLETS = ['Populaire', 'Pour toi', 'Favoris', 'Récents']
 
+// archive.org met souvent plus de trois secondes a repondre : au-dela de
+// ce delai sans son audible, mieux vaut l'avouer que laisser le silence.
+const DELAI_ABANDON = 12000
+
+type Etat = 'chargement' | 'lecture' | 'echec'
+
 // Une ligne de son : pochette, titre, auteur et compteurs.
-function Ligne({ son, choisi, rang, favori, onChoisir, onFavori }: {
+function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori }: {
   son: Son
   choisi: boolean
+  // Etat de l'apercu du son retenu, pour cette ligne seulement.
+  etat: Etat
   // Numero affiche dans l'onglet « Populaire ».
   rang?: number
   favori: boolean
   onChoisir: () => void
   onFavori: () => void
 }) {
+  const charge = choisi && etat === 'chargement'
+  const echoue = choisi && etat === 'echec'
+
   return (
     <Pressable style={[s.ligne, choisi && s.ligneChoisie]} onPress={onChoisir}>
       {rang != null && <Text style={s.rang}>{rang}</Text>}
 
       <View style={[s.pochette, { backgroundColor: son.couleur },
         choisi && s.pochetteChoisie]}>
-        <Text style={s.pochetteLettre}>{son.titre.charAt(0).toUpperCase()}</Text>
+        {charge
+          ? <ActivityIndicator size="small" color="#fff" />
+          : <Text style={s.pochetteLettre}>{son.titre.charAt(0).toUpperCase()}</Text>}
       </View>
 
       <View style={s.ligneCorps}>
         <View style={s.ligneTitreGroupe}>
-          {choisi && <Egaliseur taille={15} />}
+          {/* L'egaliseur ne s'anime qu'une fois le son vraiment audible. */}
+          {choisi && etat === 'lecture' && <Egaliseur taille={15} />}
           <Text style={[s.titre, choisi && s.titreChoisi]} numberOfLines={1}>
             {son.titre}
           </Text>
@@ -49,7 +63,9 @@ function Ligne({ son, choisi, rang, favori, onChoisir, onFavori }: {
           {son.artiste} · {abregerPublications(son.publications)} publications
           {' · '}{dureeLisible(son.duree)}
         </Text>
-        {choisi && <Text style={s.licence}>{son.licence}</Text>}
+        {charge && <Text style={s.chargement}>Chargement…</Text>}
+        {echoue && <Text style={s.echec}>{'Ce son n’a pas pu être chargé'}</Text>}
+        {choisi && !charge && !echoue && <Text style={s.licence}>{son.licence}</Text>}
       </View>
 
       {/* Les deux actions n'apparaissent que sur le son retenu. */}
@@ -113,17 +129,52 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
   const [choisi, setChoisi] = useState<string | null>(SONS[0].id)
   const [favoris, setFavoris] = useState<string[]>([])
 
-  // Le son retenu se joue en boucle, comme sur la plateforme.
+  // Apercu du son retenu. Les pistes du catalogue depassent la minute et
+  // demie : la boucle est inutile pour un apercu, et la muter ici serait
+  // modifier la valeur rendue par le hook.
   const son = SONS.find(x => x.id === choisi)
+  // `downloadFirst` est laisse a faux : attendre le fichier entier rendrait
+  // l'apercu muet le temps du telechargement, ce qui est le defaut corrige ici.
   const lecteur = useAudioPlayer(son ? { uri: son.url } : null)
+  const statut = useAudioPlayerStatus(lecteur)
+
+  // Un son qui tarde trop est declare injouable : c'est le seul etat que
+  // le statut du lecteur ne donne pas de lui-meme.
+  const [abandonne, setAbandonne] = useState<string | null>(null)
+
+  // L'etat vient du lecteur plutot que d'un setState a l'appui : lui seul
+  // sait quand le son devient reellement audible.
+  const etat: Etat = abandonne === choisi ? 'echec'
+    : statut.playing ? 'lecture'
+    : 'chargement'
+
+  // Relance la lecture a chaque changement de son, et coupe tout quand la
+  // feuille se referme : un son qui continue sans la feuille est pire que rien.
+  useEffect(() => {
+    if (!visible || !son) {
+      lecteur.pause()
+      return
+    }
+    lecteur.play()
+    return () => { lecteur.pause() }
+  }, [visible, son, lecteur])
+
+  // Le compte a rebours repart avec chaque son retenu. Il couvre aussi le
+  // cas d'une lecture refusee d'emblee : dans les deux cas rien n'est audible.
+  useEffect(() => {
+    if (!visible || !son || statut.playing) return
+    const minuteur = setTimeout(() => setAbandonne(son.id), DELAI_ABANDON)
+    return () => clearTimeout(minuteur)
+  }, [visible, son, statut.playing])
 
   const retenir = (x: Son) => {
     if (choisi === x.id) {
-      // Second appui : on valide et on referme.
+      // Second appui : on valide et on referme, sauf si rien ne s'est joue.
+      if (etat === 'echec') return
       onChoisir(x); onFermer(); return
     }
+    setAbandonne(null)
     setChoisi(x.id)
-    try { lecteur.play() } catch { /* Son illisible : silence. */ }
   }
 
   const basculerFavori = (id: string) => setFavoris(l =>
@@ -192,7 +243,7 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
               </Text>
             }
             renderItem={({ item, index }) => (
-              <Ligne son={item} choisi={choisi === item.id}
+              <Ligne son={item} choisi={choisi === item.id} etat={etat}
                 rang={onglet === 'Populaire' ? index + 1 : undefined}
                 favori={favoris.includes(item.id)}
                 onChoisir={() => retenir(item)}
@@ -252,6 +303,8 @@ const s = StyleSheet.create({
   titreChoisi: { color: '#ff2856' },
   meta: { fontSize: 12.5, color: '#9a9a9c' },
   licence: { fontSize: 11, color: '#b4b4b6' },
+  chargement: { fontSize: 11.5, color: '#9a9a9c' },
+  echec: { fontSize: 11.5, color: '#ff2856' },
 
   actions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
 })

@@ -8,6 +8,11 @@
 //
 // Pour ajouter une piste : verifier sa licence sur archive.org,
 // puis relever l'URL de son fichier .mp3 sous /download/.
+//
+// Garder les fichiers legers (1 a 3 Mo). archive.org ne sert pas
+// de plage d'octets fiable et sa latence depasse souvent 3 s : un
+// fichier de 18 Mo laissait l'apercu muet pendant quinze secondes,
+// ce que l'utilisateur prenait pour une panne.
 // ============================================================
 
 export type Son = {
@@ -29,18 +34,18 @@ export type Son = {
 
 export const SONS: Son[] = [
   {
-    id: 's1', titre: "Ethnic Wave",
-    artiste: "LittleLight",
-    licence: "CC-BY 3.0",
-    publications: 24900, duree: 90, couleur: '#c8743f',
-    url: 'https://archive.org/download/jamendo-133895/01-1120696-LittleLight-Ethnic%20Wave%20_feat.%20M.J.%20_amp_%20J.K._.mp3',
+    id: 's1', titre: "Epic Battle",
+    artiste: "Twin Musicom",
+    licence: "CC-BY 4.0",
+    publications: 24900, duree: 144, couleur: '#c8743f',
+    url: 'https://archive.org/download/twin-musicom-epic-battle/Twin%20Musicom%20-%20Epic%20Battle.mp3',
   },
   {
-    id: 's2', titre: "Drum Circle",
-    artiste: "Mark Richards",
-    licence: "CC0",
-    publications: 65900, duree: 90, couleur: '#4a5a7d',
-    url: 'https://archive.org/download/CoconutGroveDrumCircle6Nov2010/Cgdc6Nov2010A1.mp3',
+    id: 's2', titre: "Hackerland",
+    artiste: "Twin Musicom",
+    licence: "CC-BY 4.0",
+    publications: 65900, duree: 108, couleur: '#4a5a7d',
+    url: 'https://archive.org/download/twin-musicom-hackerland/Twin%20Musicom%20-%20Hackerland.mp3',
   },
   {
     id: 's3', titre: "Night At The Dance Hall",
