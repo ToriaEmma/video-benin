@@ -108,15 +108,34 @@ export default function OptionsVideo({
     } catch (e) { avertir(e instanceof Error ? e.message : 'Envoi impossible.') }
   }
 
+  // Copie du lien : presse-papiers moderne, sinon methode de secours
+  // (champ cache + commande copier) pour les navigateurs qui refusent.
+  const [copie, setCopie] = useState(false)
   const copierLien = async () => {
-    try {
-      if (Platform.OS === 'web' && navigator.clipboard) {
-        await navigator.clipboard.writeText(lien)
-        avertir('Lien copié.')
-      } else {
-        await Share.share({ message: lien })
+    let reussi = false
+    if (Platform.OS === 'web') {
+      try { await navigator.clipboard.writeText(lien); reussi = true } catch { /* Essai de secours. */ }
+      if (!reussi) {
+        const champ = document.createElement('textarea')
+        champ.value = lien
+        champ.setAttribute('readonly', '')
+        champ.style.cssText = 'position:fixed;top:0;left:0;opacity:0'
+        document.body.appendChild(champ)
+        champ.select()
+        champ.setSelectionRange(0, lien.length)
+        try { reussi = document.execCommand('copy') } catch { reussi = false }
+        champ.remove()
       }
-    } catch { avertir(lien) }
+    } else {
+      try { await Share.share({ message: lien }); return } catch { /* Partage annule. */ }
+    }
+    if (reussi) {
+      setCopie(true)
+      setTimeout(() => setCopie(false), 2000)
+      avertir('Lien copié')
+    } else {
+      avertir(`Copie impossible ici. Lien : ${lien}`)
+    }
   }
 
   const ouvrir = (url: string) => Linking.openURL(url).catch(() => avertir('Application introuvable.'))
@@ -197,7 +216,7 @@ export default function OptionsVideo({
   ]
 
   const partages = [
-    { cle: 'lien', nom: 'Copier le lien', fond: '#3b7df6', Icone: Maillon, agir: copierLien },
+    { cle: 'lien', nom: copie ? 'Lien copié ✓' : 'Copier le lien', fond: copie ? '#1fa774' : '#3b7df6', Icone: Maillon, agir: copierLien },
     { cle: 'whatsapp', nom: 'WhatsApp', Logo: LogoWhatsApp, agir: () => ouvrir(`https://wa.me/?text=${texteMessage}`) },
     { cle: 'telegram', nom: 'Telegram', Logo: LogoTelegram, agir: () => ouvrir(`https://t.me/share/url?url=${encodeURIComponent(lien)}&text=${encodeURIComponent(video.legende)}`) },
     { cle: 'sms', nom: 'SMS', Logo: LogoSMS, agir: () => ouvrir(`sms:?&body=${texteMessage}`) },
@@ -312,7 +331,11 @@ export default function OptionsVideo({
             </View>
           )}
 
-          {!!message && <Text style={s.message}>{message}</Text>}
+          {!!message && (
+            <View style={s.bulle} pointerEvents="none" accessibilityLiveRegion="polite">
+              <Text style={s.bulleTexte}>{message}</Text>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -354,5 +377,8 @@ const s = StyleSheet.create({
   ligneDetail: { fontSize: 13, color: '#777', lineHeight: 18 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#ccc' },
   radioChoisi: { borderColor: '#ff2856', borderWidth: 6 },
-  message: { textAlign: 'center', fontSize: 13.5, color: '#111', paddingTop: 10, paddingHorizontal: 16 },
+  // Avis pose en haut de la feuille, au-dessus du contenu : toujours visible.
+  bulle: { position: 'absolute', top: -52, alignSelf: 'center', backgroundColor: 'rgba(17,17,17,.88)',
+    borderRadius: 20, paddingVertical: 9, paddingHorizontal: 16, maxWidth: '90%' },
+  bulleTexte: { color: '#fff', fontSize: 14, fontWeight: '600', textAlign: 'center' },
 })
