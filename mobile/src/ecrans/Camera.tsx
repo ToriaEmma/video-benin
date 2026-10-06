@@ -20,6 +20,7 @@ import ChoixSon from './ChoixSon'
 import VignetteFiltre from '../composants/VignetteFiltre'
 import { useApercuCamera } from '../lib/apercus'
 import type { Son } from '../lib/sons'
+import { prechargerSon } from '../lib/musiqueCalee'
 
 
 // Memes listes que app/src/components/CreationCamera.tsx.
@@ -101,6 +102,8 @@ function MusiquePrise({ son, enCours }: { son: Son; enCours: boolean }) {
   // recreait entre deux prises, et le morceau repartait du debut.
   const [musique] = useState(() => createAudioPlayer({ uri: son.url }))
   useEffect(() => () => { try { musique.remove() } catch { /* Deja libere. */ } }, [musique])
+  // Le son est deja mis en memoire pour l'apercu du montage.
+  useEffect(() => { prechargerSon(son.url) }, [son.url])
   useEffect(() => {
     if (!enCours) { musique.pause(); return }
     let annule = false

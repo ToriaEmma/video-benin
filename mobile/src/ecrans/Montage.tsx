@@ -4,7 +4,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView, type VideoPlayer } from 'expo-video'
-import { useMusiqueCalee } from '../lib/musiqueCalee'
+import { useMusiqueCalee, useSonEnMemoire } from '../lib/musiqueCalee'
 import { useAudioPlayer } from 'expo-audio'
 import { File } from 'expo-file-system'
 import { Text, TextInput } from '../composants/Texte'
@@ -144,8 +144,8 @@ function CalquePose({ calque, onOuvrir }: {
 
 // Apercu du montage avec le son retenu : la musique tourne par-dessus la
 // video, comme elle sera jouee dans le fil une fois publiee.
-function MusiqueApercu({ son, lecteur }: { son: Son; lecteur: VideoPlayer }) {
-  const musique = useAudioPlayer({ uri: son.url })
+function MusiqueApercu({ son, url, lecteur }: { son: Son; url: string; lecteur: VideoPlayer }) {
+  const musique = useAudioPlayer({ uri: url })
   // La musique suit l'apercu : meme instant, meme boucle, arret si la video fige.
   useMusiqueCalee(lecteur, musique, true, son.duree)
   useEffect(() => () => { try { musique.pause() } catch { /* Lecteur deja libere. */ } }, [musique])
@@ -199,9 +199,15 @@ export default function Montage({
   const [sousTitre, setSousTitre] = useState('')
   const [sousTitresActifs, setSousTitresActifs] = useState(false)
 
+  // Avec un son, l'apercu attend que la musique soit chargee en memoire,
+  // puis video et musique partent ensemble du debut.
+  const sonLocal = useSonEnMemoire(son?.url ?? null)
+  const sonPret = !son || !!sonLocal
   useEffect(() => {
+    if (!sonPret) { lecteur.pause(); return }
+    lecteur.currentTime = 0
     lecteur.play()
-  }, [lecteur])
+  }, [lecteur, sonPret])
 
   // Un son retenu remplace la piste de la video dans l'apercu (« Son coupé »
   // coupe aussi la video sans son).
@@ -314,7 +320,7 @@ export default function Montage({
   return (
     <View style={[s.page, { paddingTop: marges.top }]}>
       <View style={s.viseur}>
-        {son && <MusiqueApercu key={son.id} son={son} lecteur={lecteur} />}
+        {son && sonLocal && <MusiqueApercu key={son.id + sonLocal} son={son} url={sonLocal} lecteur={lecteur} />}
         <VideoView player={lecteur} style={StyleSheet.absoluteFill}
           contentFit="contain" nativeControls={false} />
 
