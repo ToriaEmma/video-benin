@@ -40,7 +40,8 @@ export async function retenirCompte(pseudo: string, telephone: string) {
 // « +229 •• •• •• 42 » : seuls les deux derniers chiffres restent lisibles.
 const masquer = (telephone: string) => {
   const chiffres = telephone.replace(/\D/g, '')
-  if (chiffres.length < 4) return telephone
+  // Compte retenu par son pseudo : rien a masquer.
+  if (/[a-z]/i.test(telephone) || chiffres.length < 4) return telephone
   return `+229 •• •• •• ${chiffres.slice(-2)}`
 }
 
@@ -232,15 +233,18 @@ function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
 
   const entrer = async (telephone?: string) => {
     setErreur('')
-    const chiffres = (telephone ?? tel).replace(/\D/g, '')
-    if (chiffres.length < 8) { setErreur('Numéro de téléphone incomplet'); return }
-    if (mdp.length < 6) {
-      setErreur('Le mot de passe doit faire au moins 6 caractères'); return
-    }
+    // Numero (sous n'importe quelle forme : +229, 01…, espaces) ou pseudo.
+    const saisi = (telephone ?? tel).trim()
+    const chiffres = saisi.replace(/\D/g, '')
+    const parPseudo = /[a-z]/i.test(saisi)
+    if (!saisi) { setErreur('Entre ton numéro de téléphone ou ton pseudo'); return }
+    if (!parPseudo && chiffres.length < 8) { setErreur('Numéro de téléphone incomplet'); return }
+    if (!mdp) { setErreur('Entre ton mot de passe'); return }
+    const identifiant = parPseudo ? saisi.replace(/^@/, '').toLowerCase() : chiffres
     setOccupe(true)
     try {
-      await connecter(chiffres, mdp)
-      await retenirCompte(choisi ?? chiffres, chiffres)
+      await connecter(identifiant, mdp)
+      await retenirCompte(choisi ?? identifiant, identifiant)
       onSucces?.(); onFermer()
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Une erreur est survenue')
@@ -268,14 +272,18 @@ function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
 
               {(choisi || connus.length === 0) ? <>
                 <View style={s.champ}>
-                  <TextInput style={s.saisie} placeholder="Numéro de téléphone"
-                    placeholderTextColor="#aaa" keyboardType="phone-pad"
+                  {/* Identifiants enregistres par le navigateur ou le telephone :
+                      `username` / `current-password` les font remplir ici. */}
+                  <TextInput style={s.saisie} placeholder="Numéro de téléphone ou pseudo"
+                    placeholderTextColor="#aaa" autoCapitalize="none" autoCorrect={false}
+                    autoComplete="username" textContentType="username"
                     value={tel} onChangeText={setTel} />
                 </View>
                 <View style={s.champ}>
                   <TextInput style={s.saisie} placeholder="Mot de passe"
                     placeholderTextColor="#aaa" secureTextEntry
-                    value={mdp} onChangeText={setMdp} />
+                    autoComplete="current-password" textContentType="password"
+                    value={mdp} onChangeText={setMdp} onSubmitEditing={() => entrer()} />
                 </View>
 
                 <Pressable style={[s.principal, occupe && s.principalInactif]}

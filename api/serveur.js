@@ -168,19 +168,30 @@ app.post('/inscription', route(async (req, res) => {
 }))
 
 app.post('/connexion', route(async (req, res) => {
-  const telephone = texteRequis(req.body?.telephone, 'telephone')
+  // Le champ s'appelle encore `telephone`, mais accepte aussi le pseudo.
+  const identifiant = texteRequis(req.body?.identifiant ?? req.body?.telephone, 'telephone').trim()
   const motDePasse = texteRequis(req.body?.motDePasse, 'motDePasse')
 
-  const [profil] = await sql`
-    SELECT * FROM profils WHERE telephone = ${telephone}
-  `
-  // Un seul message pour les deux echecs : il ne doit pas reveler
-  // si le numero existe dans la base.
-  const refus = new Refus(401, 'Numéro ou mot de passe incorrect')
-  if (!profil) throw refus
-  if (!(await verifier(motDePasse, profil.mot_de_passe))) throw refus
-
-  res.json({ jeton: signerJeton(profil.id), profil: profilPublic(profil) })
+  // Numero : compare sur ses 8 derniers chiffres, pour accepter toutes les
+  // ecritures (+229, 229, ancien numero a 8 chiffres, nouveau a 10 en 01…).
+  const chiffres = identifiant.replace(/\D/g, '')
+  const parPseudo = /[a-z]/i.test(identifiant) || chiffres.length < 8
+  const candidats = parPseudo
+    ? await sql`
+        SELECT * FROM profils WHERE lower(pseudo) = ${identifiant.replace(/^@/, '').toLowerCase()}
+      `
+    : await sql`
+        SELECT * FROM profils
+        WHERE right(regexp_replace(telephone, '\\D', '', 'g'), 8) = ${chiffres.slice(-8)}
+      `
+  for (const profil of candidats) {
+    if (await verifier(motDePasse, profil.mot_de_passe)) {
+      return res.json({ jeton: signerJeton(profil.id), profil: profilPublic(profil) })
+    }
+  }
+  // Un seul message pour tous les echecs : il ne doit pas reveler si le
+  // compte existe.
+  throw new Refus(401, 'Identifiant ou mot de passe incorrect')
 }))
 
 app.get('/moi', exigerSession, route(async (req, res) => {
