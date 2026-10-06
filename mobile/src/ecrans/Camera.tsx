@@ -6,6 +6,7 @@ import { Text } from '../composants/Texte'
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
 import * as MediaLibrary from 'expo-media-library'
+import { createAudioPlayer } from 'expo-audio'
 import Svg, { Circle, Line } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
@@ -87,6 +88,36 @@ function useChrono() {
     return () => { chrono.abonnes.delete(abonne) }
   }, [])
   return v
+}
+
+// Musique du son retenu, jouee pendant chaque prise pour filmer dans le
+// rythme. Elle part du point ou en est le chronometre : les prises
+// successives s'enchainent donc sur le morceau, et la suppression d'un clip
+// la fait revenir d'autant. Montee par son (cle), la source ne change jamais.
+function MusiquePrise({ son, enCours }: { son: Son; enCours: boolean }) {
+  // Lecteur cree a la main, une fois par son : le hook useAudioPlayer le
+  // recreait entre deux prises, et le morceau repartait du debut.
+  const [musique] = useState(() => createAudioPlayer({ uri: son.url }))
+  useEffect(() => () => { try { musique.remove() } catch { /* Deja libere. */ } }, [musique])
+  useEffect(() => {
+    if (!enCours) { musique.pause(); return }
+    let annule = false
+    const lancer = async () => {
+      // Le morceau doit etre charge pour accepter une position : sinon il
+      // repartirait du debut au lieu de suivre le chronometre.
+      for (let i = 0; i < 60 && !musique.isLoaded && !annule; i++) {
+        await new Promise(r => setTimeout(r, 50))
+      }
+      if (annule) return
+      // Duree inconnue (son original) : on suit le chronometre sans boucler.
+      const position = son.duree > 0 ? chrono.valeur % son.duree : chrono.valeur
+      await musique.seekTo(position).catch(() => { /* Position refusee. */ })
+      if (!annule) musique.play()
+    }
+    lancer()
+    return () => { annule = true }
+  }, [enCours, musique, son.duree])
+  return null
 }
 
 // Affichage « mm:ss », isole pour ne re-rendre que lui.
@@ -337,6 +368,7 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   return (
     <View style={[s.page, { paddingTop: marges.top + 40 }]}>
       <View style={s.viseur}>
+        {son && <MusiquePrise key={son.id} son={son} enCours={enregistrement} />}
         <Viseur cameraRef={camera} face={face} filtre={filtre}
           torche={torche && face === 'back'} />
 

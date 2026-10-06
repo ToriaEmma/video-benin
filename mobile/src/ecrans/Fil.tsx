@@ -11,8 +11,8 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEvent } from 'expo'
 import { abreger, type Video } from '../lib/demo'
-import { sonParId, libelleSon, type Son } from '../lib/sons'
-import { sonDeezer } from '../lib/deezer'
+import { sonParId, sonOriginal, libelleSon, type Son } from '../lib/sons'
+import { estSonDistant, resoudreSon } from '../lib/resolutionSons'
 import FeuilleSon from '../composants/FeuilleSon'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -261,9 +261,9 @@ function Carte({
   // horizontal, sans quoi il volerait le defilement d'une video a l'autre.
   const [lateral] = useState(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) =>
-      g.dx > SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+      g.dx < -SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2,
     onPanResponderRelease: (_, g) => {
-      if (g.dx > SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2) {
+      if (g.dx < -SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2) {
         onVisiter?.(item.pseudo)
       }
     },
@@ -312,30 +312,28 @@ function Carte({
         </View>
 
         <Pressable style={s.action} onPress={basculerAime} hitSlop={6}>
-          <CoeurFil taille={34} couleur={aime ? '#ff2856' : '#fff'} />
+          <CoeurFil taille={28} couleur={aime ? '#ff2856' : '#fff'} />
           <Text style={s.compteur}>{abreger(nbAime)}</Text>
         </Pressable>
 
         <Pressable style={s.action} onPress={() => onCommenter(item)} hitSlop={6}>
-          <BulleFil taille={34} couleur="#fff" />
+          <BulleFil taille={28} couleur="#fff" />
           <Text style={s.compteur}>{abreger(nbCommentaires)}</Text>
         </Pressable>
 
         <Pressable style={s.action} onPress={basculerFavori} hitSlop={6}>
-          <Favori taille={32} plein={favori} couleur={favori ? '#fcd116' : '#fff'} />
-          <Text style={s.compteur}>Favori</Text>
+          <Favori taille={26} plein={favori} couleur={favori ? '#fcd116' : '#fff'} />
         </Pressable>
 
         <Pressable style={s.action} hitSlop={6}
           onPress={() => setEnvoyer(true)}>
           {sienne
-            ? <TroisPoints taille={34} couleur="#fff" />
-            : <PartageFil taille={34} couleur="#fff" />}
-          <Text style={s.compteur}>{sienne ? 'Plus' : 'Partager'}</Text>
+            ? <TroisPoints taille={28} couleur="#fff" />
+            : <PartageFil taille={28} couleur="#fff" />}
         </Pressable>
 
         {/* Le disque ouvre la feuille du son : favori ou « Utiliser ce son ». */}
-        <Pressable hitSlop={6} onPress={() => onSon(son, item.pseudo)}>
+        <Pressable hitSlop={6} onPress={() => onSon(son ?? sonOriginal(item), item.pseudo)}>
           <Animated.View style={[s.disque, {
             transform: [{
               rotate: tour.interpolate({
@@ -362,14 +360,16 @@ function Carte({
           </Pressable>
         )}
 
-        {/* Son de la publication, ou le compte de l'auteur quand la video
-            part avec sa propre piste. */}
-        <View style={s.ligneSon}>
-          <SonNote taille={14} couleur="#fff" />
-          <Text style={s.sonTexte} numberOfLines={1}>
-            {libelleSon(son, item.pseudo)}
-          </Text>
-        </View>
+        {/* Son de la publication : affiche seulement quand une musique est
+            jointe (la ligne « son original » est retiree du fil). */}
+        {son && !son.original && (
+          <View style={s.ligneSon}>
+            <SonNote taille={14} couleur="#fff" />
+            <Text style={s.sonTexte} numberOfLines={1}>
+              {libelleSon(son, item.pseudo)}
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Barre de lecture : la zone sensible est haute pour s'attraper au
@@ -444,13 +444,13 @@ export default function Fil({
   const [sonsDeezer, setSonsDeezer] = useState<Record<string, Son | null>>({})
   useEffect(() => {
     const manquants = [...new Set(liste.map(v => v.sonId).filter(
-      (id): id is string => !!id && id.startsWith('dz:') && !(id in sonsDeezer)))]
-    manquants.forEach(id => sonDeezer(id).then(son =>
+      (id): id is string => estSonDistant(id) && !(id in sonsDeezer)))]
+    manquants.forEach(id => resoudreSon(id).then(son =>
       setSonsDeezer(m => ({ ...m, [id]: son }))))
   }, [liste, sonsDeezer])
   const sonDe = (v: VideoFil): Son | null =>
-    v.sonId?.startsWith('dz:') ? sonsDeezer[v.sonId] ?? null : sonParId(v.sonId)
-  const sonEnAttente = (v: VideoFil) => !!v.sonId?.startsWith('dz:') && !(v.sonId in sonsDeezer)
+    estSonDistant(v.sonId) ? sonsDeezer[v.sonId] ?? null : sonParId(v.sonId)
+  const sonEnAttente = (v: VideoFil) => estSonDistant(v.sonId) && !(v.sonId in sonsDeezer)
 
   // Feuille du son ouverte depuis le disque d'une carte.
   const [feuilleSon, setFeuilleSon] = useState<{ son: Son | null; pseudo: string } | null>(null)
@@ -783,7 +783,7 @@ const s = StyleSheet.create({
   // trait etait colle.
   zoneBarre: {
     position: 'absolute', left: 12, right: 12, bottom: 0, height: 28,
-    justifyContent: 'flex-end', paddingBottom: 3, zIndex: 3,
+    justifyContent: 'flex-end', paddingBottom: 0, zIndex: 3,
   },
   barre: {
     height: 2, backgroundColor: 'rgba(255,255,255,.19)', borderRadius: 2,

@@ -359,9 +359,9 @@ function Carte({
   // horizontal, sans quoi il volerait le defilement d'une video a l'autre.
   const [lateral] = useState(() => PanResponder.create({
     onMoveShouldSetPanResponder: (_, g) =>
-      g.dx > SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+      g.dx < -SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2,
     onPanResponderRelease: (_, g) => {
-      if (g.dx > SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2) {
+      if (g.dx < -SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2) {
         onVisiter?.(item.pseudo)
       }
     },

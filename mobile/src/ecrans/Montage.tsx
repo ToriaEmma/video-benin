@@ -4,6 +4,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
+import { useAudioPlayer } from 'expo-audio'
 import { File } from 'expo-file-system'
 import { Text, TextInput } from '../composants/Texte'
 import Feuille from '../composants/Feuille'
@@ -138,6 +139,18 @@ function CalquePose({ calque, onOuvrir }: {
   )
 }
 
+// Apercu du montage avec le son retenu : la musique tourne par-dessus la
+// video, comme elle sera jouee dans le fil une fois publiee.
+function MusiqueApercu({ son }: { son: Son }) {
+  const musique = useAudioPlayer({ uri: son.url })
+  useEffect(() => {
+    musique.loop = true
+    musique.play()
+    return () => { try { musique.pause() } catch { /* Lecteur deja libere. */ } }
+  }, [musique])
+  return null
+}
+
 export default function Montage({
   uri, pseudo, sonInitial, onRetour, onSuivant, onOutil,
 }: {
@@ -186,6 +199,12 @@ export default function Montage({
   useEffect(() => {
     lecteur.play()
   }, [lecteur])
+
+  // Un son retenu remplace la piste de la video dans l'apercu (« Son coupé »
+  // coupe aussi la video sans son).
+  useEffect(() => {
+    lecteur.muted = coupe || !!son
+  }, [lecteur, coupe, son])
 
   // Le message s'effacant seul, chaque appel remplace le precedent.
   useEffect(() => {
@@ -292,6 +311,7 @@ export default function Montage({
   return (
     <View style={[s.page, { paddingTop: marges.top }]}>
       <View style={s.viseur}>
+        {son && <MusiqueApercu key={son.id} son={son} />}
         <VideoView player={lecteur} style={StyleSheet.absoluteFill}
           contentFit="contain" nativeControls={false} />
 

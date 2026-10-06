@@ -30,9 +30,9 @@ export default function FeuilleSon({ visible, son, pseudo, onFermer, onUtiliser 
           </View>
           <View style={s.textes}>
             <Text style={s.titre} numberOfLines={2}>{son ? son.titre : 'son original'}</Text>
-            <Text style={s.artiste} numberOfLines={1}>{son ? son.artiste : `@${pseudo}`}</Text>
+            <Text style={s.artiste} numberOfLines={1}>{son ? (son.original ? `@${son.artiste}` : son.artiste) : `@${pseudo}`}</Text>
             <Text style={s.meta} numberOfLines={1}>
-              {son ? `${abregerPublications(son.publications)} publications · ${son.licence}` : 'Piste enregistrée avec la vidéo'}
+              {son ? (son.original ? 'Son original · piste de la vidéo' : `${abregerPublications(son.publications)} publications · ${son.licence}`) : 'Piste enregistrée avec la vidéo'}
             </Text>
           </View>
         </View>

@@ -128,3 +128,17 @@ export const sonParId = (id: string | null | undefined) =>
 // l'auteur qui s'affiche : la piste est alors celle de la video elle-meme.
 export const libelleSon = (son: Son | null, pseudo: string) =>
   son ? `${son.titre} - ${son.artiste}` : `son original - ${pseudo}`
+
+// Son original d'une video : sa propre piste, reutilisable comme n'importe
+// quel son (favori, « Utiliser ce son »). La duree reste inconnue (0).
+export const sonOriginal = (v: { id: string; url: string; pseudo: string }): Son => ({
+  id: `video:${v.id}`,
+  titre: 'son original',
+  artiste: v.pseudo,
+  licence: `Son original de @${v.pseudo}`,
+  publications: 1,
+  duree: 0,
+  url: v.url,
+  couleur: '#3a3a3c',
+  original: true,
+})

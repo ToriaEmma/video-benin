@@ -72,8 +72,8 @@ function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori }: {
           </Text>
         </View>
         <Text style={s.meta} numberOfLines={1}>
-          {son.artiste} · {abregerPublications(son.publications)} publications
-          {' · '}{dureeLisible(son.duree)}
+          {son.original ? `@${son.artiste} · son original`
+            : `${son.artiste} · ${abregerPublications(son.publications)} publications · ${dureeLisible(son.duree)}`}
         </Text>
         {charge && <Text style={s.chargement}>Chargement…</Text>}
         {echoue && <Text style={s.echec}>{'Ce son n’a pas pu être chargé'}</Text>}
