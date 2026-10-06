@@ -81,6 +81,7 @@ const s = StyleSheet.create({
   voile: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   panneau: {
     backgroundColor: '#fff', borderTopLeftRadius: 15, borderTopRightRadius: 15,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
     paddingTop: 14, paddingHorizontal: 16, paddingBottom: 28, maxHeight: '85%',
   },
   entete: { alignItems: 'center', justifyContent: 'center',

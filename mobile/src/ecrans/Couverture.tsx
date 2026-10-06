@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import {
-  View, StyleSheet, Pressable, ScrollView, useWindowDimensions,
-  Platform,
+  View, StyleSheet, Pressable, ScrollView, Platform,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'

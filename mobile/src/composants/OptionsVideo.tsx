@@ -15,8 +15,9 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, ScrollView, Modal, Share, Linking, Platform,
-  ActivityIndicator, useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { Text, TextInput } from './Texte'
 import {
   FeuilleCroix, Maillon, Telecharger, Statistiques, Crayon2, CadenasPlein,
@@ -345,7 +346,7 @@ export default function OptionsVideo({
 const s = StyleSheet.create({
   fond: { flex: 1, backgroundColor: 'rgba(0,0,0,.4)', justifyContent: 'flex-end' },
   voile: { flex: 1 },
-  feuille: { backgroundColor: '#fff', borderTopLeftRadius: 14, borderTopRightRadius: 14, paddingBottom: 24 },
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', backgroundColor: '#fff', borderTopLeftRadius: 14, borderTopRightRadius: 14, paddingBottom: 24 },
   entete: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
   titre: { fontSize: 15.5, fontWeight: '700', color: '#111' },
   croix: { width: 52, alignItems: 'flex-end' },

@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react'
-import { View, Pressable, StyleSheet, StatusBar, ActivityIndicator } from 'react-native'
+import { View, Pressable, StyleSheet, StatusBar, ActivityIndicator, useWindowDimensions } from 'react-native'
+import { FournisseurColonne, useMiseEnPageLarge } from './src/lib/ecran'
+import MenuLateral, { type Destination } from './src/composants/MenuLateral'
+import { allerVideo } from './src/lib/navigationFil'
 import { Text, TextInput } from './src/composants/Texte'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { setAudioModeAsync } from 'expo-audio'
@@ -64,6 +67,24 @@ function Application() {
     setOnglet('publier')
   }
 
+  // Grand ecran : menu lateral (icones seules sur tablette en portrait).
+  const fenetre = useWindowDimensions()
+  const large = useMiseEnPageLarge()
+  const compact = fenetre.width < 1100
+
+  // Destinations du menu lateral : memes regles que la barre du bas.
+  const aller = (d: Destination) => {
+    if (d === 'fil') { setLecture(null); setOnglet('fil'); return }
+    if (d === 'profil') {
+      setProfilVisite(null); setMessageProfil(undefined)
+      setBrouillons(false); setLecture(null); setOnglet('profil'); return
+    }
+    const raison = { amis: 'voir tes amis', publier: 'publier une vidéo', messages: 'envoyer des messages' }[d]
+    if (!exiger(raison)) return
+    setLecture(null); setOnglet(d)
+  }
+  const changerVideo = (sens: 1 | -1) => allerVideo(sens)
+
   const visiter = (pseudo: string) => {
     // Le lecteur se referme : sinon il recouvrirait le profil visite.
     setLecture(null)
@@ -87,103 +108,144 @@ function Application() {
     <View style={s.centre}><ActivityIndicator color="#fff" /></View>
   )
 
+  // Le contenu de l'onglet : identique sur telephone et grand ecran.
+  const contenu = (
+    <View style={s.contenu}>
+      {onglet === 'fil' && (
+        <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')}
+          onUtiliserSon={utiliserSon} onLive={setEnLive} videoAOuvrir={videoPartagee} />
+      )}
+      {onglet === 'amis' && (
+        lecture
+          ? <Fil
+              videos={lecture.videos}
+              indexInitial={lecture.index}
+              onRetour={() => setLecture(null)}
+              onVisiter={visiter}
+              onUtiliserSon={utiliserSon}
+            />
+          : <AmisEcran
+              onVisiter={visiter}
+              onOuvrirVideo={(videos, index) => setLecture({ videos, index })}
+            />
+      )}
+      {onglet === 'messages' && <MessagesEcran />}
+      {onglet === 'publier' && (
+        videoChoisie
+          ? montage
+            ? <Montage
+                uri={videoChoisie}
+                pseudo={profil?.pseudo ?? ''}
+                sonInitial={sonChoisi}
+                vitesseInitiale={vitesseChoisie}
+                onRetour={() => {
+                  setMontage(false); setVideoChoisie(null); setSonChoisi(null)
+                }}
+                onSuivant={(son, video) => {
+                  setSonChoisi(son); setVideoChoisie(video); setVitesseChoisie(1); setMontage(false)
+                }}
+                onBrouillon={() => {
+                  setMontage(false); setVideoChoisie(null); setSonChoisi(null); setProfilVisite(null)
+                  setMessageProfil('Brouillon enregistré')
+                  setOnglet('profil')
+                }}
+                onStory={() => {
+                  setMontage(false); setVideoChoisie(null); setSonChoisi(null)
+                  setCleFil(v => v + 1); setOnglet('fil')
+                }}
+              />
+            : <Publier
+                uriInitiale={videoChoisie}
+                sonInitial={sonChoisi}
+                onPublie={() => {
+                  setVideoChoisie(null); setSonChoisi(null)
+                  setCleFil(v => v + 1); setOnglet('fil')
+                }}
+                onAnnuler={() => { setVideoChoisie(null); setSonChoisi(null) }}
+                onBrouillon={() => {
+                  setVideoChoisie(null); setSonChoisi(null); setProfilVisite(null)
+                  setMessageProfil('Brouillon enregistré')
+                  setOnglet('profil')
+                }}
+              />
+          : <Camera
+              sonInitial={sonChoisi}
+              onFermer={() => { setSonChoisi(null); setOnglet('fil') }}
+              onChoisir={(uri, son, vitesse) => {
+                setVideoChoisie(uri); setSonChoisi(son ?? null); setVitesseChoisie(vitesse ?? 1); setMontage(true)
+              }}
+            />
+      )}
+      {onglet === 'profil' && !profil && <Connexion onSucces={() => setOnglet('fil')} />}
+      {onglet === 'profil' && profil && (
+        lecture
+          ? <Fil
+              videos={lecture.videos}
+              indexInitial={lecture.index}
+              recherche={profilVisite ?? profil.pseudo}
+              onRetour={() => setLecture(null)}
+              onVisiter={visiter}
+              onUtiliserSon={utiliserSon}
+            />
+        : brouillons
+          ? <Brouillons
+              onRetour={() => setBrouillons(false)}
+              onPublier={b => {
+                setBrouillons(false); setVideoChoisie(b.url)
+                setSonChoisi(null); setMontage(false); setOnglet('publier')
+              }}
+            />
+          : <Profil
+              pseudoVisite={profilVisite ?? undefined}
+              messageArrivee={messageProfil}
+              onBrouillons={() => setBrouillons(true)}
+              onVisiter={visiter}
+              onOuvrirVideo={(videos, index) => setLecture({ videos, index })}
+              onRetour={() => { setProfilVisite(null); setOnglet('fil') }}
+            />
+      )}
+    </View>
+  )
+
+  // Ordinateur et tablette : menu a gauche, contenu dans une colonne
+  // centrale (format video 9:16 pour le fil et la creation), fleches pour
+  // passer d'une video a l'autre, comme TikTok sur ordinateur.
+  if (large) {
+    const formatVideo = onglet === 'fil' || onglet === 'publier' || !!lecture
+    const largeurColonne = formatVideo
+      // Exactement 9:16 sur la hauteur du cadre (96 %) : pas de bandes noires.
+      ? Math.min(Math.round(fenetre.height * 0.96 * 9 / 16), 600)
+      : Math.min(fenetre.width - (compact ? 76 : 240) - 48, 680)
+    return (
+      <View style={[s.app, s.large]}>
+        <MenuLateral actif={onglet} pseudo={profil?.pseudo ?? null} compact={compact}
+          clair={clair && !lecture} onAller={aller} />
+        <View style={[s.scene, clair && !lecture && s.sceneClaire]}>
+          <View style={[s.colonne, { width: largeurColonne }, formatVideo && s.colonneVideo]}>
+            <FournisseurColonne width={largeurColonne} height={fenetre.height}>
+              {contenu}
+            </FournisseurColonne>
+          </View>
+          {onglet === 'fil' && !lecture && !enLive && (
+            <View style={s.fleches}>
+              <Pressable style={s.fleche} onPress={() => changerVideo(-1)}
+                accessibilityRole="button" accessibilityLabel="Vidéo précédente">
+                <Text style={s.flecheTexte}>↑</Text>
+              </Pressable>
+              <Pressable style={s.fleche} onPress={() => changerVideo(1)}
+                accessibilityRole="button" accessibilityLabel="Vidéo suivante">
+                <Text style={s.flecheTexte}>↓</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+      </View>
+    )
+  }
+
   return (
     <View style={s.app}>
-      <View style={s.contenu}>
-        {onglet === 'fil' && (
-          <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')}
-            onUtiliserSon={utiliserSon} onLive={setEnLive} videoAOuvrir={videoPartagee} />
-        )}
-        {onglet === 'amis' && (
-          lecture
-            ? <Fil
-                videos={lecture.videos}
-                indexInitial={lecture.index}
-                onRetour={() => setLecture(null)}
-                onVisiter={visiter}
-                onUtiliserSon={utiliserSon}
-              />
-            : <AmisEcran
-                onVisiter={visiter}
-                onOuvrirVideo={(videos, index) => setLecture({ videos, index })}
-              />
-        )}
-        {onglet === 'messages' && <MessagesEcran />}
-        {onglet === 'publier' && (
-          videoChoisie
-            ? montage
-              ? <Montage
-                  uri={videoChoisie}
-                  pseudo={profil?.pseudo ?? ''}
-                  sonInitial={sonChoisi}
-                  vitesseInitiale={vitesseChoisie}
-                  onRetour={() => {
-                    setMontage(false); setVideoChoisie(null); setSonChoisi(null)
-                  }}
-                  onSuivant={(son, video) => {
-                    setSonChoisi(son); setVideoChoisie(video); setVitesseChoisie(1); setMontage(false)
-                  }}
-                  onBrouillon={() => {
-                    setMontage(false); setVideoChoisie(null); setSonChoisi(null); setProfilVisite(null)
-                    setMessageProfil('Brouillon enregistré')
-                    setOnglet('profil')
-                  }}
-                  onStory={() => {
-                    setMontage(false); setVideoChoisie(null); setSonChoisi(null)
-                    setCleFil(v => v + 1); setOnglet('fil')
-                  }}
-                />
-              : <Publier
-                  uriInitiale={videoChoisie}
-                  sonInitial={sonChoisi}
-                  onPublie={() => {
-                    setVideoChoisie(null); setSonChoisi(null)
-                    setCleFil(v => v + 1); setOnglet('fil')
-                  }}
-                  onAnnuler={() => { setVideoChoisie(null); setSonChoisi(null) }}
-                  onBrouillon={() => {
-                    setVideoChoisie(null); setSonChoisi(null); setProfilVisite(null)
-                    setMessageProfil('Brouillon enregistré')
-                    setOnglet('profil')
-                  }}
-                />
-            : <Camera
-                sonInitial={sonChoisi}
-                onFermer={() => { setSonChoisi(null); setOnglet('fil') }}
-                onChoisir={(uri, son, vitesse) => {
-                  setVideoChoisie(uri); setSonChoisi(son ?? null); setVitesseChoisie(vitesse ?? 1); setMontage(true)
-                }}
-              />
-        )}
-        {onglet === 'profil' && !profil && <Connexion onSucces={() => setOnglet('fil')} />}
-        {onglet === 'profil' && profil && (
-          lecture
-            ? <Fil
-                videos={lecture.videos}
-                indexInitial={lecture.index}
-                recherche={profilVisite ?? profil.pseudo}
-                onRetour={() => setLecture(null)}
-                onVisiter={visiter}
-                onUtiliserSon={utiliserSon}
-              />
-          : brouillons
-            ? <Brouillons
-                onRetour={() => setBrouillons(false)}
-                onPublier={b => {
-                  setBrouillons(false); setVideoChoisie(b.url)
-                  setSonChoisi(null); setMontage(false); setOnglet('publier')
-                }}
-              />
-            : <Profil
-                pseudoVisite={profilVisite ?? undefined}
-                messageArrivee={messageProfil}
-                onBrouillons={() => setBrouillons(true)}
-                onVisiter={visiter}
-                onOuvrirVideo={(videos, index) => setLecture({ videos, index })}
-                onRetour={() => { setProfilVisite(null); setOnglet('fil') }}
-              />
-        )}
-      </View>
+      {contenu}
 
       {!camera && <View style={[s.nav, clair && s.navClair]}>
         <Pressable style={s.navBouton}
@@ -276,6 +338,16 @@ export default function App() {
 const s = StyleSheet.create({
   app: { flex: 1, backgroundColor: '#000' },
   contenu: { flex: 1 },
+  large: { flexDirection: 'row' },
+  scene: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, backgroundColor: '#000' },
+  sceneClaire: { backgroundColor: '#f4f4f5' },
+  colonne: { height: '100%', overflow: 'hidden', backgroundColor: '#000' },
+  // Fil et creation : le cadre video arrondi, comme sur ordinateur.
+  colonneVideo: { height: '96%', borderRadius: 12 },
+  fleches: { gap: 14 },
+  fleche: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,.12)',
+    alignItems: 'center', justifyContent: 'center' },
+  flecheTexte: { color: '#fff', fontSize: 22, fontWeight: '700' },
   centre: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
 
   // .nav : 54px + zone sure, bordure haute fine.

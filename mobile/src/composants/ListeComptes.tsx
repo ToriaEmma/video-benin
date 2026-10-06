@@ -8,8 +8,8 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, Modal, ScrollView, ActivityIndicator,
-  useWindowDimensions,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { Text } from './Texte'
 import { FeuilleCroix } from './Icones'
 import LigneCompte from './LigneCompte'
@@ -81,7 +81,7 @@ export default function ListeComptes({ pseudo, sens, onFermer, onVisiter }: {
 const s = StyleSheet.create({
   fond: { flex: 1, backgroundColor: 'rgba(0,0,0,.42)', justifyContent: 'flex-end' },
   voile: { flex: 1 },
-  feuille: { backgroundColor: '#161616', borderTopLeftRadius: 16,
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', backgroundColor: '#161616', borderTopLeftRadius: 16,
     borderTopRightRadius: 16 },
 
   entete: { minHeight: 54, justifyContent: 'center', paddingHorizontal: 16 },

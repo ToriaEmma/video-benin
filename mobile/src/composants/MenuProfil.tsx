@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  View, Pressable, StyleSheet, Modal, ScrollView, useWindowDimensions,
-  Animated, Easing,
+  View, Pressable, StyleSheet, Modal, ScrollView, Animated, Easing,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Rect, Circle, Ellipse } from 'react-native-svg'
 import { Text } from './Texte'

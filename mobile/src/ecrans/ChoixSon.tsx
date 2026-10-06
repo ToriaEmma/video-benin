@@ -6,8 +6,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   View, StyleSheet, Pressable, FlatList, Modal, Animated, PanResponder,
-  useWindowDimensions, ScrollView, ActivityIndicator, Image,
+  ScrollView, ActivityIndicator, Image,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { usePiste, usePisteJoue } from '../lib/piste'
 import { Text, TextInput } from '../composants/Texte'
 import {
@@ -352,7 +353,7 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
 const s = StyleSheet.create({
   fond: { flex: 1, justifyContent: 'flex-end' },
   voile: { flex: 1 },
-  feuille: { backgroundColor: '#fff', borderTopLeftRadius: 16,
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', backgroundColor: '#fff', borderTopLeftRadius: 16,
     borderTopRightRadius: 16, overflow: 'hidden' },
 
   // Zone saisissable du haut. Sur le web, touchAction evite que le navigateur

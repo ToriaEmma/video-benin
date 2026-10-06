@@ -440,7 +440,7 @@ const s = StyleSheet.create({
 
   // Panneau de premiere visite : .param-voile / .param-feuille du web.
   voile: { flex: 1, backgroundColor: 'rgba(0,0,0,.35)', justifyContent: 'flex-end' },
-  feuille: { backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22,
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', backgroundColor: '#fff', borderTopLeftRadius: 22, borderTopRightRadius: 22,
     paddingHorizontal: 22, paddingTop: 24, paddingBottom: 26 },
   feuilleTitre: { color: '#111', fontSize: 22, fontWeight: '800', lineHeight: 27,
     textAlign: 'center', marginBottom: 18 },

@@ -1,7 +1,8 @@
 import React from 'react'
 import {
-  View, StyleSheet, Pressable, Modal, ScrollView, useWindowDimensions,
+  View, StyleSheet, Pressable, Modal, ScrollView,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { Text } from './Texte'
 import { FeuilleCroix } from './Icones'
 import { feuille as F } from '../lib/theme'
@@ -52,7 +53,7 @@ export default function Feuille({
 const s = StyleSheet.create({
   fond: { flex: 1, backgroundColor: 'rgba(0,0,0,.42)', justifyContent: 'flex-end' },
   voile: { flex: 1 },
-  feuille: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   feuilleGrise: { backgroundColor: '#f4f4f5' },
 
   entete: { minHeight: 54, justifyContent: 'center', paddingHorizontal: F.marge },

@@ -1,6 +1,6 @@
-// Mise en route propre au web. Sur ordinateur, l'application s'affiche dans un
-// cadre de telephone (une iframe a la taille d'un ecran mobile), pour que toutes
-// les mesures d'ecran soient celles d'un telephone, comme dans l'application.
+// Mise en route propre au web : styles de base, son automatique, application
+// installable. La mise en page ordinateur et tablette (menu a gauche, colonne
+// centrale) est geree par l'application elle-meme (src/lib/ecran.tsx).
 import { installerAlerte } from './alerte'
 
 export function preparerWeb(): boolean {
@@ -26,34 +26,8 @@ export function preparerWeb(): boolean {
   // son des la lecture, sans toucher prealable.
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {})
 
-  const installee = matchMedia('(display-mode: standalone)').matches
-  const surOrdinateur = !installee && window.innerWidth > 640 && window.self === window.top && !matchMedia('(pointer: coarse)').matches
-  if (surOrdinateur) {
-    afficherCadreTelephone()
-    return true
-  }
   installerAlerte()
   return false
-}
-
-function afficherCadreTelephone() {
-  const racine = document.getElementById('root')
-  if (racine) racine.style.display = 'none'
-  const scene = document.createElement('div')
-  scene.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0b0b;'
-  const cadre = document.createElement('iframe')
-  cadre.src = location.pathname + location.search + (location.search ? '&' : '?') + 'cadre=1' + location.hash
-  cadre.title = 'TockTick'
-  cadre.allow = 'camera; microphone; autoplay; clipboard-write; web-share; fullscreen'
-  const ajuster = () => {
-    const h = Math.min(window.innerHeight - 32, 880)
-    const w = Math.round(h * 393 / 852)
-    cadre.style.cssText = `width:${w}px;height:${h}px;border:0;border-radius:44px;background:#000;box-shadow:0 0 0 10px #1c1c1e,0 0 0 11px #3a3a3c,0 30px 80px rgba(0,0,0,.6);`
-  }
-  ajuster()
-  window.addEventListener('resize', ajuster)
-  scene.appendChild(cadre)
-  document.body.appendChild(scene)
 }
 
 // Lecteurs mis en sourdine par nous (lecture avec son refusee), y compris
@@ -70,8 +44,11 @@ function installerSonAutomatique() {
   const montrerPastille = () => {
     if (pastille) return
     pastille = document.createElement('div')
-    pastille.textContent = '🔇  Touche l’écran pour activer le son'
-    pastille.style.cssText = 'position:fixed;left:50%;top:max(14px,env(safe-area-inset-top));transform:translateX(-50%);z-index:9998;padding:8px 14px;border-radius:20px;background:rgba(0,0,0,.6);color:#fff;font:600 13px -apple-system,system-ui,sans-serif;pointer-events:none;white-space:nowrap'
+    // Souris : « Clique » ; grand ecran : en haut a droite, hors de la video.
+    const souris = matchMedia('(pointer: fine)').matches
+    const grand = window.innerWidth >= 768
+    pastille.textContent = souris ? '🔇  Clique n’importe où pour activer le son' : '🔇  Touche l’écran pour activer le son'
+    pastille.style.cssText = `position:fixed;${grand ? 'top:18px;right:24px' : 'left:50%;top:calc(env(safe-area-inset-top) + 78px);transform:translateX(-50%)'};z-index:9998;padding:8px 14px;border-radius:20px;background:rgba(0,0,0,.72);color:#fff;font:600 13px -apple-system,system-ui,sans-serif;pointer-events:none;white-space:nowrap`
     document.body.appendChild(pastille)
   }
   // Une pause demandee par l'application : ce lecteur ne doit pas repartir seul.

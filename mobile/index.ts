@@ -3,8 +3,7 @@ import { Platform } from 'react-native';
 
 import App from './App';
 
-// Sur le web, preparation propre au navigateur ; sur ordinateur l'application
-// est servie dans un cadre de telephone, d'ou l'absence d'enregistrement ici.
+// Sur le web, preparation propre au navigateur (styles, son, installation).
 const dansCadre = Platform.OS === 'web' ? require('./web/demarrage').preparerWeb() : false
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

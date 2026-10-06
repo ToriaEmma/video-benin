@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import {
-  View, StyleSheet, Pressable, FlatList, SafeAreaView, useWindowDimensions, Image,
+  View, StyleSheet, Pressable, FlatList, SafeAreaView, Image,
   Alert, ActivityIndicator,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { Text } from '../composants/Texte'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useVideoPlayer, VideoView } from 'expo-video'

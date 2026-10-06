@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import {
-  View, StyleSheet, Pressable, FlatList, ScrollView, useWindowDimensions, Alert,
+  View, StyleSheet, Pressable, FlatList, ScrollView, Alert,
   ActivityIndicator,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Text } from '../composants/Texte'

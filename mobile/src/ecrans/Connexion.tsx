@@ -9,8 +9,9 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, Pressable, StyleSheet, ScrollView, Modal,
-  KeyboardAvoidingView, Platform, ActivityIndicator, useWindowDimensions,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, TextInput } from '../composants/Texte'
 import {
@@ -401,7 +402,7 @@ const s = StyleSheet.create({
   // --- Feuilles ---
   fond: { flex: 1, backgroundColor: 'rgba(0,0,0,.42)', justifyContent: 'flex-end' },
   voile: { flex: 1 },
-  feuille: { backgroundColor: '#fff', borderTopLeftRadius: 14,
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', backgroundColor: '#fff', borderTopLeftRadius: 14,
     borderTopRightRadius: 14 },
   enteteFeuille: { flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 16,

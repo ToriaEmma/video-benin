@@ -199,7 +199,7 @@ export default function Commentaires({
 
 const s = StyleSheet.create({
   voile: { flex: 1, backgroundColor: 'rgba(0,0,0,.55)' },
-  feuille: { height: '72%', backgroundColor: '#161616', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', height: '72%', backgroundColor: '#161616', borderTopLeftRadius: 16, borderTopRightRadius: 16 },
   entete: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,.12)',

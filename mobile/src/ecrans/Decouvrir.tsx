@@ -9,9 +9,9 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import {
-  View, StyleSheet, Pressable, FlatList, useWindowDimensions,
-  ActivityIndicator,
+  View, StyleSheet, Pressable, FlatList, ActivityIndicator,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Text, TextInput } from '../composants/Texte'

@@ -5,8 +5,9 @@
 
 import React, { useState } from 'react'
 import {
-  View, StyleSheet, Pressable, ScrollView, Modal, useWindowDimensions,
+  View, StyleSheet, Pressable, ScrollView, Modal,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Path, Circle, Rect } from 'react-native-svg'
 import { Text, TextInput } from '../composants/Texte'
@@ -680,7 +681,7 @@ const s = StyleSheet.create({
   fenetreFond: { flex: 1, backgroundColor: 'rgba(0,0,0,.53)',
     justifyContent: 'flex-end' },
   voile: { flex: 1 },
-  feuille: { backgroundColor: '#fff', borderTopLeftRadius: 24,
+  feuille: { width: '100%', maxWidth: 600, alignSelf: 'center', backgroundColor: '#fff', borderTopLeftRadius: 24,
     borderTopRightRadius: 24, paddingTop: 26 },
   feuilleGrise: { backgroundColor: '#f5f5f5' },
   feuilleFlottante: { marginHorizontal: 16, marginBottom: 20,

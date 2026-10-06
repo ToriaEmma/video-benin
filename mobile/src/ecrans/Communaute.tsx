@@ -10,8 +10,9 @@
 
 import React, { useMemo } from 'react'
 import {
-  View, ScrollView, Pressable, StyleSheet, useWindowDimensions,
+  View, ScrollView, Pressable, StyleSheet,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { BARRE_ETAT_WEB } from '../lib/theme'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Text } from '../composants/Texte'

@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  View, FlatList, Pressable, StyleSheet, ActivityIndicator, PanResponder,
+  View, FlatList, Pressable, StyleSheet, ActivityIndicator, PanResponder, Platform,
   Animated, Easing, Image,
 } from 'react-native'
 import { BARRE_ETAT_WEB } from '../lib/theme'
@@ -27,6 +27,7 @@ import {
 } from '../composants/Icones'
 import OptionsVideo from '../composants/OptionsVideo'
 import { useExigerCompte } from '../lib/invite'
+import { allerVideo, ecouterNavigationFil } from '../lib/navigationFil'
 import AnalyseVideo from './AnalyseVideo'
 import Communaute from './Communaute'
 import DirectLive from './DirectLive'
@@ -456,6 +457,29 @@ export default function Fil({
   const [listeApi, setListeApi] = useState<VideoFil[]>([])
   const [chargement, setChargement] = useState(!autonome)
   const [erreur, setErreur] = useState('')
+  // Video suivante ou precedente sans geste tactile : fleches du grand
+  // ecran et touches du clavier (fleches haut et bas), comme sur ordinateur.
+  const defileur = useRef<FlatList<VideoFil>>(null)
+  const etatDefilement = useRef({ index: 0, hauteur: 0, nombre: 0 })
+  useEffect(() => ecouterNavigationFil(sens => {
+    const { index: i, hauteur: h, nombre } = etatDefilement.current
+    const cible = Math.max(0, Math.min(nombre - 1, i + sens))
+    if (cible === i || !h) return
+    defileur.current?.scrollToOffset({ offset: cible * h, animated: true })
+    setIndex(cible)
+  }), [])
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    const touche = (e: KeyboardEvent) => {
+      const cible = e.target as HTMLElement | null
+      if (cible && (cible.tagName === 'INPUT' || cible.tagName === 'TEXTAREA' || cible.isContentEditable)) return
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); allerVideo(1) }
+      if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); allerVideo(-1) }
+    }
+    window.addEventListener('keydown', touche)
+    return () => window.removeEventListener('keydown', touche)
+  }, [])
+
   // Retouches locales : videos retirees (supprimees, « Pas intéressé ») et
   // modifiees depuis la feuille d'options, sans recharger le fil.
   const [masquees, setMasquees] = useState<Set<string>>(() => new Set())
@@ -552,6 +576,7 @@ export default function Fil({
   // defilement par ecran. La mesurer evite de dependre de la hauteur de la
   // fenetre, qui serait trop grande et desalignerait chaque video.
   const [hauteur, setHauteur] = useState(0)
+  useEffect(() => { etatDefilement.current = { index, hauteur, nombre: liste.length } })
 
   // Carte touchee dans la mosaique « Communauté » : le fil bascule sur
   // « Pour toi » et se positionne sur cette video, en reprenant le
@@ -612,6 +637,7 @@ export default function Fil({
         </View>
       ) : autonome || filApi === categorie ? (
         <FlatList
+          ref={defileur}
           data={liste}
           keyExtractor={v => v.id}
           pagingEnabled

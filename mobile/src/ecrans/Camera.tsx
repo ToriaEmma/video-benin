@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  View, Pressable, StyleSheet, useWindowDimensions, SafeAreaView, Alert, Image, Platform,
+  View, Pressable, StyleSheet, SafeAreaView, Alert, Image, Platform,
   ActivityIndicator,
 } from 'react-native'
+import { useWindowDimensions } from '../lib/ecran'
 import { Text, TextInput } from '../composants/Texte'
 import Feuille from '../composants/Feuille'
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera'
