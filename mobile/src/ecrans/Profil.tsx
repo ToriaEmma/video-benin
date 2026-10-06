@@ -209,7 +209,7 @@ export default function Profil({
 
   const supprimer = (id: string) => {
     if (!monProfil) return
-    Alert.alert('Supprimer cette vidéo ?', undefined, [
+    Alert.alert('Supprimer cette vidéo ?', 'Elle sera effacée définitivement.', [
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Supprimer', style: 'destructive',

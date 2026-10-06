@@ -8,7 +8,7 @@
 // ============================================================
 
 import 'dotenv/config'
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { randomUUID } from 'node:crypto'
 
@@ -64,3 +64,12 @@ export const signerDepot = (cle, type) =>
     new PutObjectCommand({ Bucket: SEAU, Key: cle, ContentType: type }),
     { expiresIn: 600 },
   )
+
+// Efface le fichier d'une video de notre seau. Une adresse etrangere (autre
+// hebergement, ancien stockage) est ignoree : il n'y a rien a effacer ici.
+export async function supprimerFichier(url) {
+  const prefixe = `${POINT_DACCES}/${SEAU}/`
+  if (!client || typeof url !== 'string' || !url.startsWith(prefixe)) return
+  const cle = decodeURIComponent(url.slice(prefixe.length).split('?')[0])
+  await client.send(new DeleteObjectCommand({ Bucket: SEAU, Key: cle }))
+}

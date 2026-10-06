@@ -25,6 +25,7 @@ import {
   construireCle,
   urlPubliqueDe,
   signerDepot,
+  supprimerFichier,
 } from './stockage.js'
 
 const app = express()
@@ -450,13 +451,28 @@ app.patch('/videos/:id', exigerSession, route(async (req, res) => {
   res.json(video)
 }))
 
-// Suppression douce : la video rejoint la corbeille pendant 30 jours.
+// Suppression definitive : la ligne part de la base (j'aime, favoris et
+// commentaires suivent par cascade) et le fichier part du stockage.
 app.delete('/videos/:id', exigerSession, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de vidéo')
   await videoDeLAuteur(id, req.profilId)
-  await sql`UPDATE videos SET supprimee_le = now() WHERE id = ${id}`
+  const [supprimee] = await sql`DELETE FROM videos WHERE id = ${id} RETURNING url`
+  if (supprimee) await effacerFichierOrphelin(supprimee.url)
   res.json({ ok: true })
 }))
+
+// Le fichier n'est efface que si plus rien ne s'en sert : une video publiee
+// depuis un brouillon partage son adresse avec lui.
+async function effacerFichierOrphelin(url) {
+  const [utilise] = await sql`
+    SELECT 1 FROM videos WHERE url = ${url}
+    UNION ALL SELECT 1 FROM brouillons WHERE url = ${url}
+    LIMIT 1
+  `
+  if (utilise) return
+  // Un fichier qui resterait ne gene personne : l'echec ne bloque pas la suppression.
+  await supprimerFichier(url).catch(e => console.error('Fichier non efface', e.message))
+}
 
 app.get('/corbeille', exigerSession, route(async (req, res) => {
   const lignes = await sql`
@@ -869,9 +885,10 @@ app.delete('/brouillons/:id', exigerSession, route(async (req, res) => {
   const [supprime] = await sql`
     DELETE FROM brouillons
     WHERE id = ${id} AND auteur_id = ${req.profilId}
-    RETURNING id
+    RETURNING url
   `
   if (!supprime) throw new Refus(404, 'Brouillon introuvable')
+  await effacerFichierOrphelin(supprime.url)
   res.json({ ok: true })
 }))
 
