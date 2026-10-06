@@ -16,6 +16,7 @@ import { estSonDistant, resoudreSon } from '../lib/resolutionSons'
 import FeuilleSon from '../composants/FeuilleSon'
 import { useAvatar } from '../lib/avatars'
 import { useMusiqueCalee } from '../lib/musiqueCalee'
+import { useBascule } from '../lib/bascule'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Suggestions from '../composants/Suggestions'
@@ -101,9 +102,15 @@ function Carte({
   // ne peuvent plus faire de bruit.
   const musique = usePiste(son ? son.url : null)
 
-  const [aime, setAime] = useState(item.aime)
+  // J'aime et favori : affiches au toucher, puis envoyes un par un
+  // jusqu'a ce que le serveur porte le dernier choix (voir lib/bascule).
   const [nbAime, setNbAime] = useState(item.nbAime)
-  const [favori, setFavori] = useState(Boolean(item.favori))
+  const [aime, basculerAimeServeur] = useBascule(item.aime,
+    vise => (vise ? apiInteractions.aimer(item.id) : apiInteractions.retirerJaime(item.id)),
+    { surReponse: r => setNbAime(r.nbAime), surErreur: e => onErreur(e.message) })
+  const [favori, basculerFavori] = useBascule(Boolean(item.favori),
+    vise => (vise ? apiInteractions.mettreEnFavori(item.id) : apiInteractions.retirerFavori(item.id)),
+    { surErreur: e => onErreur(e.message) })
   const [developpe, setDeveloppe] = useState(false)
   const [progression, setProgression] = useState(0)
   // Deplacement en cours sur la barre : tant qu'il dure, la barre suit le
@@ -179,29 +186,10 @@ function Carte({
   // optimiste, puis on se recale dessus, et on revient en arriere si la
   // requete echoue.
   const basculerAime = () => {
-    const vise = !aime
-    setAime(vise); setNbAime(v => v + (vise ? 1 : -1))
-    const envoi = vise
-      ? apiInteractions.aimer(item.id)
-      : apiInteractions.retirerJaime(item.id)
-    envoi
-      .then(r => { setAime(r.aime); setNbAime(r.nbAime) })
-      .catch((e: Error) => {
-        setAime(!vise); setNbAime(v => v + (vise ? -1 : 1))
-        onErreur(e.message)
-      })
+    setNbAime(v => v + (aime ? -1 : 1))
+    basculerAimeServeur()
   }
 
-  const basculerFavori = () => {
-    const vise = !favori
-    setFavori(vise)
-    const envoi = vise
-      ? apiInteractions.mettreEnFavori(item.id)
-      : apiInteractions.retirerFavori(item.id)
-    envoi
-      .then(r => setFavori(r.favori))
-      .catch((e: Error) => { setFavori(!vise); onErreur(e.message) })
-  }
 
   // Abonnement depuis le fil, sur le meme modele que le j'aime :
   // affiche d'abord, confirme ensuite, defait si le serveur refuse.

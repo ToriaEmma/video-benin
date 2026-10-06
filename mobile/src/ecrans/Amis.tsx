@@ -28,6 +28,7 @@ import { useEvent } from 'expo'
 import {
   etat, abreger, type Video as VideoType, type Story,
 } from '../lib/demo'
+import { useBascule } from '../lib/bascule'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../composants/Commentaires'
@@ -209,9 +210,15 @@ function Carte({
     p.loop = true; p.timeUpdateEventInterval = 0.25
   })
 
-  const [aime, setAime] = useState(item.aime)
+  // J'aime et favori : affiches au toucher, puis envoyes un par un
+  // jusqu'a ce que le serveur porte le dernier choix (voir lib/bascule).
   const [nbAime, setNbAime] = useState(item.nbAime)
-  const [favori, setFavori] = useState(Boolean(item.favori))
+  const [aime, basculerAimeServeur] = useBascule(item.aime,
+    vise => (vise ? apiInteractions.aimer(item.id) : apiInteractions.retirerJaime(item.id)),
+    { surReponse: r => setNbAime(r.nbAime), surErreur: e => onErreur(e.message) })
+  const [favori, basculerFavori] = useBascule(Boolean(item.favori),
+    vise => (vise ? apiInteractions.mettreEnFavori(item.id) : apiInteractions.retirerFavori(item.id)),
+    { surErreur: e => onErreur(e.message) })
   const [developpe, setDeveloppe] = useState(false)
   // Pause demandee par l'utilisateur, a distinguer d'un chargement. La
   // demande est rangee avec le passage de la carte auquel elle se
@@ -280,29 +287,10 @@ function Carte({
   // optimiste, puis on se recale dessus, et on revient en arriere si la
   // requete echoue.
   const basculerAime = () => {
-    const vise = !aime
-    setAime(vise); setNbAime(v => v + (vise ? 1 : -1))
-    const envoi = vise
-      ? apiInteractions.aimer(item.id)
-      : apiInteractions.retirerJaime(item.id)
-    envoi
-      .then(r => { setAime(r.aime); setNbAime(r.nbAime) })
-      .catch((e: Error) => {
-        setAime(!vise); setNbAime(v => v + (vise ? -1 : 1))
-        onErreur(e.message)
-      })
+    setNbAime(v => v + (aime ? -1 : 1))
+    basculerAimeServeur()
   }
 
-  const basculerFavori = () => {
-    const vise = !favori
-    setFavori(vise)
-    const envoi = vise
-      ? apiInteractions.mettreEnFavori(item.id)
-      : apiInteractions.retirerFavori(item.id)
-    envoi
-      .then(r => setFavori(r.favori))
-      .catch((e: Error) => { setFavori(!vise); onErreur(e.message) })
-  }
 
   const partager = async () => {
     try {

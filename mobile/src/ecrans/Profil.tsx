@@ -243,9 +243,13 @@ export default function Profil({
     ])
   }
 
+  // Un seul envoi a la fois : deux appuis rapides ne doivent pas se croiser.
+  const [suiviEnCours, setSuiviEnCours] = useState(false)
   const basculerSuivi = () => {
+    if (suiviEnCours) return
     const vise = !suivi
     setSuivi(vise)
+    setSuiviEnCours(true)
     const envoi = vise
       ? apiInteractions.suivre(pseudo)
       : apiInteractions.nePlusSuivre(pseudo)
@@ -257,6 +261,7 @@ export default function Profil({
         } : p))
       })
       .catch((e: Error) => { setSuivi(!vise); setErreur(e.message) })
+      .finally(() => setSuiviEnCours(false))
   }
 
   const nbSuivis = entete?.nbSuivis ?? 0
