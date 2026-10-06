@@ -319,6 +319,10 @@ export const apiVideos = {
   restaurer: (id: string) =>
     requete<{ ok: true }>(`/videos/${id}/restaurer`, { methode: 'POST' }),
 
+  // Signalement a la moderation ; un compte ne signale qu'une fois.
+  signaler: (id: string, motif: string) =>
+    requete<{ ok: true }>(`/videos/${id}/signalement`, { methode: 'POST', corps: { motif } }),
+
   vue: (id: string) =>
     requete<{ vues: number }>(`/videos/${id}/vue`, { methode: 'POST' }),
 }

@@ -25,16 +25,20 @@ import {
   Grille, Cadenas, Coeur, Repartage, Studio, Lecture, Plus, Triangle, FavoriContour,
   Brouillon,
 } from '../composants/Icones'
+import OptionsVideo from '../composants/OptionsVideo'
+import AnalyseVideo from './AnalyseVideo'
 
 // Equivalent de clamp(min, valeur en vw, max) du CSS.
 const clamp = (largeurEcran: number, mini: number, vw: number, maxi: number) =>
   Math.round(Math.min(Math.max(largeurEcran * vw / 100, mini), maxi))
 
 // Ratio 3/4, comme `aspect-ratio: 3/4` de la version web.
-function Vignette({ item, largeur, onSupprimer, onOuvrir }: {
+function Vignette({ item, largeur, onSupprimer, onOuvrir, onOptions }: {
   item: Video; largeur: number
   onSupprimer?: (id: string) => void
   onOuvrir?: () => void
+  // Sa propre video : « ⋯ » ouvre les options sans ouvrir la video.
+  onOptions?: () => void
 }) {
   const lecteur = useVideoPlayer(item.url, p => { p.muted = true })
   return (
@@ -47,6 +51,15 @@ function Vignette({ item, largeur, onSupprimer, onOuvrir }: {
         <Lecture taille={11} couleur="#fff" />
         <Text style={s.vuesTexte}>{abreger(item.vues)}</Text>
       </View>
+      {onOptions && (
+        <Pressable style={s.options} onPress={onOptions} hitSlop={8}
+          accessibilityRole="button" accessibilityLabel="Options de la vidéo">
+          <Text style={s.optionsTexte}>⋯</Text>
+        </Pressable>
+      )}
+      {item.visibilite && item.visibilite !== 'monde' && (
+        <View style={s.privee}><Cadenas taille={11} couleur="#fff" /></View>
+      )}
     </Pressable>
   )
 }
@@ -206,6 +219,10 @@ export default function Profil({
   const cases: ({ id: string } | Video)[] = tuileBrouillons.length > 0
     ? [{ id: 'brouillons' }, ...videos]
     : videos
+
+  // Options d'une video de sa grille (« ⋯ ») et ecran d'analyse.
+  const [options, setOptions] = useState<VideoApi | null>(null)
+  const [analyse, setAnalyse] = useState<Video | null>(null)
 
   const supprimer = (id: string) => {
     if (!monProfil) return
@@ -441,9 +458,25 @@ export default function Profil({
               onPresser={() => onBrouillons?.()} />
           : <Vignette item={item as Video} largeur={largeurCase}
               onSupprimer={monProfil ? supprimer : undefined}
+              onOptions={monProfil ? () => setOptions(item as VideoApi) : undefined}
               onOuvrir={() => onOuvrirVideo?.(
                 videos, videos.indexOf(item as VideoApi))} />}
       />
+
+      {options && <OptionsVideo visible video={options}
+        onFermer={() => setOptions(null)}
+        onAnalytiques={() => setAnalyse(options)}
+        onPasInteresse={() => setOptions(null)}
+        onSupprimee={id => {
+          setVideos(l => l.filter(v => v.id !== id))
+          setEntete(p => (p ? { ...p, nbVideos: Math.max(0, p.nbVideos - 1) } : p))
+        }}
+        onModifiee={(id, valeurs) => setVideos(l => l.map(v => (v.id === id ? { ...v, ...valeurs } : v)))} />}
+      {analyse && (
+        <View style={StyleSheet.absoluteFill}>
+          <AnalyseVideo video={analyse} onRetour={() => setAnalyse(null)} />
+        </View>
+      )}
 
       {!!message && (
         <View style={s.toast} pointerEvents="none">
@@ -480,6 +513,10 @@ export default function Profil({
 
 // .page-profil : fond blanc, texte #111, padding 12px 16px 28px.
 const s = StyleSheet.create({
+  options: { position: 'absolute', top: 4, right: 4, width: 28, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,.45)', alignItems: 'center', justifyContent: 'center' },
+  optionsTexte: { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: -4 },
+  privee: { position: 'absolute', top: 6, left: 6 },
   avisPhoto: { position: 'absolute', top: '100%', marginTop: 8, width: 170, alignSelf: 'center', textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#ff2856' },
   page: { flex: 1, backgroundColor: '#fff' },
   entete: { paddingHorizontal: 16, paddingTop: 12 },

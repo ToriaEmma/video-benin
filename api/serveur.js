@@ -553,6 +553,19 @@ app.post('/videos/:id/vue', sessionFacultative, route(async (req, res) => {
   res.json({ vues: video.vues })
 }))
 
+// Signalement : note pour la moderation, un seul par compte et par video.
+app.post('/videos/:id/signalement', exigerSession, route(async (req, res) => {
+  const id = identifiant(req.params.id, 'Identifiant de vidéo')
+  const motif = texteRequis(req.body?.motif, 'motif', 100)
+  await videoVisible(id, req.profilId)
+  await sql`
+    INSERT INTO signalements (video_id, profil_id, motif)
+    VALUES (${id}, ${req.profilId}, ${motif})
+    ON CONFLICT (video_id, profil_id) DO UPDATE SET motif = EXCLUDED.motif, cree_le = now()
+  `
+  res.status(201).json({ ok: true })
+}))
+
 // ------------------------------------------------------------
 // Interactions
 // ------------------------------------------------------------

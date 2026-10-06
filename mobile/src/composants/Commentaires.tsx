@@ -7,6 +7,8 @@ import {
 import { Text, TextInput } from './Texte'
 import { type Commentaire, type Video } from '../lib/demo'
 import { apiCommentaires } from '../lib/api'
+import { useAuth } from '../lib/auth'
+import { useExigerCompte } from '../lib/invite'
 import {
   Croix, Tri, Envoyer, ImageCommentaire, Emoji, Mention,
 } from './Icones'
@@ -51,6 +53,10 @@ export default function Commentaires({
       .finally(() => { if (valable) setChargement(false) })
     return () => { valable = false }
   }, [video.id])
+
+  // Un visiteur lit les commentaires ; pour ecrire, il se connecte.
+  const { profil } = useAuth()
+  const exiger = useExigerCompte()
 
   const envoyer = () => {
     const propre = texte.trim()
@@ -144,7 +150,11 @@ export default function Commentaires({
             )}
           />
 
-          <View style={s.pied}>
+          {!profil ? (
+            <Pressable style={s.pied} onPress={() => exiger('commenter')} accessibilityRole="button">
+              <Text style={[s.champ, s.champVisiteur]}>Connecte-toi pour commenter</Text>
+            </Pressable>
+          ) : <View style={s.pied}>
             <TextInput ref={saisie} style={s.champ} placeholder="Ajouter un commentaire…"
               placeholderTextColor="#777" value={texte} onChangeText={setTexte} maxLength={300} />
             {texte.trim() ? (
@@ -174,7 +184,7 @@ export default function Commentaires({
                 </Pressable>
               </View>
             )}
-          </View>
+          </View>}
 
           {message !== '' && (
             <Pressable onPress={() => setMessage('')}>
@@ -213,6 +223,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12,
     borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,.12)',
   },
+  champVisiteur: { color: '#9a9a9a', paddingVertical: 12 },
   champ: {
     flex: 1, backgroundColor: '#232323', borderRadius: 20,
     paddingHorizontal: 14, paddingVertical: 10, color: '#fff', fontSize: 16,

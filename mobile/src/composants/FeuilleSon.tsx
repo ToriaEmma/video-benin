@@ -7,6 +7,7 @@ import Feuille from './Feuille'
 import { MarquePage, Camera, SonNote } from './Icones'
 import { abregerPublications, type Son } from '../lib/sons'
 import { basculerFavoriSon, useFavorisSons } from '../lib/favorisSons'
+import { useExigerCompte } from '../lib/invite'
 
 export default function FeuilleSon({ visible, son, pseudo, onFermer, onUtiliser }: {
   visible: boolean
@@ -17,6 +18,7 @@ export default function FeuilleSon({ visible, son, pseudo, onFermer, onUtiliser 
   onUtiliser: (son: Son) => void
 }) {
   const { estFavori } = useFavorisSons()
+  const exiger = useExigerCompte()
   const favori = !!son && estFavori(son.id)
 
   return (
@@ -45,12 +47,12 @@ export default function FeuilleSon({ visible, son, pseudo, onFermer, onUtiliser 
 
         <View style={s.boutons}>
           <Pressable style={[s.bouton, s.boutonGris, !son && s.inactif]} disabled={!son}
-            onPress={() => son && basculerFavoriSon(son)}>
+            onPress={() => son && exiger('enregistrer ce son') && basculerFavoriSon(son)}>
             <MarquePage taille={20} couleur="#111" plein={favori} />
             <Text style={s.boutonGrisTexte}>{favori ? 'Dans tes favoris' : 'Ajouter aux favoris'}</Text>
           </Pressable>
           <Pressable style={[s.bouton, s.boutonRose, !son && s.inactif]} disabled={!son}
-            onPress={() => { if (son) { onFermer(); onUtiliser(son) } }}>
+            onPress={() => { if (son && exiger('utiliser ce son')) { onFermer(); onUtiliser(son) } }}>
             <Camera taille={20} couleur="#fff" />
             <Text style={s.boutonRoseTexte}>Utiliser ce son</Text>
           </Pressable>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   View, FlatList, Pressable, StyleSheet, ActivityIndicator, PanResponder,
   Animated, Easing, Image,
@@ -24,7 +24,8 @@ import {
   CoeurFil, BulleFil, PartageFil, Favori, LecturePleine, LiveEntete,
   LoupeEntete, NoteDisque, Chevron, Loupe, TroisPoints, PlusStory, SonNote,
 } from '../composants/Icones'
-import EnvoyerA from '../composants/EnvoyerA'
+import OptionsVideo from '../composants/OptionsVideo'
+import { useExigerCompte } from '../lib/invite'
 import AnalyseVideo from './AnalyseVideo'
 import Communaute from './Communaute'
 import DirectLive from './DirectLive'
@@ -49,7 +50,7 @@ const SEUIL_LATERAL = 55
 
 function Carte({
   item, actif, hauteur, onCommenter, onVisiter, sienne, nbCommentaires, onErreur,
-  suivi, onSuivi, son, onSon,
+  suivi, onSuivi, son, onSon, onSupprimee, onModifiee, onPasInteresse,
 }: {
   item: VideoFil; actif: boolean; hauteur: number
   onCommenter: (v: VideoFil) => void
@@ -69,7 +70,14 @@ function Carte({
   // varier, et la carte doit suivre sans que l'API soit reinterrogee.
   nbCommentaires: number
   onErreur: (message: string) => void
+  // Gestion depuis la feuille d'options : le fil met sa liste a jour.
+  onSupprimee: (id: string) => void
+  onModifiee: (id: string, valeurs: Partial<VideoFil>) => void
+  onPasInteresse: (id: string) => void
 }) {
+  // Visiteur sans compte : il regarde, toute interaction l'invite a se connecter.
+  const exiger = useExigerCompte()
+  const visiter = (pseudo: string) => { if (exiger('voir ce profil')) onVisiter?.(pseudo) }
   // Le son attache arrive resolu par le fil ; sans lui, « son original ».
   // Photo de l'auteur ; le disque d'un son original montre celle du compte
   // a qui appartient ce son (l'auteur de la video d'origine).
@@ -264,7 +272,7 @@ function Carte({
       g.dx < -SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2,
     onPanResponderRelease: (_, g) => {
       if (g.dx < -SEUIL_LATERAL && Math.abs(g.dx) > Math.abs(g.dy) * 2) {
-        onVisiter?.(item.pseudo)
+        visiter(item.pseudo)
       }
     },
   }))
@@ -298,7 +306,8 @@ function Carte({
 
       <View style={s.actions}>
         <View style={s.avatarBoite}>
-          <Pressable style={s.avatar} onPress={() => onVisiter?.(item.pseudo)}>
+          <Pressable style={s.avatar} onPress={() => visiter(item.pseudo)}
+            accessibilityRole="button" accessibilityLabel={`Profil de ${item.pseudo}`}>
             {avatar
               ? <Image source={{ uri: avatar }} style={s.avatarImage} />
               : <Text style={s.avatarLettre}>{item.pseudo.charAt(0).toUpperCase()}</Text>}
@@ -306,28 +315,32 @@ function Carte({
           {/* S'abonner sans quitter le fil. La pastille s'efface une fois
               l'abonnement pris, et ne parait pas sur ses propres videos. */}
           {!sienne && !suivi && (
-            <Pressable style={s.pastilleSuivre} onPress={suivre} hitSlop={8}
+            <Pressable style={s.pastilleSuivre} onPress={() => exiger('suivre ce compte') && suivre()} hitSlop={8}
               accessibilityLabel={`S'abonner à ${item.pseudo}`}>
               <PlusStory taille={12} couleur="#fff" />
             </Pressable>
           )}
         </View>
 
-        <Pressable style={s.action} onPress={basculerAime} hitSlop={6}>
+        <Pressable style={s.action} onPress={() => exiger('aimer cette vidéo') && basculerAime()} hitSlop={6}
+          accessibilityRole="button" accessibilityLabel={aime ? 'Je n’aime plus' : 'J’aime'}>
           <CoeurFil taille={28} couleur={aime ? '#ff2856' : '#fff'} />
           <Text style={s.compteur}>{abreger(nbAime)}</Text>
         </Pressable>
 
-        <Pressable style={s.action} onPress={() => onCommenter(item)} hitSlop={6}>
+        <Pressable style={s.action} onPress={() => onCommenter(item)} hitSlop={6}
+          accessibilityRole="button" accessibilityLabel="Commentaires">
           <BulleFil taille={28} couleur="#fff" />
           <Text style={s.compteur}>{abreger(nbCommentaires)}</Text>
         </Pressable>
 
-        <Pressable style={s.action} onPress={basculerFavori} hitSlop={6}>
+        <Pressable style={s.action} onPress={() => exiger('enregistrer cette vidéo') && basculerFavori()} hitSlop={6}
+          accessibilityRole="button" accessibilityLabel={favori ? 'Retirer des favoris' : 'Ajouter aux favoris'}>
           <Favori taille={26} plein={favori} couleur={favori ? '#fcd116' : '#fff'} />
         </Pressable>
 
-        <Pressable style={s.action} hitSlop={6}
+        <Pressable style={s.action} hitSlop={6} accessibilityRole="button"
+          accessibilityLabel={sienne ? 'Options de la vidéo' : 'Partager'}
           onPress={() => setEnvoyer(true)}>
           {sienne
             ? <TroisPoints taille={28} couleur="#fff" />
@@ -356,7 +369,7 @@ function Carte({
       </View>
 
       <View style={s.infos}>
-        <Pressable onPress={() => onVisiter?.(item.pseudo)}>
+        <Pressable onPress={() => visiter(item.pseudo)}>
           <Text style={s.pseudo}>{item.pseudo}</Text>
         </Pressable>
         {!!item.legende && (
@@ -401,10 +414,10 @@ function Carte({
         </View>
       )}
 
-      <EnvoyerA visible={envoyer} legende={item.legende}
-        sienne={!!sienne} auteur={item.pseudo}
+      {envoyer && <OptionsVideo visible video={item}
         onFermer={() => setEnvoyer(false)}
-        onAnalytiques={() => setAnalyse(true)} />
+        onAnalytiques={() => setAnalyse(true)}
+        onSupprimee={onSupprimee} onModifiee={onModifiee} onPasInteresse={onPasInteresse} />}
 
       {analyse && (
         <View style={StyleSheet.absoluteFill}>
@@ -417,6 +430,7 @@ function Carte({
 
 export default function Fil({
   onVisiter, onRechercher, videos, indexInitial = 0, recherche, onRetour, onUtiliserSon, onLive,
+  videoAOuvrir,
 }: {
   onVisiter?: (pseudo: string) => void
   onRechercher?: () => void
@@ -432,8 +446,11 @@ export default function Fil({
   onUtiliserSon?: (son: Son) => void
   // Previent l'application de l'entree et de la sortie de l'espace LIVE.
   onLive?: (actif: boolean) => void
+  // Video d'un lien partage (…/v/<id>) : montree en premier.
+  videoAOuvrir?: string | null
 }) {
   const { profil } = useAuth()
+  const exiger = useExigerCompte()
   const [categorie, setCategorie] = useState('Pour toi')
   // Espace LIVE : la barre de navigation de l'application s'efface.
   useEffect(() => {
@@ -451,7 +468,17 @@ export default function Fil({
   const [listeApi, setListeApi] = useState<VideoFil[]>([])
   const [chargement, setChargement] = useState(!autonome)
   const [erreur, setErreur] = useState('')
-  const liste = videos ?? listeApi
+  // Retouches locales : videos retirees (supprimees, « Pas intéressé ») et
+  // modifiees depuis la feuille d'options, sans recharger le fil.
+  const [masquees, setMasquees] = useState<Set<string>>(() => new Set())
+  const [modifiees, setModifiees] = useState<Record<string, Partial<VideoFil>>>({})
+  const liste = useMemo(() => (videos ?? listeApi)
+    .filter(v => !masquees.has(v.id))
+    .map(v => (modifiees[v.id] ? { ...v, ...modifiees[v.id] } : v)),
+  [videos, listeApi, masquees, modifiees])
+  const masquer = (id: string) => setMasquees(m => new Set(m).add(id))
+  const modifier = (id: string, valeurs: Partial<VideoFil>) =>
+    setModifiees(m => ({ ...m, [id]: { ...m[id], ...valeurs } }))
 
   // Sons Deezer des publications : resolus avant de monter les cartes, pour
   // que chacune connaisse sa musique des le depart (adresse d'extrait fraiche).
@@ -475,18 +502,31 @@ export default function Fil({
   const [tentative, setTentative] = useState(0)
 
   const recharger = () => { setChargement(true); setTentative(n => n + 1) }
+  const [avisLien, setAvisLien] = useState('')
 
   useEffect(() => {
     if (autonome) return
     let valable = true
     const envoi = filApi === 'Suivis' ? apiVideos.suivis() : apiVideos.liste()
-    envoi
-      .then(v => { if (valable) { setListeApi(v); setErreur('') } })
+    // Lien partage : la video demandee passe en tete (une seule fois).
+    const partagee = videoAOuvrir && filApi === 'Pour toi' && tentative === 0
+      ? apiVideos.une(videoAOuvrir).catch(() => {
+        setAvisLien('Cette vidéo n’est plus disponible ou elle est privée.')
+        return null
+      })
+      : Promise.resolve(null)
+    Promise.all([envoi, partagee])
+      .then(([v, tete]) => {
+        if (!valable) return
+        setListeApi(tete ? [tete, ...v.filter(x => x.id !== tete.id)] : v)
+        setErreur('')
+      })
       // La liste est videe avec l'erreur : garder celle de l'onglet
       // precedent ferait passer ses videos pour celles de celui-ci.
       .catch((e: Error) => { if (valable) { setListeApi([]); setErreur(e.message) } })
       .finally(() => { if (valable) setChargement(false) })
     return () => { valable = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autonome, filApi, tentative])
 
   // Comptes suivis, charges une fois pour tout le fil : la video de l'API
@@ -536,6 +576,8 @@ export default function Fil({
   // precedente est ecartee tout de suite, pour ne pas montrer les videos
   // de « Pour toi » sous l'onglet « Suivis » le temps du chargement.
   const changerCategorie = (c: string) => {
+    // Sans compte : seul « Pour toi » est ouvert.
+    if (c !== 'Pour toi' && !exiger(c === 'Suivis' ? 'voir les comptes que tu suis' : 'ouvrir cet espace')) return
     const apres = c === 'Suivis' ? 'Suivis' : 'Pour toi'
     if (!autonome && (c === 'Suivis' || c === 'Pour toi') && apres !== filApi) {
       setListeApi([]); setErreur(''); setChargement(true); setIndex(0)
@@ -614,7 +656,8 @@ export default function Fil({
               onErreur={setErreur}
               son={sonDe(item)}
               onSon={(son, pseudo) => setFeuilleSon({ son, pseudo })}
-              onCommenter={setVideoCom} onVisiter={onVisiter} />
+              onCommenter={setVideoCom} onVisiter={onVisiter}
+              onSupprimee={masquer} onPasInteresse={masquer} onModifiee={modifier} />
           )}
         />
       ) : categorie === 'LIVE' ? (
@@ -646,7 +689,7 @@ export default function Fil({
         </View>
       ) : (
         <View style={[s.entete, clair && s.enteteClaire]}>
-          <Pressable hitSlop={10} onPress={() => setCategorie('LIVE')}>
+          <Pressable hitSlop={10} onPress={() => changerCategorie('LIVE')} accessibilityRole="button" accessibilityLabel="LIVE">
             <LiveEntete taille={26} couleur={clair ? '#111' : '#fff'} />
           </Pressable>
 
@@ -665,7 +708,8 @@ export default function Fil({
             ))}
           </View>
 
-          <Pressable hitSlop={10} onPress={onRechercher}>
+          <Pressable hitSlop={10} onPress={() => exiger('rechercher des comptes') && onRechercher?.()}
+            accessibilityRole="button" accessibilityLabel="Rechercher">
             <LoupeEntete taille={25} couleur={clair ? '#111' : '#fff'} />
           </Pressable>
         </View>
@@ -676,6 +720,11 @@ export default function Fil({
       {!!erreur && (autonome || liste.length > 0) && (
         <Pressable style={s.bandeau} onPress={() => setErreur('')}>
           <Text style={s.bandeauTexte}>{erreur}</Text>
+        </Pressable>
+      )}
+      {!!avisLien && (
+        <Pressable style={s.bandeau} onPress={() => setAvisLien('')}>
+          <Text style={s.bandeauTexte}>{avisLien}</Text>
         </Pressable>
       )}
 

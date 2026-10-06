@@ -144,3 +144,13 @@ CREATE TABLE IF NOT EXISTS tentatives (
 );
 
 CREATE INDEX IF NOT EXISTS tentatives_cle ON tentatives(cle, cree_le);
+
+-- ---------- Signalements ----------
+-- Un compte signale une video une fois (son motif peut changer).
+CREATE TABLE IF NOT EXISTS signalements (
+  video_id   uuid NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+  profil_id  uuid NOT NULL REFERENCES profils(id) ON DELETE CASCADE,
+  motif      text NOT NULL,
+  cree_le    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (video_id, profil_id)
+);

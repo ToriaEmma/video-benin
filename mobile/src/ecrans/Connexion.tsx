@@ -72,7 +72,7 @@ function EnteteFeuille({ onFermer }: { onFermer: () => void }) {
 // Feuille d'inscription
 // ------------------------------------------------------------
 
-function Inscription({ visible, onFermer, onConnexion, onSucces }: {
+export function Inscription({ visible, onFermer, onConnexion, onSucces }: {
   visible: boolean
   onFermer: () => void
   // Bascule vers la liste des comptes connus.
@@ -206,7 +206,7 @@ function Inscription({ visible, onFermer, onConnexion, onSucces }: {
 // Feuille « Ravis de te revoir » : les comptes deja connus
 // ------------------------------------------------------------
 
-function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
+export function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
   visible: boolean
   onFermer: () => void
   onInscription: () => void

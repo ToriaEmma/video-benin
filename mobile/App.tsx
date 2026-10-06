@@ -4,6 +4,8 @@ import { Text, TextInput } from './src/composants/Texte'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { setAudioModeAsync } from 'expo-audio'
 import { FournisseurAuth, useAuth } from './src/lib/auth'
+import { FournisseurInvite, useExigerCompte } from './src/lib/invite'
+import { videoDuLien, oublierLien } from './src/lib/lien'
 import Connexion from './src/ecrans/Connexion'
 import Fil from './src/ecrans/Fil'
 import Publier from './src/ecrans/Publier'
@@ -21,6 +23,10 @@ type Onglet = 'fil' | 'amis' | 'publier' | 'messages' | 'profil'
 
 function Application() {
   const { profil, chargement } = useAuth()
+  const exiger = useExigerCompte()
+  // Video ouverte par un lien partage (…/v/<id>) : le fil la montre d'abord.
+  const [videoPartagee] = useState(videoDuLien)
+  useEffect(() => { if (videoPartagee) oublierLien() }, [videoPartagee])
   // Vrai tant que l'etat enregistre n'a pas ete relu : afficher avant
   // montrerait les donnees d'origine, puis les ferait sauter.
   const [restauration, setRestauration] = useState(true)
@@ -81,14 +87,12 @@ function Application() {
     <View style={s.centre}><ActivityIndicator color="#fff" /></View>
   )
 
-  if (!profil) return <Connexion />
-
   return (
     <View style={s.app}>
       <View style={s.contenu}>
         {onglet === 'fil' && (
           <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')}
-            onUtiliserSon={utiliserSon} onLive={setEnLive} />
+            onUtiliserSon={utiliserSon} onLive={setEnLive} videoAOuvrir={videoPartagee} />
         )}
         {onglet === 'amis' && (
           lecture
@@ -110,7 +114,7 @@ function Application() {
             ? montage
               ? <Montage
                   uri={videoChoisie}
-                  pseudo={profil.pseudo}
+                  pseudo={profil?.pseudo ?? ''}
                   sonInitial={sonChoisi}
                   vitesseInitiale={vitesseChoisie}
                   onRetour={() => {
@@ -151,7 +155,8 @@ function Application() {
                 }}
               />
         )}
-        {onglet === 'profil' && (
+        {onglet === 'profil' && !profil && <Connexion onSucces={() => setOnglet('fil')} />}
+        {onglet === 'profil' && profil && (
           lecture
             ? <Fil
                 videos={lecture.videos}
@@ -189,7 +194,7 @@ function Application() {
         </Pressable>
 
         <Pressable style={s.navBouton}
-          onPress={() => { setLecture(null); setOnglet('amis') }}>
+          onPress={() => { if (!exiger('voir tes amis')) return; setLecture(null); setOnglet('amis') }}>
           <Amis taille={23} couleur={onglet === 'amis' ? teinte : teinteAttenuee} />
           <Text style={[s.navTexte, { color: onglet === 'amis' ? teinte : teinteAttenuee }]}>Amis</Text>
         </Pressable>
@@ -197,7 +202,8 @@ function Application() {
         {/* Pastille blanche avec ses deux ombres decalees : cyan a gauche,
             rouge a droite. En RN il n'y a pas de box-shadow multiple, on
             empile donc trois vues. */}
-        <Pressable style={s.navCreer} onPress={() => setOnglet('publier')}>
+        <Pressable style={s.navCreer} accessibilityRole="button" accessibilityLabel="Créer"
+          onPress={() => { if (exiger('publier une vidéo')) setOnglet('publier') }}>
           <View style={s.pastilleGroupe}>
             <View style={[s.pastilleOmbre, s.pastilleCyan]} />
             <View style={[s.pastilleOmbre, s.pastilleRouge]} />
@@ -208,7 +214,7 @@ function Application() {
         </Pressable>
 
         <Pressable style={s.navBouton}
-          onPress={() => { setLecture(null); setOnglet('messages') }}>
+          onPress={() => { if (!exiger('envoyer des messages')) return; setLecture(null); setOnglet('messages') }}>
           <Messages taille={23} couleur={onglet === 'messages' ? teinte : teinteAttenuee} />
           <Text style={[s.navTexte, { color: onglet === 'messages' ? teinte : teinteAttenuee }]}>Messages</Text>
         </Pressable>
@@ -259,7 +265,9 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       <FournisseurAuth>
-        <Application />
+        <FournisseurInvite>
+          <Application />
+        </FournisseurInvite>
       </FournisseurAuth>
     </SafeAreaProvider>
   )
