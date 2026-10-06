@@ -5,7 +5,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView, type VideoPlayer } from 'expo-video'
 import { useMusiqueCalee, useSonEnMemoire } from '../lib/musiqueCalee'
-import { useAudioPlayer } from 'expo-audio'
+import { usePiste } from '../lib/piste'
 import { File } from 'expo-file-system'
 import { Text, TextInput } from '../composants/Texte'
 import Feuille from '../composants/Feuille'
@@ -79,8 +79,9 @@ const EFFETS_VOCAUX = [
 // Les reglages sont poses sur le lecteur ici, hors du composant : une
 // propriete d'objet venant d'un hook ne se modifie pas dans le rendu.
 function reglerLecture(p: {
-  loop: boolean; muted: boolean; playbackRate: number; preservesPitch: boolean
-}, r: { boucle?: boolean; coupe?: boolean; debit?: number; hauteur?: boolean }) {
+  loop: boolean; muted: boolean; playbackRate: number; preservesPitch: boolean; currentTime: number
+}, r: { boucle?: boolean; coupe?: boolean; debit?: number; hauteur?: boolean; position?: number }) {
+  if (r.position !== undefined) p.currentTime = r.position
   if (r.boucle !== undefined) p.loop = r.boucle
   if (r.coupe !== undefined) p.muted = r.coupe
   if (r.hauteur !== undefined) p.preservesPitch = r.hauteur
@@ -144,11 +145,12 @@ function CalquePose({ calque, onOuvrir }: {
 
 // Apercu du montage avec le son retenu : la musique tourne par-dessus la
 // video, comme elle sera jouee dans le fil une fois publiee.
-function MusiqueApercu({ son, url, lecteur }: { son: Son; url: string; lecteur: VideoPlayer }) {
-  const musique = useAudioPlayer({ uri: url })
+function MusiqueApercu({ son, url, lecteur, actif }: { son: Son; url: string; lecteur: VideoPlayer; actif: boolean }) {
+  const musique = usePiste(url)
   // La musique suit l'apercu : meme instant, meme boucle, arret si la video fige.
-  useMusiqueCalee(lecteur, musique, true, son.duree)
-  useEffect(() => () => { try { musique.pause() } catch { /* Lecteur deja libere. */ } }, [musique])
+  // Elle se tait pendant le choix d'un autre son (qui fait son propre apercu).
+  useMusiqueCalee(lecteur, musique, actif, son.duree, son.original ? 0.3 : 0.08)
+  useEffect(() => { if (!actif) musique.pause() }, [actif, musique])
   return null
 }
 
@@ -201,18 +203,18 @@ export default function Montage({
 
   // Avec un son, l'apercu attend que la musique soit chargee en memoire,
   // puis video et musique partent ensemble du debut.
-  const sonLocal = useSonEnMemoire(son?.url ?? null)
+  const sonLocal = useSonEnMemoire(son?.url ?? null, !son?.original)
   const sonPret = !son || !!sonLocal
   useEffect(() => {
     if (!sonPret) { lecteur.pause(); return }
-    lecteur.currentTime = 0
+    reglerLecture(lecteur, { position: 0 })
     lecteur.play()
   }, [lecteur, sonPret])
 
   // Un son retenu remplace la piste de la video dans l'apercu (« Son coupé »
   // coupe aussi la video sans son).
   useEffect(() => {
-    lecteur.muted = coupe || !!son
+    reglerLecture(lecteur, { coupe: coupe || !!son })
   }, [lecteur, coupe, son])
 
   // Le message s'effacant seul, chaque appel remplace le precedent.
@@ -320,7 +322,7 @@ export default function Montage({
   return (
     <View style={[s.page, { paddingTop: marges.top }]}>
       <View style={s.viseur}>
-        {son && sonLocal && <MusiqueApercu key={son.id + sonLocal} son={son} url={sonLocal} lecteur={lecteur} />}
+        {son && sonLocal && <MusiqueApercu key={son.id + sonLocal} son={son} url={sonLocal} lecteur={lecteur} actif={!choixSon} />}
         <VideoView player={lecteur} style={StyleSheet.absoluteFill}
           contentFit="contain" nativeControls={false} />
 

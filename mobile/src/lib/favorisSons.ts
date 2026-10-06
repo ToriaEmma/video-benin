@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { Son } from './sons'
+import { estSonDistant, resoudreSon } from './resolutionSons'
 
 const CLE = 'tocktick-sons-favoris-v1'
 let favoris: Son[] = []
@@ -19,6 +20,26 @@ async function charger() {
     if (brut) favoris = JSON.parse(brut)
   } catch { /* Stockage illisible : liste vide. */ }
   diffuser()
+  rafraichir()
+}
+
+// Les extraits Deezer ont une adresse signee qui expire en un jour : un
+// favori garde tel quel ne se lirait plus. On redemande chaque son distant
+// (Deezer ou son original d'une video) a l'ouverture.
+async function rafraichir() {
+  const frais = await Promise.all(favoris.map(async f => {
+    if (!estSonDistant(f.id)) return f
+    const r = await resoudreSon(f.id).catch(() => null)
+    // Son original : on garde l'identite du favori (video d'origine), avec
+    // l'adresse a jour.
+    if (!r || (f.original && !r.original)) return f
+    return { ...f, url: r.url, duree: r.duree || f.duree, pochette: r.pochette ?? f.pochette }
+  }))
+  // La liste a pu changer pendant la resolution : on ne met a jour que les adresses.
+  const parId = new Map(frais.map(f => [f.id, f]))
+  favoris = favoris.map(f => parId.get(f.id) ?? f)
+  diffuser()
+  AsyncStorage.setItem(CLE, JSON.stringify(favoris)).catch(() => {})
 }
 
 export function basculerFavoriSon(son: Son) {

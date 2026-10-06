@@ -8,10 +8,10 @@ import {
   View, StyleSheet, Pressable, FlatList, Modal, Animated, PanResponder,
   useWindowDimensions, ScrollView, ActivityIndicator, Image,
 } from 'react-native'
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
+import { usePiste, usePisteJoue } from '../lib/piste'
 import { Text, TextInput } from '../composants/Texte'
 import {
-  Loupe, Egaliseur, Ciseaux, MarquePage,
+  Loupe, Egaliseur, Ciseaux, MarquePage, CocheValider,
 } from '../composants/Icones'
 import {
   SONS, parPopularite, abregerPublications, dureeLisible, type Son,
@@ -37,7 +37,7 @@ const DELAI_ABANDON = 12000
 type Etat = 'chargement' | 'lecture' | 'echec'
 
 // Une ligne de son : pochette, titre, auteur et compteurs.
-function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori }: {
+function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori, onUtiliser }: {
   son: Son
   choisi: boolean
   // Etat de l'apercu du son retenu, pour cette ligne seulement.
@@ -47,6 +47,7 @@ function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori }: {
   favori: boolean
   onChoisir: () => void
   onFavori: () => void
+  onUtiliser: () => void
 }) {
   const charge = choisi && etat === 'chargement'
   const echoue = choisi && etat === 'echec'
@@ -72,7 +73,7 @@ function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori }: {
           </Text>
         </View>
         <Text style={s.meta} numberOfLines={1}>
-          {son.original ? `@${son.artiste} · son original`
+          {son.original ? `${son.artiste} · son original`
             : `${son.artiste} · ${abregerPublications(son.publications)} publications · ${dureeLisible(son.duree)}`}
         </Text>
         {charge && <Text style={s.chargement}>Chargement…</Text>}
@@ -85,6 +86,10 @@ function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori }: {
         <Pressable hitSlop={8}><Ciseaux taille={23} couleur="#111" /></Pressable>
         <Pressable hitSlop={8} onPress={onFavori}>
           <MarquePage taille={23} couleur="#111" plein={favori} />
+        </Pressable>
+        {/* Valide le son, comme la coche rouge de TikTok. */}
+        <Pressable hitSlop={8} onPress={onUtiliser} style={s.utiliser}>
+          <CocheValider taille={18} couleur="#fff" />
         </Pressable>
       </View>}
     </Pressable>
@@ -198,8 +203,8 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
   const son = choisiSon
   // `downloadFirst` est laisse a faux : attendre le fichier entier rendrait
   // l'apercu muet le temps du telechargement, ce qui est le defaut corrige ici.
-  const lecteur = useAudioPlayer(son ? { uri: son.url } : null)
-  const statut = useAudioPlayerStatus(lecteur)
+  const lecteur = usePiste(son ? son.url : null)
+  const statut = { playing: usePisteJoue(lecteur) }
 
   // Un son qui tarde trop est declare injouable : c'est le seul etat que
   // le statut du lecteur ne donne pas de lui-meme.
@@ -233,7 +238,9 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
   const retenir = (x: Son) => {
     if (choisi === x.id) {
       // Second appui : on valide et on referme, sauf si rien ne s'est joue.
-      if (etat === 'echec') return
+      // Un son original (piste d'une video) peut etre long a pre-ecouter :
+      // il reste utilisable, la video le lira a son rythme.
+      if (etat === 'echec' && !x.original) return
       noterRecent(x)
       onChoisir(x); onFermer(); return
     }
@@ -332,7 +339,8 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
                 rang={onglet === 'Populaire' && !enRecherche ? index + 1 : undefined}
                 favori={estFavori(item.id)}
                 onChoisir={() => retenir(item)}
-                onFavori={() => basculerFavoriSon(item)} />
+                onFavori={() => basculerFavoriSon(item)}
+                onUtiliser={() => { noterRecent(item); onChoisir(item); onFermer() }} />
             )}
           />
         </Animated.View>
@@ -402,4 +410,6 @@ const s = StyleSheet.create({
   echec: { fontSize: 11.5, color: '#ff2856' },
 
   actions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  utiliser: { width: 34, height: 34, borderRadius: 6, backgroundColor: '#ff2856',
+    alignItems: 'center', justifyContent: 'center' },
 })

@@ -7,7 +7,7 @@ import { BARRE_ETAT_WEB } from '../lib/theme'
 import { useFinDefilementWeb } from '../lib/finDefilement'
 import { Text } from '../composants/Texte'
 import { useVideoPlayer, VideoView } from 'expo-video'
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
+import { usePiste } from '../lib/piste'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEvent } from 'expo'
 import { abreger, type Video } from '../lib/demo'
@@ -88,11 +88,10 @@ function Carte({
     p.muted = !!son
   })
 
-  // Musique jouee par-dessus la video. `expo-audio` n'accepte pas une
-  // source nulle au montage sans la remplacer ensuite : la carte etant
-  // reconstruite par video, la source ne change jamais de son vivant.
-  const musique = useAudioPlayer(son ? { uri: son.url } : null)
-  const etatMusique = useAudioPlayerStatus(musique)
+  // Musique jouee par-dessus la video, en boucle. Sur le web, une seule
+  // platine pour tout le site : la carte qui joue la prend, les autres
+  // ne peuvent plus faire de bruit.
+  const musique = usePiste(son ? son.url : null)
 
   const [aime, setAime] = useState(item.aime)
   const [nbAime, setNbAime] = useState(item.nbAime)
@@ -159,19 +158,6 @@ function Carte({
 
   // Calage permanent : la musique suit la video (chargement, boucle, reprise).
   useMusiqueCalee(lecteur, son ? musique : null, actif, son?.duree ?? 0)
-
-  // Morceau fini avant la video : on le reprend au debut. `loop` ferait
-  // la meme chose, mais muter ce que rend un hook est proscrit ici.
-  useEffect(() => {
-    if (!son || !etatMusique.didJustFinish) return
-    musique.seekTo(0)
-      .then(() => musique.play())
-      .catch(() => { /* Reprise refusee : la video continue en silence. */ })
-  }, [son, etatMusique.didJustFinish, musique])
-
-  useEffect(() => () => {
-    try { musique.pause() } catch { /* Lecteur deja libere. */ }
-  }, [musique])
 
   // La vue part quand la carte devient celle qu'on regarde, et non a
   // chaque rendu. L'echec est silencieux : rater un comptage ne doit pas

@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
-  View, Pressable, StyleSheet, useWindowDimensions, SafeAreaView, Alert, Image,
+  View, Pressable, StyleSheet, useWindowDimensions, SafeAreaView, Alert, Image, Platform,
+  ActivityIndicator,
 } from 'react-native'
 import { Text } from '../composants/Texte'
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
 import * as MediaLibrary from 'expo-media-library'
-import { createAudioPlayer } from 'expo-audio'
+import { usePiste } from '../lib/piste'
+import { assemblerVideos } from '../lib/assemblage'
 import Svg, { Circle, Line } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
@@ -97,20 +99,23 @@ function useChrono() {
 // rythme. Elle part du point ou en est le chronometre : les prises
 // successives s'enchainent donc sur le morceau, et la suppression d'un clip
 // la fait revenir d'autant. Montee par son (cle), la source ne change jamais.
+// Camera web : enregistrement continu, a clore pour obtenir la video.
+type CameraSeance = { terminerSession: () => Promise<string | undefined> }
+const seanceWeb = (c: unknown): CameraSeance | null =>
+  c && typeof (c as Partial<CameraSeance>).terminerSession === 'function' ? c as CameraSeance : null
+
 function MusiquePrise({ son, enCours }: { son: Son; enCours: boolean }) {
-  // Lecteur cree a la main, une fois par son : le hook useAudioPlayer le
-  // recreait entre deux prises, et le morceau repartait du debut.
-  const [musique] = useState(() => createAudioPlayer({ uri: son.url }))
-  useEffect(() => () => { try { musique.remove() } catch { /* Deja libere. */ } }, [musique])
-  // Le son est deja mis en memoire pour l'apercu du montage.
-  useEffect(() => { prechargerSon(son.url) }, [son.url])
+  const musique = usePiste(son.url)
+  // Le son est deja mis en memoire pour l'apercu du montage (sauf un son
+  // original : c'est la piste d'une video, trop lourde pour ca).
+  useEffect(() => { if (!son.original) prechargerSon(son.url) }, [son.url, son.original])
   useEffect(() => {
     if (!enCours) { musique.pause(); return }
     let annule = false
     const lancer = async () => {
-      // Le morceau doit etre charge pour accepter une position : sinon il
-      // repartirait du debut au lieu de suivre le chronometre.
-      for (let i = 0; i < 60 && !musique.isLoaded && !annule; i++) {
+      // Mobile : le morceau doit etre charge pour accepter une position. Le
+      // web la retient et l'applique des que le fichier est pret.
+      for (let i = 0; Platform.OS !== 'web' && i < 60 && !musique.isLoaded && !annule; i++) {
         await new Promise(r => setTimeout(r, 50))
       }
       if (annule) return
@@ -241,7 +246,16 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   const [cumul, setCumul] = useState(0)
 
   // Duree maximale selon le mode choisi, qui borne aussi l'arc de progression.
-  const dureeMax = mode === '60 s' ? 60 : 15
+  const dureeMax = mode === '10 min' ? 600 : mode === '60 s' ? 60 : 15
+  // Avec un son, la video s'arrete a la fin du morceau, comme sur TikTok.
+  const limite = son && son.duree > 0 ? Math.min(dureeMax, son.duree) : dureeMax
+  // Web : les prises s'enchainent dans un enregistrement continu (seance).
+  // Supprimer une prise clot la seance ; on garde sa partie utile, et la
+  // validation raccorde les seances. `debutSeance` : chrono au debut de la
+  // seance en cours (null s'il n'y en a pas).
+  const seances = useRef<{ uri: string; debut: number; fin: number; entiere: boolean }[]>([])
+  const debutSeance = useRef<number | null>(null)
+  const [assemblage, setAssemblage] = useState(false)
 
   useEffect(() => {
     if (enregistrement) chrono.demarrer()
@@ -313,9 +327,15 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   const filmer = async () => {
     if (!camera.current) return
     if (enregistrement) { camera.current.stopRecording(); return }
+    const restant = limite - chrono.valeur
+    if (restant < 0.3) {
+      setMessage(son && son.duree > 0 && limite === son.duree ? 'Le son est terminé : valide ta vidéo.' : 'Durée maximale atteinte.')
+      setTimeout(() => setMessage(''), 2600)
+      return
+    }
     setEnregistrement(true)
+    if (seanceWeb(camera.current) && debutSeance.current === null) debutSeance.current = chrono.valeur
     try {
-      const restant = Math.max(Math.round(dureeMax - chrono.valeur), 1)
       const v = await camera.current.recordAsync({ maxDuration: restant })
       if (v?.uri) setClips(l => [...l, { uri: v.uri, fin: chrono.valeur }])
     } catch {
@@ -332,9 +352,24 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
       { text: 'Annuler', style: 'cancel' },
       {
         text: 'Supprimer', style: 'destructive',
-        onPress: () => {
+        onPress: async () => {
           const reste = clips.slice(0, -1)
           setClips(reste)
+          const finGardee = reste.length ? reste[reste.length - 1].fin : 0
+          // La seance en cours contient la prise supprimee : on la clot, et
+          // seule sa partie d'avant la prise sera gardee.
+          const cam = seanceWeb(camera.current)
+          if (cam) {
+            if (debutSeance.current !== null) {
+              const debut = debutSeance.current
+              debutSeance.current = null
+              const uri = await cam.terminerSession()
+              if (uri) seances.current.push({ uri, debut, fin: Infinity, entiere: false })
+            }
+            seances.current = seances.current
+              .map(x => ({ ...x, fin: Math.min(x.fin, finGardee) }))
+              .filter(x => x.fin > x.debut + 0.05)
+          }
           // Le chronometre revient a la fin du clip precedent.
           const fin = reste.length ? reste[reste.length - 1].fin : 0
           chrono.poser(fin); setCumul(fin)
@@ -344,9 +379,28 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   }
 
   // La coche valide le montage et passe a la publication.
-  const valider = () => {
-    const dernier = clips[clips.length - 1]
-    if (dernier) onChoisir(dernier.uri, son)
+  const valider = async () => {
+    if (!clips.length || assemblage || enregistrement) return
+    const cam = seanceWeb(camera.current)
+    // Mobile : chaque prise est un fichier, la camera rend la derniere.
+    if (!cam) return onChoisir(clips[clips.length - 1].uri, son)
+    setAssemblage(true)
+    try {
+      if (debutSeance.current !== null) {
+        const debut = debutSeance.current
+        debutSeance.current = null
+        const uri = await cam.terminerSession()
+        if (uri) seances.current.push({ uri, debut, fin: chrono.valeur, entiere: true })
+      }
+      const morceaux = seances.current
+      if (!morceaux.length) throw new Error('Aucune prise')
+      if (morceaux.length === 1 && morceaux[0].entiere) return onChoisir(morceaux[0].uri, son)
+      onChoisir(await assemblerVideos(morceaux.map(m => ({ uri: m.uri, duree: m.fin - m.debut }))), son)
+    } catch {
+      setMessage('Impossible de préparer la vidéo. Réessaie.')
+    } finally {
+      setAssemblage(false)
+    }
   }
 
   if (!permission?.granted) {
@@ -474,6 +528,12 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
       {!!message && (
         <View style={s.message}><Text style={s.messageTexte}>{message}</Text></View>
       )}
+      {assemblage && (
+        <View style={s.message}>
+          <ActivityIndicator color="#fff" />
+          <Text style={s.messageTexte}>Préparation de la vidéo…</Text>
+        </View>
+      )}
 
       {/* Bas : durees, carrousel, modes */}
       <SafeAreaView style={s.basZone}>
@@ -518,8 +578,8 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
                   // (= reprendre), l'arc gardant l'avancement acquis.
                   <Pressable key="filmer" onPress={filmer}>
                     <DisqueEnregistrement taille={tailleFilmer}
-                      dureeMax={dureeMax} enCours={enregistrement}
-                      separations={clips.map(c => c.fin / dureeMax)} />
+                      dureeMax={limite} enCours={enregistrement}
+                      separations={clips.map(c => c.fin / limite)} />
                   </Pressable>
                 ) : (
                   <Pressable key="filmer" disabled={!camera}

@@ -56,7 +56,6 @@ function afficherCadreTelephone() {
   document.body.appendChild(scene)
 }
 
-let sonDebloque = false
 // Lecteurs coupes automatiquement, y compris ceux qui ne sont pas dans la page
 // (expo-audio joue les sons par un element Audio detache).
 const coupes = new Set<HTMLMediaElement>()
@@ -65,7 +64,7 @@ function installerSonAutomatique() {
   const jouer = HTMLMediaElement.prototype.play
   let pastille: HTMLDivElement | null = null
   const montrerPastille = () => {
-    if (pastille || sonDebloque) return
+    if (pastille) return
     pastille = document.createElement('div')
     pastille.textContent = '🔇  Touche l’écran pour activer le son'
     pastille.style.cssText = 'position:fixed;left:50%;top:max(14px,env(safe-area-inset-top));transform:translateX(-50%);z-index:9998;padding:8px 14px;border-radius:20px;background:rgba(0,0,0,.6);color:#fff;font:600 13px -apple-system,system-ui,sans-serif;pointer-events:none;white-space:nowrap'
@@ -83,7 +82,9 @@ function installerSonAutomatique() {
     ;(window as unknown as { __medias: Set<HTMLMediaElement> }).__medias.add(media)
     const promesse = jouer.call(media)
     promesse?.catch((e: DOMException) => {
-      if (e?.name !== 'NotAllowedError' || sonDebloque || media.muted) return
+      // Sur iPhone, chaque nouveau lecteur peut etre refuse, meme apres un
+      // premier toucher : la sourdine automatique reste donc toujours prete.
+      if (e?.name !== 'NotAllowedError' || media.muted) return
       media.muted = true
       jouer.call(media).catch(() => {})
       coupes.add(media)
@@ -95,8 +96,7 @@ function installerSonAutomatique() {
   // aussi la video en pause) : on l'absorbe quand une sourdine automatique attend.
   const absorber = (e: Event) => { e.stopPropagation(); e.preventDefault() }
   const debloquer = (e: Event) => {
-    if (sonDebloque) return
-    sonDebloque = true
+    if (!coupes.size) { pastille?.remove(); pastille = null; return }
     if (pastille && e.type !== 'keydown') {
       for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.addEventListener(t, absorber, { capture: true })
       absorber(e)

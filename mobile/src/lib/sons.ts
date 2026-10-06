@@ -135,7 +135,7 @@ export const sonOriginal = (v: { id: string; url: string; pseudo: string }): Son
   id: `video:${v.id}`,
   titre: 'son original',
   artiste: v.pseudo,
-  licence: `Son original de @${v.pseudo}`,
+  licence: `Son original de ${v.pseudo}`,
   publications: 1,
   duree: 0,
   url: v.url,

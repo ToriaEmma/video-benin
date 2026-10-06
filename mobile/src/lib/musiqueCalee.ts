@@ -20,11 +20,18 @@ const PAS = 100
 // Sans progression pendant ce delai, la video est consideree figee.
 const FIGEE_MS = 400
 
-export function useMusiqueCalee(video: Video, musique: Musique | null, actif: boolean, duree: number) {
+// `ecartMax` : ecart tolere avant recalage. Une musique en memoire se recale
+// sans a-coup, on peut alors etre plus exigeant.
+export function useMusiqueCalee(video: Video, musique: Musique | null, actif: boolean, duree: number, ecartMax = 0.3) {
   useEffect(() => {
     if (!actif || !musique) return
     let dernier = -1
     let immobile = 0
+    // Apres un saut, la musique met un instant a repartir : on la recale
+    // plus finement pendant les deux secondes qui suivent.
+    let precis = 0
+    // Relevés laisses a la musique pour se poser apres un recalage.
+    let calme = 0
     const minuteur = setInterval(() => {
       const v = video.currentTime
       const avance = Math.abs(v - dernier) > 0.005
@@ -39,13 +46,18 @@ export function useMusiqueCalee(video: Video, musique: Musique | null, actif: bo
       immobile = 0
       // Extrait plus court que la video : la musique repart en boucle.
       const cible = duree > 0 ? v % duree : v
-      if (boucle || Math.abs(musique.currentTime - cible) > 0.3) {
+      const tolerance = precis > 0 ? Math.min(0.12, ecartMax) : ecartMax
+      if (precis > 0) precis--
+      if (calme > 0 && !boucle) calme--
+      else if (boucle || Math.abs(musique.currentTime - cible) > tolerance) {
+        if (boucle || precis === 0) precis = 20
+        calme = 3
         musique.seekTo(cible).catch(() => { /* Position refusee. */ })
       }
       if (!musique.playing) musique.play()
     }, PAS)
     return () => clearInterval(minuteur)
-  }, [actif, video, musique, duree])
+  }, [actif, video, musique, duree, ecartMax])
 }
 
 // Musique chargee entierement en memoire (web) : les retours au debut de la
@@ -67,16 +79,17 @@ export function prechargerSon(url: string): Promise<string> {
   return p
 }
 
-// Renvoie null tant que le fichier n'est pas pret.
-export function useSonEnMemoire(url: string | null): string | null {
+// Renvoie null tant que le fichier n'est pas pret. `memoire` a faux (son
+// original : la piste d'une video, souvent lourde) lit l'adresse en continu.
+export function useSonEnMemoire(url: string | null, memoire = true): string | null {
   const [pret, setPret] = useState<{ url: string; local: string } | null>(null)
   useEffect(() => {
-    if (!url || Platform.OS !== 'web') return
+    if (!url || Platform.OS !== 'web' || !memoire) return
     let annule = false
     prechargerSon(url).then(local => { if (!annule) setPret({ url, local }) })
     return () => { annule = true }
-  }, [url])
+  }, [url, memoire])
   if (!url) return null
-  if (Platform.OS !== 'web') return url
+  if (Platform.OS !== 'web' || !memoire) return url
   return pret?.url === url ? pret.local : null
 }
