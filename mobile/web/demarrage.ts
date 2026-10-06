@@ -14,14 +14,11 @@ export function preparerWeb(): boolean {
   `
   document.head.appendChild(style)
 
-  // Les lecteurs video interrompent souvent play() (changement de carte,
-  // pause) : la promesse rejetee est attendue, on la marque comme geree.
-  const jouer = HTMLMediaElement.prototype.play
-  HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
-    const promesse = jouer.call(this)
-    promesse?.catch(() => {})
-    return promesse
-  }
+  // Lecture automatique : le navigateur refuse le son avant le premier geste.
+  // Une video refusee repart sans le son au lieu de rester figee ; au premier
+  // toucher, le son revient sur tout ce qui avait ete coupe ainsi.
+  installerSonAutomatique()
+
   document.documentElement.lang = 'fr'
   document.title = 'TockTick'
 
@@ -52,4 +49,58 @@ function afficherCadreTelephone() {
   window.addEventListener('resize', ajuster)
   scene.appendChild(cadre)
   document.body.appendChild(scene)
+}
+
+let sonDebloque = false
+// Lecteurs coupes automatiquement, y compris ceux qui ne sont pas dans la page
+// (expo-audio joue les sons par un element Audio detache).
+const coupes = new Set<HTMLMediaElement>()
+
+function installerSonAutomatique() {
+  const jouer = HTMLMediaElement.prototype.play
+  let pastille: HTMLDivElement | null = null
+  const montrerPastille = () => {
+    if (pastille || sonDebloque) return
+    pastille = document.createElement('div')
+    pastille.textContent = '🔇  Touche l’écran pour activer le son'
+    pastille.style.cssText = 'position:fixed;left:50%;top:max(14px,env(safe-area-inset-top));transform:translateX(-50%);z-index:9998;padding:8px 14px;border-radius:20px;background:rgba(0,0,0,.6);color:#fff;font:600 13px -apple-system,system-ui,sans-serif;pointer-events:none;white-space:nowrap'
+    document.body.appendChild(pastille)
+  }
+  // Une pause demandee par l'application : ce lecteur ne doit pas repartir seul.
+  const arreter = HTMLMediaElement.prototype.pause
+  HTMLMediaElement.prototype.pause = function (this: HTMLMediaElement) {
+    coupes.delete(this)
+    return arreter.call(this)
+  }
+  HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
+    const media = this
+    ;(window as unknown as { __medias?: Set<HTMLMediaElement> }).__medias ??= new Set()
+    ;(window as unknown as { __medias: Set<HTMLMediaElement> }).__medias.add(media)
+    const promesse = jouer.call(media)
+    promesse?.catch((e: DOMException) => {
+      if (e?.name !== 'NotAllowedError' || sonDebloque || media.muted) return
+      media.muted = true
+      jouer.call(media).catch(() => {})
+      coupes.add(media)
+      montrerPastille()
+    })
+    return promesse
+  }
+  // Le geste qui active le son ne doit rien faire d'autre (sinon il mettrait
+  // aussi la video en pause) : on l'absorbe quand une sourdine automatique attend.
+  const absorber = (e: Event) => { e.stopPropagation(); e.preventDefault() }
+  const debloquer = (e: Event) => {
+    if (sonDebloque) return
+    sonDebloque = true
+    if (pastille && e.type !== 'keydown') {
+      for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.addEventListener(t, absorber, { capture: true })
+      absorber(e)
+      setTimeout(() => { for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.removeEventListener(t, absorber, { capture: true }) }, 450)
+    }
+    // Le son revient ; un lecteur que l'application voulait faire jouer repart.
+    coupes.forEach(m => { m.muted = false; if (m.paused) jouer.call(m).catch(() => {}) })
+    coupes.clear()
+    pastille?.remove(); pastille = null
+  }
+  for (const evt of ['pointerdown', 'touchstart', 'keydown']) window.addEventListener(evt, debloquer, { capture: true })
 }
