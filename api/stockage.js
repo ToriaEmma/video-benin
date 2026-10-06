@@ -58,12 +58,18 @@ export const urlPubliqueDe = (cle) =>
 
 // L'URL signee expire : elle ne sert qu'au televersement qui suit
 // immediatement, pas a un acces durable.
-export const signerDepot = (cle, type) =>
+// La taille annoncee est signee avec l'autorisation : le stockage refuse
+// un fichier d'une autre taille, ce qui empeche de contourner TAILLE_MAX.
+export const signerDepot = (cle, type, taille) =>
   getSignedUrl(
     client,
-    new PutObjectCommand({ Bucket: SEAU, Key: cle, ContentType: type }),
-    { expiresIn: 600 },
+    new PutObjectCommand({ Bucket: SEAU, Key: cle, ContentType: type, ContentLength: taille }),
+    { expiresIn: 600, signableHeaders: new Set(['content-type', 'content-length']) },
   )
+
+// Dossier des fichiers d'un compte : une publication ne peut pointer que
+// vers un fichier que son auteur a lui-meme televerse.
+export const prefixeDepot = (profilId) => urlPubliqueDe(`videos/${profilId}/`)
 
 // Efface le fichier d'une video de notre seau. Une adresse etrangere (autre
 // hebergement, ancien stockage) est ignoree : il n'y a rien a effacer ici.

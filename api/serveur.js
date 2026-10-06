@@ -17,6 +17,7 @@ import {
   signerJeton,
   exigerSession,
   sessionFacultative,
+  EMPREINTE_LEURRE,
 } from './auth.js'
 import {
   stockageConfigure,
@@ -26,11 +27,39 @@ import {
   urlPubliqueDe,
   signerDepot,
   supprimerFichier,
+  prefixeDepot,
 } from './stockage.js'
+import {
+  Refus,
+  LIMITES,
+  texteRequis,
+  texteFacultatif,
+  booleenOuDefaut,
+  pseudoValide,
+  telephoneValide,
+  finDeNumero,
+  motDePasseValide,
+  identifiant,
+  sonValide,
+  avatarValide,
+  dateFacultative,
+  limiteDemandee,
+} from './regles.js'
 
 const app = express()
-app.use(cors())
-app.use(express.json())
+// Rien ne doit trahir la technologie du serveur.
+app.disable('x-powered-by')
+// Derriere le proxy de Vercel : l'adresse du client est dans X-Forwarded-For.
+app.set('trust proxy', true)
+// Les sessions passent par l'en-tete Authorization et non par un cookie :
+// ouvrir CORS a toutes les origines n'expose donc pas aux requetes forgees.
+app.use(cors({ methods: ['GET', 'POST', 'PATCH', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'] }))
+// 512 Ko : de quoi porter une photo de profil, pas davantage.
+app.use(express.json({ limit: '512kb' }))
+app.use((_req, res, suite) => {
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' })
+  suite()
+})
 
 // ------------------------------------------------------------
 // Outils communs
@@ -41,60 +70,21 @@ app.use(express.json())
 const route = (traitement) => (req, res, suite) =>
   Promise.resolve(traitement(req, res, suite)).catch(suite)
 
-// Erreur portant un code HTTP, pour distinguer un refus attendu
-// (403, 404) d'une panne serveur.
-class Refus extends Error {
-  constructor(code, message) {
-    super(message)
-    this.code = code
-  }
-}
-
-const texteRequis = (valeur, nom) => {
-  if (typeof valeur !== 'string' || valeur.trim() === '') {
-    throw new Refus(400, `Le champ « ${nom} » est requis`)
-  }
-  return valeur.trim()
-}
-
-const texteFacultatif = (valeur) =>
-  typeof valeur === 'string' ? valeur.trim() : null
-
-const booleenOuDefaut = (valeur, defaut) =>
-  typeof valeur === 'boolean' ? valeur : defaut
-
 const VISIBILITES = ['monde', 'amis', 'moi']
 
-// La limite est plafonnee : une requete ne doit pas pouvoir demander
-// la table entiere.
-const limiteDemandee = (brut) => {
-  const n = Number.parseInt(brut, 10)
-  if (!Number.isFinite(n) || n <= 0) return 20
-  return Math.min(n, 50)
-}
-
-// uuid attendu dans l'URL : un identifiant mal forme ferait echouer la
-// requete SQL avec une erreur de type, qu'on ne veut pas remonter.
-const MOTIF_UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const identifiant = (brut, nom = 'identifiant') => {
-  if (!MOTIF_UUID.test(brut || '')) {
-    throw new Refus(400, `${nom} invalide`)
-  }
-  return brut
-}
-
-// Projection d'un profil : l'empreinte du mot de passe n'en sort jamais.
+// Projection d'un profil vu par les autres : ni l'empreinte du mot de
+// passe ni le numero de telephone n'en sortent.
 const profilPublic = (p) => ({
   id: p.id,
   pseudo: p.pseudo,
   nom: p.nom,
   bio: p.bio,
   avatar_url: p.avatar_url,
-  telephone: p.telephone,
   cree_le: p.cree_le,
 })
+
+// Le titulaire du compte, et lui seul, revoit son numero.
+const profilPrive = (p) => ({ ...profilPublic(p), telephone: p.telephone })
 
 // Mise en forme attendue par l'application mobile (mobile/src/lib/demo.ts).
 const videoPublique = (v) => ({
@@ -129,7 +119,7 @@ const commentairePublic = (c) => ({
 
 const trouverProfilParPseudo = async (pseudo) => {
   const [profil] = await sql`
-    SELECT * FROM profils WHERE pseudo = ${pseudo}
+    SELECT * FROM profils WHERE pseudo = ${String(pseudo ?? '').replace(/^@/, '').toLowerCase()}
   `
   if (!profil) throw new Refus(404, 'Compte introuvable')
   return profil
@@ -139,23 +129,52 @@ const trouverProfilParPseudo = async (pseudo) => {
 // Comptes
 // ------------------------------------------------------------
 
-app.post('/inscription', route(async (req, res) => {
-  const telephone = texteRequis(req.body?.telephone, 'telephone')
-  const motDePasse = texteRequis(req.body?.motDePasse, 'motDePasse')
-  const pseudo = texteRequis(req.body?.pseudo, 'pseudo')
+// ------------------------------------------------------------
+// Limitation des essais
+//
+// Sans elle, un robot pourrait essayer des milliers de mots de passe sur
+// un compte, ou creer des comptes en serie. Les essais sont notes en
+// base : sur un hebergement sans serveur, la memoire ne survit pas
+// d'une requete a l'autre.
+// ------------------------------------------------------------
 
-  if (motDePasse.length < 6) {
-    throw new Refus(400, 'Le mot de passe doit faire au moins 6 caractères')
+const FENETRE_ESSAIS = '15 minutes'
+
+const verifierEssais = async (regles) => {
+  for (const { cle, max } of regles) {
+    const [{ n }] = await sql`
+      SELECT count(*)::int AS n FROM tentatives
+      WHERE cle = ${cle} AND cree_le > now() - ${FENETRE_ESSAIS}::interval
+    `
+    if (n >= max) throw new Refus(429, 'Trop de tentatives. Réessaie dans 15 minutes.')
   }
+}
+
+const noterEssais = async (cles) => {
+  for (const cle of cles) await sql`INSERT INTO tentatives (cle) VALUES (${cle})`
+  // Menage au passage : rien ne sert au-dela d'une journee.
+  await sql`DELETE FROM tentatives WHERE cree_le < now() - interval '1 day'`
+}
+
+const adresseClient = (req) => req.ip || 'inconnue'
+
+app.post('/inscription', route(async (req, res) => {
+  const ip = `inscription-ip:${adresseClient(req)}`
+  await verifierEssais([{ cle: ip, max: 5 }])
+
+  const telephone = telephoneValide(req.body?.telephone)
+  const motDePasse = motDePasseValide(req.body?.motDePasse)
+  const pseudo = pseudoValide(req.body?.pseudo)
 
   const existants = await sql`
     SELECT pseudo, telephone FROM profils
-    WHERE pseudo = ${pseudo} OR telephone = ${telephone}
+    WHERE pseudo = ${pseudo}
+       OR right(regexp_replace(telephone, '\\D', '', 'g'), 8) = ${finDeNumero(telephone)}
   `
   if (existants.some((p) => p.pseudo === pseudo)) {
     throw new Refus(409, 'Ce pseudo est déjà pris')
   }
-  if (existants.some((p) => p.telephone === telephone)) {
+  if (existants.length) {
     throw new Refus(409, 'Ce numéro est déjà associé à un compte')
   }
 
@@ -165,31 +184,44 @@ app.post('/inscription', route(async (req, res) => {
     VALUES (${pseudo}, ${telephone}, ${empreinte})
     RETURNING *
   `
-  res.status(201).json({ jeton: signerJeton(profil.id), profil: profilPublic(profil) })
+  await noterEssais([ip])
+  res.status(201).json({ jeton: signerJeton(profil.id), profil: profilPrive(profil) })
 }))
 
 app.post('/connexion', route(async (req, res) => {
   // Le champ s'appelle encore `telephone`, mais accepte aussi le pseudo.
-  const identifiant = texteRequis(req.body?.identifiant ?? req.body?.telephone, 'telephone').trim()
-  const motDePasse = texteRequis(req.body?.motDePasse, 'motDePasse')
+  const saisi = texteRequis(req.body?.identifiant ?? req.body?.telephone, 'telephone', 40)
+  const motDePasse = typeof req.body?.motDePasse === 'string' ? req.body.motDePasse : ''
+  if (!motDePasse || motDePasse.length > 200) throw new Refus(400, 'Mot de passe requis')
 
   // Numero : compare sur ses 8 derniers chiffres, pour accepter toutes les
   // ecritures (+229, 229, ancien numero a 8 chiffres, nouveau a 10 en 01…).
-  const chiffres = identifiant.replace(/\D/g, '')
-  const parPseudo = /[a-z]/i.test(identifiant) || chiffres.length < 8
+  const chiffres = saisi.replace(/\D/g, '')
+  const parPseudo = /[a-z]/i.test(saisi) || chiffres.length < 8
+  const cleCompte = parPseudo
+    ? `connexion:${saisi.replace(/^@/, '').toLowerCase()}`
+    : `connexion:${finDeNumero(chiffres)}`
+  const cleIp = `connexion-ip:${adresseClient(req)}`
+  await verifierEssais([{ cle: cleCompte, max: 8 }, { cle: cleIp, max: 40 }])
+
   const candidats = parPseudo
     ? await sql`
-        SELECT * FROM profils WHERE lower(pseudo) = ${identifiant.replace(/^@/, '').toLowerCase()}
+        SELECT * FROM profils WHERE pseudo = ${saisi.replace(/^@/, '').toLowerCase()}
       `
     : await sql`
         SELECT * FROM profils
-        WHERE right(regexp_replace(telephone, '\\D', '', 'g'), 8) = ${chiffres.slice(-8)}
+        WHERE right(regexp_replace(telephone, '\\D', '', 'g'), 8) = ${finDeNumero(chiffres)}
       `
   for (const profil of candidats) {
     if (await verifier(motDePasse, profil.mot_de_passe)) {
-      return res.json({ jeton: signerJeton(profil.id), profil: profilPublic(profil) })
+      await sql`DELETE FROM tentatives WHERE cle = ${cleCompte}`
+      return res.json({ jeton: signerJeton(profil.id), profil: profilPrive(profil) })
     }
   }
+  // Compte inconnu : on hache quand meme, pour que la duree de reponse ne
+  // revele pas si le compte existe.
+  if (!candidats.length) await verifier(motDePasse, EMPREINTE_LEURRE)
+  await noterEssais([cleCompte, cleIp])
   // Un seul message pour tous les echecs : il ne doit pas reveler si le
   // compte existe.
   throw new Refus(401, 'Identifiant ou mot de passe incorrect')
@@ -198,7 +230,7 @@ app.post('/connexion', route(async (req, res) => {
 app.get('/moi', exigerSession, route(async (req, res) => {
   const [profil] = await sql`SELECT * FROM profils WHERE id = ${req.profilId}`
   if (!profil) throw new Refus(404, 'Compte introuvable')
-  res.json(profilPublic(profil))
+  res.json(profilPrive(profil))
 }))
 
 app.patch('/moi', exigerSession, route(async (req, res) => {
@@ -206,7 +238,7 @@ app.patch('/moi', exigerSession, route(async (req, res) => {
 
   let nouveauPseudo = null
   if (pseudo !== undefined) {
-    nouveauPseudo = texteRequis(pseudo, 'pseudo')
+    nouveauPseudo = pseudoValide(pseudo)
     const [pris] = await sql`
       SELECT id FROM profils
       WHERE pseudo = ${nouveauPseudo} AND id <> ${req.profilId}
@@ -217,15 +249,15 @@ app.patch('/moi', exigerSession, route(async (req, res) => {
   // COALESCE : un champ absent du corps garde sa valeur actuelle.
   const [profil] = await sql`
     UPDATE profils SET
-      nom        = COALESCE(${nom === undefined ? null : texteFacultatif(nom)}, nom),
+      nom        = COALESCE(${nom === undefined ? null : texteFacultatif(nom, 'nom', LIMITES.nom)}, nom),
       pseudo     = COALESCE(${nouveauPseudo}, pseudo),
-      bio        = COALESCE(${bio === undefined ? null : texteFacultatif(bio)}, bio),
-      avatar_url = COALESCE(${avatarUrl === undefined ? null : texteFacultatif(avatarUrl)}, avatar_url)
+      bio        = COALESCE(${bio === undefined ? null : texteFacultatif(bio, 'bio', LIMITES.bio)}, bio),
+      avatar_url = COALESCE(${avatarValide(avatarUrl)}, avatar_url)
     WHERE id = ${req.profilId}
     RETURNING *
   `
   if (!profil) throw new Refus(404, 'Compte introuvable')
-  res.json(profilPublic(profil))
+  res.json(profilPrive(profil))
 }))
 
 // ------------------------------------------------------------
@@ -243,7 +275,7 @@ app.post('/televersements', exigerSession, route(async (req, res) => {
   }
 
   const taille = Number(req.body?.taille)
-  if (!Number.isFinite(taille) || taille <= 0) {
+  if (!Number.isSafeInteger(taille) || taille <= 0) {
     throw new Refus(400, 'La taille du fichier est requise')
   }
   if (taille > TAILLE_MAX) {
@@ -265,7 +297,7 @@ app.post('/televersements', exigerSession, route(async (req, res) => {
 
   const cle = construireCle(req.profilId, type)
   res.status(201).json({
-    url: await signerDepot(cle, type),
+    url: await signerDepot(cle, type, taille),
     cle,
     urlPublique: urlPubliqueDe(cle),
   })
@@ -336,7 +368,7 @@ app.get('/videos', sessionFacultative, route(async (req, res) => {
     auteurId: null,
     videoId: null,
     limite: limiteDemandee(req.query.limite),
-    avant: req.query.avant || null,
+    avant: dateFacultative(req.query.avant),
   })
   res.json(videos)
 }))
@@ -350,7 +382,7 @@ app.get('/videos/suivis', exigerSession, route(async (req, res) => {
     videoId: null,
     suivisSeuls: true,
     limite: limiteDemandee(req.query.limite),
-    avant: req.query.avant || null,
+    avant: dateFacultative(req.query.avant),
   })
   res.json(videos)
 }))
@@ -374,13 +406,26 @@ app.get('/profils/:pseudo/videos', sessionFacultative, route(async (req, res) =>
     auteurId: auteur.id,
     videoId: null,
     limite: limiteDemandee(req.query.limite),
-    avant: req.query.avant || null,
+    avant: dateFacultative(req.query.avant),
   })
   res.json(videos)
 }))
 
+// Adresse d'un fichier televerse par ce compte, et par lui seul : sans
+// cette regle, une publication pourrait pointer vers n'importe quel site
+// ou vers le fichier d'un autre.
+const urlDeLAuteur = (brut, profilId) => {
+  const url = texteRequis(brut, 'url', 500)
+  const prefixe = prefixeDepot(profilId)
+  const reste = url.slice(prefixe.length)
+  if (!url.startsWith(prefixe) || !/^[\w.-]+$/.test(reste)) {
+    throw new Refus(400, 'Adresse de vidéo invalide : téléverse d’abord la vidéo')
+  }
+  return url
+}
+
 app.post('/videos', exigerSession, route(async (req, res) => {
-  const url = texteRequis(req.body?.url, 'url')
+  const url = urlDeLAuteur(req.body?.url, req.profilId)
   const visibilite = req.body?.visibilite ?? 'monde'
   if (!VISIBILITES.includes(visibilite)) {
     throw new Refus(400, 'Visibilité inconnue : monde, amis ou moi')
@@ -393,12 +438,12 @@ app.post('/videos', exigerSession, route(async (req, res) => {
     ) VALUES (
       ${req.profilId},
       ${url},
-      ${texteFacultatif(req.body?.legende) ?? ''},
-      ${texteFacultatif(req.body?.departement)},
+      ${texteFacultatif(req.body?.legende, 'legende', LIMITES.legende) ?? ''},
+      ${texteFacultatif(req.body?.departement, 'departement', LIMITES.departement)},
       ${visibilite},
       ${booleenOuDefaut(req.body?.commentaires_autorises, true)},
       ${booleenOuDefaut(req.body?.reutilisation_autorisee, true)},
-      ${texteFacultatif(req.body?.son_id)}
+      ${sonValide(req.body?.son_id)}
     )
     RETURNING id
   `
@@ -433,7 +478,7 @@ app.patch('/videos/:id', exigerSession, route(async (req, res) => {
 
   await sql`
     UPDATE videos SET
-      legende     = COALESCE(${legende === undefined ? null : texteFacultatif(legende)}, legende),
+      legende     = COALESCE(${legende === undefined ? null : texteFacultatif(legende, 'legende', LIMITES.legende)}, legende),
       visibilite  = COALESCE(${visibilite ?? null}, visibilite),
       commentaires_autorises = COALESCE(
         ${typeof req.body?.commentaires_autorises === 'boolean'
@@ -499,14 +544,12 @@ app.post('/videos/:id/restaurer', exigerSession, route(async (req, res) => {
 }))
 
 // Comptage des vues : ouvert, un visiteur non connecte regarde aussi.
-app.post('/videos/:id/vue', route(async (req, res) => {
+app.post('/videos/:id/vue', sessionFacultative, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de vidéo')
+  await videoVisible(id, req.profilId)
   const [video] = await sql`
-    UPDATE videos SET vues = vues + 1
-    WHERE id = ${id} AND supprimee_le IS NULL
-    RETURNING vues
+    UPDATE videos SET vues = vues + 1 WHERE id = ${id} RETURNING vues
   `
-  if (!video) throw new Refus(404, 'Vidéo introuvable')
   res.json({ vues: video.vues })
 }))
 
@@ -514,9 +557,25 @@ app.post('/videos/:id/vue', route(async (req, res) => {
 // Interactions
 // ------------------------------------------------------------
 
-const videoVivante = async (videoId) => {
+// Une video n'est accessible (j'aime, favori, commentaires, vue) que si
+// le demandeur a le droit de la voir : memes regles que le fil. Une video
+// privee repond « introuvable », sans confirmer qu'elle existe.
+const videoVisible = async (videoId, viewerId) => {
   const [video] = await sql`
-    SELECT * FROM videos WHERE id = ${videoId} AND supprimee_le IS NULL
+    SELECT v.* FROM videos v
+    WHERE v.id = ${videoId}
+      AND v.supprimee_le IS NULL
+      AND (
+        v.visibilite = 'monde'
+        OR v.auteur_id = ${viewerId ?? null}
+        OR (
+          v.visibilite = 'amis'
+          AND EXISTS (SELECT 1 FROM abonnements a
+                      WHERE a.suiveur_id = ${viewerId ?? null} AND a.suivi_id = v.auteur_id)
+          AND EXISTS (SELECT 1 FROM abonnements a
+                      WHERE a.suiveur_id = v.auteur_id AND a.suivi_id = ${viewerId ?? null})
+        )
+      )
   `
   if (!video) throw new Refus(404, 'Vidéo introuvable')
   return video
@@ -524,7 +583,7 @@ const videoVivante = async (videoId) => {
 
 app.post('/videos/:id/jaime', exigerSession, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de vidéo')
-  await videoVivante(id)
+  await videoVisible(id, req.profilId)
   // ON CONFLICT : un double appui ne doit pas devenir une erreur.
   await sql`
     INSERT INTO jaime (video_id, profil_id) VALUES (${id}, ${req.profilId})
@@ -549,7 +608,7 @@ app.delete('/videos/:id/jaime', exigerSession, route(async (req, res) => {
 
 app.post('/videos/:id/favori', exigerSession, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de vidéo')
-  await videoVivante(id)
+  await videoVisible(id, req.profilId)
   await sql`
     INSERT INTO favoris (video_id, profil_id) VALUES (${id}, ${req.profilId})
     ON CONFLICT DO NOTHING
@@ -580,6 +639,10 @@ const listerDepuisTable = async (table, profilId) => {
         JOIN videos v ON v.id = t.video_id
         JOIN profils p ON p.id = v.auteur_id
         WHERE t.profil_id = ${profilId} AND v.supprimee_le IS NULL
+          AND (v.visibilite = 'monde' OR v.auteur_id = ${profilId} OR (
+            v.visibilite = 'amis'
+            AND EXISTS (SELECT 1 FROM abonnements a WHERE a.suiveur_id = ${profilId} AND a.suivi_id = v.auteur_id)
+            AND EXISTS (SELECT 1 FROM abonnements a WHERE a.suiveur_id = v.auteur_id AND a.suivi_id = ${profilId})))
         ORDER BY t.cree_le DESC
       `
     : await sql`
@@ -593,6 +656,10 @@ const listerDepuisTable = async (table, profilId) => {
         JOIN videos v ON v.id = t.video_id
         JOIN profils p ON p.id = v.auteur_id
         WHERE t.profil_id = ${profilId} AND v.supprimee_le IS NULL
+          AND (v.visibilite = 'monde' OR v.auteur_id = ${profilId} OR (
+            v.visibilite = 'amis'
+            AND EXISTS (SELECT 1 FROM abonnements a WHERE a.suiveur_id = ${profilId} AND a.suivi_id = v.auteur_id)
+            AND EXISTS (SELECT 1 FROM abonnements a WHERE a.suiveur_id = v.auteur_id AND a.suivi_id = ${profilId})))
         ORDER BY t.cree_le DESC
       `
   return lignes.map(videoPublique)
@@ -681,6 +748,7 @@ app.get('/recherche', sessionFacultative, route(async (req, res) => {
   if (typeof terme !== 'string' || terme.trim() === '') {
     throw new Refus(400, 'Indique ce que tu cherches')
   }
+  if (terme.length > 100) throw new Refus(400, 'Recherche trop longue')
   const motif = motifRecherche(terme.trim())
   const viewerId = req.profilId || null
   const limite = limiteDemandee(req.query.limite)
@@ -791,8 +859,9 @@ app.get('/suggestions', exigerSession, route(async (req, res) => {
 // Commentaires
 // ------------------------------------------------------------
 
-app.get('/videos/:id/commentaires', route(async (req, res) => {
+app.get('/videos/:id/commentaires', sessionFacultative, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de vidéo')
+  await videoVisible(id, req.profilId)
   const lignes = await sql`
     SELECT c.*, p.pseudo
     FROM commentaires c
@@ -805,9 +874,9 @@ app.get('/videos/:id/commentaires', route(async (req, res) => {
 
 app.post('/videos/:id/commentaires', exigerSession, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de vidéo')
-  const texte = texteRequis(req.body?.texte, 'texte')
+  const texte = texteRequis(req.body?.texte, 'texte', LIMITES.commentaire)
 
-  const video = await videoVivante(id)
+  const video = await videoVisible(id, req.profilId)
   if (!video.commentaires_autorises) {
     throw new Refus(403, 'Les commentaires sont fermés sur cette vidéo')
   }
@@ -860,15 +929,15 @@ app.get('/brouillons', exigerSession, route(async (req, res) => {
 }))
 
 app.post('/brouillons', exigerSession, route(async (req, res) => {
-  const url = texteRequis(req.body?.url, 'url')
+  const url = urlDeLAuteur(req.body?.url, req.profilId)
   const octets = Number(req.body?.octets ?? 0)
-  if (!Number.isFinite(octets) || octets < 0) {
+  if (!Number.isSafeInteger(octets) || octets < 0) {
     throw new Refus(400, 'Le champ « octets » doit être un nombre positif')
   }
   const [b] = await sql`
     INSERT INTO brouillons (auteur_id, url, legende, octets)
     VALUES (${req.profilId}, ${url},
-            ${texteFacultatif(req.body?.legende) ?? ''}, ${Math.round(octets)})
+            ${texteFacultatif(req.body?.legende, 'legende', LIMITES.legende) ?? ''}, ${octets})
     RETURNING *
   `
   res.status(201).json({
@@ -970,7 +1039,7 @@ app.get('/conversations/:id/messages', exigerSession, route(async (req, res) => 
 app.post('/conversations/:id/messages', exigerSession, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de conversation')
   await exigerParticipant(id, req.profilId)
-  const texte = texteRequis(req.body?.texte, 'texte')
+  const texte = texteRequis(req.body?.texte, 'texte', LIMITES.message)
 
   const [m] = await sql`
     INSERT INTO messages (conversation_id, auteur_id, texte)
@@ -986,7 +1055,7 @@ app.post('/conversations/:id/messages', exigerSession, route(async (req, res) =>
 }))
 
 app.post('/conversations', exigerSession, route(async (req, res) => {
-  const pseudo = texteRequis(req.body?.pseudo, 'pseudo')
+  const pseudo = texteRequis(req.body?.pseudo, 'pseudo', 40)
   const autre = await trouverProfilParPseudo(pseudo)
   if (autre.id === req.profilId) {
     throw new Refus(400, 'Impossible d’ouvrir une conversation avec soi-même')
@@ -1035,7 +1104,7 @@ app.post('/conversations/:id/lu', exigerSession, route(async (req, res) => {
 const DUREE_RECIT = '24 hours'
 
 app.post('/stories', exigerSession, route(async (req, res) => {
-  const url = texteRequis(req.body?.url, 'url')
+  const url = urlDeLAuteur(req.body?.url, req.profilId)
   const [recit] = await sql`
     INSERT INTO stories (auteur_id, url) VALUES (${req.profilId}, ${url})
     RETURNING id, url, cree_le

@@ -133,3 +133,14 @@ CREATE TABLE IF NOT EXISTS stories (
 );
 
 CREATE INDEX IF NOT EXISTS stories_auteur ON stories(auteur_id, cree_le DESC);
+
+-- ---------- Limitation des essais ----------
+-- Une ligne par essai de connexion manque ou par inscription, notee par
+-- compte vise et par adresse : au-dela d'un seuil sur 15 minutes, l'API
+-- refuse (protection contre les robots qui devinent les mots de passe).
+CREATE TABLE IF NOT EXISTS tentatives (
+  cle      text NOT NULL,
+  cree_le  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS tentatives_cle ON tentatives(cle, cree_le);

@@ -31,6 +31,7 @@ export async function choisirPhotoProfil(): Promise<string | null> {
   if (r.canceled || !r.assets[0]) return null
   const image = r.assets[0]
   if (Platform.OS === 'web') return reduireWeb(image.uri)
-  if ((image.fileSize ?? 0) > 2_000_000) throw new Error('Choisis une image de moins de 2 Mo.')
+  // L'API refuse une photo de plus de 300 Ko (encodee).
+  if ((image.fileSize ?? 0) > 280_000) throw new Error('Choisis une image plus légère (moins de 280 Ko).')
   return image.base64 ? `data:image/jpeg;base64,${image.base64}` : image.uri
 }
