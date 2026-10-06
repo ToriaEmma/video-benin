@@ -105,8 +105,15 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
   const [deploye, setDeploye] = useState(false)
   // Hauteur animee et reponse au glissement, creees une seule fois :
   // elles ne dependent que de HAUT_BAS et HAUT_HAUT, qui ne bougent pas.
+  // Le haut de la feuille (poignee et onglets) suit le doigt : vers le haut
+  // elle se deploie, vers le bas elle se replie, tiree loin elle se ferme.
+  const fermerRef = React.useRef(onFermer)
+  fermerRef.current = onFermer
   const [{ hauteur, poignee }] = useState(() => {
     const valeur = new Animated.Value(HAUT_BAS)
+    let actuelle = HAUT_BAS
+    let depart = HAUT_BAS
+    valeur.addListener(({ value }) => { actuelle = value })
     const vers = (deplie: boolean) => {
       setDeploye(deplie)
       Animated.spring(valeur, {
@@ -117,13 +124,21 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
     return {
       hauteur: valeur,
       vers,
-      // Vers le haut la feuille se deploie, vers le bas elle se replie.
       poignee: PanResponder.create({
-        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4,
-        onPanResponderRelease: (_, g) => {
-          if (g.dy < -30) vers(true)
-          else if (g.dy > 30) vers(false)
+        // Un geste surtout vertical seulement : les appuis sur les onglets
+        // et leur defilement horizontal restent libres.
+        onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 4 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderGrant: () => { valeur.stopAnimation(); depart = actuelle },
+        onPanResponderMove: (_, g) => {
+          valeur.setValue(Math.max(HAUT_BAS * .45, Math.min(HAUT_HAUT, depart - g.dy)))
         },
+        onPanResponderRelease: (_, g) => {
+          const fin = depart - g.dy
+          if (fin < HAUT_BAS * .7 && g.vy > -0.2) { vers(false); fermerRef.current(); return }
+          const milieu = (HAUT_BAS + HAUT_HAUT) / 2
+          vers(g.vy < -0.3 || (g.vy <= 0.3 && fin > milieu))
+        },
+        onPanResponderTerminate: () => { vers(actuelle > (HAUT_BAS + HAUT_HAUT) / 2) },
       }),
     }
   })
@@ -242,8 +257,9 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
         <Pressable style={s.voile} onPress={onFermer} />
 
         <Animated.View style={[s.feuille, { height: hauteur }]}>
-          {/* Poignee : glisser pour deployer ou replier */}
-          <View {...poignee.panHandlers} style={s.poigneeZone}>
+          {/* Haut de la feuille : glisser pour deployer, replier ou fermer */}
+          <View {...poignee.panHandlers} style={s.haut}>
+          <View style={s.poigneeZone}>
             <Pressable onPress={() => glisser(!deploye)} hitSlop={10}>
               <View style={s.poignee} />
             </Pressable>
@@ -265,6 +281,7 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
               onPress={() => { setRechercheOuverte(v => !v); setTerme('') }}>
               <Loupe taille={24} couleur="#111" />
             </Pressable>
+          </View>
           </View>
 
           {rechercheOuverte && (
@@ -330,6 +347,9 @@ const s = StyleSheet.create({
   feuille: { backgroundColor: '#fff', borderTopLeftRadius: 16,
     borderTopRightRadius: 16, overflow: 'hidden' },
 
+  // Zone saisissable du haut. Sur le web, touchAction evite que le navigateur
+  // prenne le geste pour un defilement de la page.
+  haut: { touchAction: 'none' } as object,
   poigneeZone: { alignItems: 'center', paddingTop: 10, paddingBottom: 6 },
   poignee: { width: 44, height: 5, borderRadius: 3, backgroundColor: '#d2d2d4' },
 

@@ -3,7 +3,8 @@ import {
   View, StyleSheet, Pressable, ScrollView, SafeAreaView, Image,
   type TextInput as TypeSaisie,
 } from 'react-native'
-import * as ImagePicker from 'expo-image-picker'
+import { choisirPhotoProfil } from '../lib/photoProfil'
+import { oublierAvatar } from '../lib/avatars'
 import Svg, { Path } from 'react-native-svg'
 import { Text, TextInput } from '../composants/Texte'
 import { useAuth } from '../lib/auth'
@@ -64,24 +65,14 @@ export default function ModifierProfil({ onRetour }: { onRetour: () => void }) {
   }
 
   const choisirPhoto = async () => {
-    const r = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'], quality: .7, base64: true,
-    })
-    if (r.canceled || !r.assets[0]) return
-    const image = r.assets[0]
-    // Meme garde-fou que le web : au-dela de 2 Mo, on refuse l'image.
-    if ((image.fileSize ?? 0) > 2_000_000) {
-      setMessage('Choisis une image de moins de 2 Mo.')
-      return
-    }
     try {
-      const donnees = image.base64
-        ? `data:image/jpeg;base64,${image.base64}`
-        : image.uri
+      const donnees = await choisirPhotoProfil()
+      if (!donnees) return
       await modifierProfil({ avatar_url: donnees })
+      oublierAvatar(profil.pseudo, donnees)
       setMessage('Photo enregistrée.')
-    } catch {
-      setMessage("Impossible d'enregistrer la photo.")
+    } catch (e) {
+      setMessage((e as Error).message || "Impossible d'enregistrer la photo.")
     }
   }
 

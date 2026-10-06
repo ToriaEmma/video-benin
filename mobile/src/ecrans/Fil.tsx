@@ -14,6 +14,7 @@ import { abreger, type Video } from '../lib/demo'
 import { sonParId, sonOriginal, libelleSon, type Son } from '../lib/sons'
 import { estSonDistant, resoudreSon } from '../lib/resolutionSons'
 import FeuilleSon from '../composants/FeuilleSon'
+import { useAvatar } from '../lib/avatars'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Suggestions from '../composants/Suggestions'
@@ -69,6 +70,15 @@ function Carte({
   onErreur: (message: string) => void
 }) {
   // Le son attache arrive resolu par le fil ; sans lui, « son original ».
+  // Photo de l'auteur ; le disque d'un son original montre celle du compte
+  // a qui appartient ce son (l'auteur de la video d'origine).
+  const { profil: moi } = useAuth()
+  const avatarAuteur = useAvatar(item.pseudo)
+  const avatar = item.pseudo === moi?.pseudo ? moi?.avatar_url ?? avatarAuteur : avatarAuteur
+  const proprietaireSon = son?.original ? son.artiste : son ? null : item.pseudo
+  const avatarProprietaire = useAvatar(proprietaireSon)
+  const avatarSon = !proprietaireSon ? null
+    : proprietaireSon === moi?.pseudo ? moi?.avatar_url ?? avatarProprietaire : avatarProprietaire
 
   const lecteur = useVideoPlayer(item.url, p => {
     p.loop = true; p.timeUpdateEventInterval = 0.25
@@ -299,7 +309,9 @@ function Carte({
       <View style={s.actions}>
         <View style={s.avatarBoite}>
           <Pressable style={s.avatar} onPress={() => onVisiter?.(item.pseudo)}>
-            <Text style={s.avatarLettre}>{item.pseudo.charAt(0).toUpperCase()}</Text>
+            {avatar
+              ? <Image source={{ uri: avatar }} style={s.avatarImage} />
+              : <Text style={s.avatarLettre}>{item.pseudo.charAt(0).toUpperCase()}</Text>}
           </Pressable>
           {/* S'abonner sans quitter le fil. La pastille s'efface une fois
               l'abonnement pris, et ne parait pas sur ses propres videos. */}
@@ -341,9 +353,12 @@ function Carte({
               }),
             }],
           }]}>
+            {/* Musique : sa pochette. Son original : la photo de son auteur. */}
             {son?.pochette
               ? <Image source={{ uri: son.pochette }} style={s.disquePochette} />
-              : <NoteDisque taille={24} couleur="#fff" />}
+              : avatarSon
+                ? <Image source={{ uri: avatarSon }} style={s.disquePochette} />
+                : <NoteDisque taille={24} couleur="#fff" />}
           </Animated.View>
         </Pressable>
       </View>
@@ -746,10 +761,11 @@ const s = StyleSheet.create({
   },
   // .fil-ecran .actions .avatar : 38px, bordure 1px, fond #777.
   avatar: {
-    width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: '#fff',
-    backgroundColor: '#777', alignItems: 'center', justifyContent: 'center',
+    width: 46, height: 46, borderRadius: 23, borderWidth: 1.5, borderColor: '#fff',
+    backgroundColor: '#777', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
-  avatarLettre: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  avatarImage: { width: '100%', height: '100%' },
+  avatarLettre: { color: '#fff', fontSize: 19, fontWeight: '700' },
   // L'avatar et sa pastille forment un bloc : la pastille mord sur le bas
   // de l'avatar, comme le « + » de l'application d'origine.
   avatarBoite: { alignItems: 'center', marginBottom: 5 },

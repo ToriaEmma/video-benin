@@ -16,6 +16,8 @@ import MenuProfil from '../composants/MenuProfil'
 import Parametres from './Parametres'
 import Solde from './Solde'
 import ModifierProfil from './ModifierProfil'
+import { choisirPhotoProfil } from '../lib/photoProfil'
+import { oublierAvatar } from '../lib/avatars'
 import ComptesProfil from '../composants/ComptesProfil'
 import ListeComptes, { type SensListe } from '../composants/ListeComptes'
 import {
@@ -83,7 +85,7 @@ export default function Profil({
   // Ouvre le profil d'un compte touche dans les listes d'abonnement.
   onVisiter?: (pseudo: string) => void
 }) {
-  const { profil, deconnecter } = useAuth()
+  const { profil, deconnecter, modifierProfil } = useAuth()
   // Mesure reactive : en Expo Go la largeur n'est pas encore connue au
   // chargement du module, et elle change a la rotation. La lire au rendu
   // evite une grille et un titre calcules sur une valeur obsolete.
@@ -126,6 +128,23 @@ export default function Profil({
   // En-tete du profil : compteurs et relation d'abonnement viennent de
   // /profils/:pseudo, qui porte aussi la bio du compte visite.
   const [entete, setEntete] = useState<ProfilDetaille | null>(null)
+  // Photo affichee : la mienne vient de la session (a jour apres un
+  // changement), celle d'un autre compte de son profil detaille.
+  const photoAffichee = monProfil ? profil?.avatar_url ?? null : entete?.avatar_url ?? null
+  const [avisPhoto, setAvisPhoto] = useState('')
+  // Toucher le « + » de sa photo : choisir une nouvelle photo de profil.
+  const changerPhoto = async () => {
+    try {
+      const donnees = await choisirPhotoProfil()
+      if (!donnees || !profil) return
+      await modifierProfil({ avatar_url: donnees })
+      oublierAvatar(profil.pseudo, donnees)
+      setAvisPhoto('Photo de profil mise à jour')
+    } catch (e) {
+      setAvisPhoto((e as Error).message || 'Impossible d’enregistrer la photo')
+    }
+    setTimeout(() => setAvisPhoto(''), 2600)
+  }
   const [suivi, setSuivi] = useState(false)
   // Grille de l'onglet courant, et brouillons de son propre profil.
   const [videos, setVideos] = useState<VideoApi[]>([])
@@ -325,14 +344,18 @@ export default function Profil({
                     width: tailleAvatar - 8, height: tailleAvatar - 8,
                     borderRadius: (tailleAvatar - 8) / 2,
                   }]}>
-                    {monProfil && profil?.avatar_url
-                      ? <Image source={{ uri: profil.avatar_url }} style={s.avatarImage} />
+                    {photoAffichee
+                      ? <Image source={{ uri: photoAffichee }} style={s.avatarImage} />
                       : <Text style={s.avatarLettre}>{pseudo.charAt(0).toUpperCase()}</Text>}
                   </View>
                 </LinearGradient>
                 {monProfil && (
-                  <View style={s.avatarPlus}><Plus taille={16} couleur="#fff" /></View>
+                  <Pressable style={s.avatarPlus} onPress={changerPhoto} hitSlop={8}
+                    accessibilityLabel="Changer la photo de profil">
+                    <Plus taille={16} couleur="#fff" />
+                  </Pressable>
                 )}
+                {!!avisPhoto && <Text style={s.avisPhoto} numberOfLines={2}>{avisPhoto}</Text>}
               </View>
             </View>
 
@@ -457,6 +480,7 @@ export default function Profil({
 
 // .page-profil : fond blanc, texte #111, padding 12px 16px 28px.
 const s = StyleSheet.create({
+  avisPhoto: { position: 'absolute', top: '100%', marginTop: 8, width: 170, alignSelf: 'center', textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#ff2856' },
   page: { flex: 1, backgroundColor: '#fff' },
   entete: { paddingHorizontal: 16, paddingTop: 12 },
 
