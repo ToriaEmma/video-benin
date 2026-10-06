@@ -56,9 +56,13 @@ function afficherCadreTelephone() {
   document.body.appendChild(scene)
 }
 
-// Lecteurs coupes automatiquement, y compris ceux qui ne sont pas dans la page
-// (expo-audio joue les sons par un element Audio detache).
-const coupes = new Set<HTMLMediaElement>()
+// Lecteurs mis en sourdine par nous (lecture avec son refusee), y compris
+// ceux qui ne sont pas dans la page (la musique joue par un element Audio
+// detache). Ils restent marques jusqu'au toucher qui rend le son, meme s'ils
+// sont mis en pause entre-temps : sinon ils resteraient muets pour de bon.
+const sourdine = new Set<HTMLMediaElement>()
+// Parmi eux, ceux que l'application veut voir jouer.
+const aRelancer = new Set<HTMLMediaElement>()
 
 function installerSonAutomatique() {
   const jouer = HTMLMediaElement.prototype.play
@@ -73,21 +77,36 @@ function installerSonAutomatique() {
   // Une pause demandee par l'application : ce lecteur ne doit pas repartir seul.
   const arreter = HTMLMediaElement.prototype.pause
   HTMLMediaElement.prototype.pause = function (this: HTMLMediaElement) {
-    coupes.delete(this)
+    aRelancer.delete(this)
     return arreter.call(this)
   }
+  // Une sourdine posee par l'application elle-meme (video dont la musique
+  // remplace la piste) prime : on ne la levera pas au toucher.
+  const descripteur = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'muted')!
+  let nousMemes = false
+  Object.defineProperty(HTMLMediaElement.prototype, 'muted', {
+    ...descripteur,
+    set(this: HTMLMediaElement, v: boolean) {
+      if (!nousMemes) sourdine.delete(this)
+      descripteur.set!.call(this, v)
+    },
+  })
+  const assourdir = (m: HTMLMediaElement, v: boolean) => { nousMemes = true; m.muted = v; nousMemes = false }
+
   HTMLMediaElement.prototype.play = function (this: HTMLMediaElement) {
     const media = this
     ;(window as unknown as { __medias?: Set<HTMLMediaElement> }).__medias ??= new Set()
     ;(window as unknown as { __medias: Set<HTMLMediaElement> }).__medias.add(media)
+    if (sourdine.has(media)) aRelancer.add(media)
     const promesse = jouer.call(media)
     promesse?.catch((e: DOMException) => {
       // Sur iPhone, chaque nouveau lecteur peut etre refuse, meme apres un
       // premier toucher : la sourdine automatique reste donc toujours prete.
       if (e?.name !== 'NotAllowedError' || media.muted) return
-      media.muted = true
+      assourdir(media, true)
+      sourdine.add(media)
+      aRelancer.add(media)
       jouer.call(media).catch(() => {})
-      coupes.add(media)
       montrerPastille()
     })
     return promesse
@@ -96,15 +115,19 @@ function installerSonAutomatique() {
   // aussi la video en pause) : on l'absorbe quand une sourdine automatique attend.
   const absorber = (e: Event) => { e.stopPropagation(); e.preventDefault() }
   const debloquer = (e: Event) => {
-    if (!coupes.size) { pastille?.remove(); pastille = null; return }
+    if (!sourdine.size) { pastille?.remove(); pastille = null; return }
     if (pastille && e.type !== 'keydown') {
       for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.addEventListener(t, absorber, { capture: true })
       absorber(e)
       setTimeout(() => { for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.removeEventListener(t, absorber, { capture: true }) }, 450)
     }
-    // Le son revient ; un lecteur que l'application voulait faire jouer repart.
-    coupes.forEach(m => { m.muted = false; if (m.paused) jouer.call(m).catch(() => {}) })
-    coupes.clear()
+    // Le son revient. Relancer pendant le toucher autorise aussi le lecteur
+    // pour la suite (iPhone) ; ceux mis en pause par l'application restent en pause.
+    sourdine.forEach(m => {
+      assourdir(m, false)
+      if (!m.paused || aRelancer.has(m)) jouer.call(m).catch(() => {})
+    })
+    sourdine.clear(); aRelancer.clear()
     pastille?.remove(); pastille = null
   }
   for (const evt of ['pointerdown', 'touchstart', 'keydown']) window.addEventListener(evt, debloquer, { capture: true })
