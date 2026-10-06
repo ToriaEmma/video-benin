@@ -168,8 +168,10 @@ const DisqueEnregistrement = React.memo(function DisqueEnregistrement({
   )
 })
 
-export default function Camera({ onFermer, onChoisir }: {
+export default function Camera({ onFermer, onChoisir, sonInitial }: {
   onFermer: () => void
+  // Son deja retenu (« Utiliser ce son » depuis le fil).
+  sonInitial?: Son | null
   // Le son retenu voyage avec la video : sans lui, le choix fait ici
   // serait perdu entre le viseur et la publication.
   onChoisir: (uri: string, son?: Son | null) => void
@@ -193,7 +195,7 @@ export default function Camera({ onFermer, onChoisir }: {
   const [filtre, setFiltre] = useState(0)
   // Son retenu pour la prochaine prise, choisi dans la feuille.
   const [choixSon, setChoixSon] = useState(false)
-  const [son, setSon] = useState<Son | null>(null)
+  const [son, setSon] = useState<Son | null>(sonInitial ?? null)
   const [message, setMessage] = useState('')
   const [enregistrement, setEnregistrement] = useState(false)
   // Clips deja captures : chaque appui sur le bouton ajoute un segment, et la

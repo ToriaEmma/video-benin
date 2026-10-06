@@ -34,6 +34,8 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
   const flux = useRef<MediaStream | null>(null)
   const enregistreur = useRef<MediaRecorder | null>(null)
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const facingRef = useRef(facing)
+  facingRef.current = facing
 
   // Ouvre la camera demandee ; on rouvre a chaque changement de face.
   useEffect(() => {
@@ -41,7 +43,7 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
     const ouvrir = async () => {
       try {
         const s = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: facing === 'front' ? 'user' : 'environment', width: { ideal: 720 }, height: { ideal: 1280 } },
+          video: { facingMode: facing === 'front' ? 'user' : 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: !mute,
         })
         if (annule) { s.getTracks().forEach(t => t.stop()); return }
@@ -69,8 +71,32 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
 
   useImperativeHandle(ref, () => ({
     recordAsync: ({ maxDuration } = {}) => new Promise((resoudre, rejeter) => {
-      const s = flux.current
-      if (!s) return rejeter(new Error('Caméra indisponible'))
+      const source = flux.current
+      const v = video.current
+      if (!source || !v) return rejeter(new Error('Caméra indisponible'))
+      // Les cameras livrent souvent une image en paysage : on enregistre une
+      // image verticale 9:16 recadree au centre, comme l'apercu (object-fit: cover).
+      const toile = document.createElement('canvas')
+      toile.width = 720; toile.height = 1280
+      const ctx = toile.getContext('2d')!
+      let actif = true
+      const dessiner = () => {
+        if (!actif) return
+        const vw = v.videoWidth, vh = v.videoHeight
+        if (vw && vh) {
+          const echelle = Math.max(toile.width / vw, toile.height / vh)
+          const w = vw * echelle, h = vh * echelle
+          ctx.save()
+          // Camera avant : meme sens que l'apercu (effet miroir).
+          if (facingRef.current === 'front') { ctx.translate(toile.width, 0); ctx.scale(-1, 1) }
+          ctx.drawImage(v, (toile.width - w) / 2, (toile.height - h) / 2, w, h)
+          ctx.restore()
+        }
+        requestAnimationFrame(dessiner)
+      }
+      dessiner()
+      const s = toile.captureStream(30)
+      source.getAudioTracks().forEach(t => s.addTrack(t))
       const type = typeEnregistrement()
       const morceaux: Blob[] = []
       let rec: MediaRecorder
@@ -79,6 +105,8 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
       rec.ondataavailable = e => { if (e.data && e.data.size) morceaux.push(e.data) }
       rec.onerror = () => rejeter(new Error('Enregistrement impossible'))
       rec.onstop = () => {
+        actif = false
+        s.getVideoTracks().forEach(t => t.stop())
         if (minuteur.current) clearTimeout(minuteur.current)
         enregistreur.current = null
         const base = (rec.mimeType || type || 'video/webm').split(';')[0]

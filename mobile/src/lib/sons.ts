@@ -30,6 +30,8 @@ export type Son = {
   couleur: string
   // Vrai pour un « son original » enregistre par un compte.
   original?: boolean
+  // Image de l'album (sons Deezer).
+  pochette?: string
 }
 
 export const SONS: Son[] = [

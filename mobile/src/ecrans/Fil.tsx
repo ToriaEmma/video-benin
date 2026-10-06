@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, FlatList, Pressable, StyleSheet, ActivityIndicator, PanResponder,
-  Animated, Easing,
+  Animated, Easing, Image,
 } from 'react-native'
 import { BARRE_ETAT_WEB } from '../lib/theme'
 import { useFinDefilementWeb } from '../lib/finDefilement'
@@ -11,7 +11,9 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEvent } from 'expo'
 import { abreger, type Video } from '../lib/demo'
-import { sonParId, libelleSon } from '../lib/sons'
+import { sonParId, libelleSon, type Son } from '../lib/sons'
+import { sonDeezer } from '../lib/deezer'
+import FeuilleSon from '../composants/FeuilleSon'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Suggestions from '../composants/Suggestions'
@@ -45,11 +47,14 @@ const SEUIL_LATERAL = 55
 
 function Carte({
   item, actif, hauteur, onCommenter, onVisiter, sienne, nbCommentaires, onErreur,
-  suivi, onSuivi,
+  suivi, onSuivi, son, onSon,
 }: {
   item: VideoFil; actif: boolean; hauteur: number
   onCommenter: (v: VideoFil) => void
   onVisiter?: (pseudo: string) => void
+  // Son de la publication, deja resolu par le fil (catalogue ou Deezer).
+  son: Son | null
+  onSon: (son: Son | null, pseudo: string) => void
   // Abonnement a l'auteur, tenu par l'ecran : la meme personne pouvant
   // publier plusieurs videos du fil, la pastille doit disparaitre sur
   // toutes ses cartes des qu'on s'abonne depuis l'une d'elles.
@@ -63,9 +68,7 @@ function Carte({
   nbCommentaires: number
   onErreur: (message: string) => void
 }) {
-  // Son attache a la publication, resolu dans le catalogue. Un son retire
-  // du catalogue laisse la carte sur « son original ».
-  const son = sonParId(item.sonId)
+  // Le son attache arrive resolu par le fil ; sans lui, « son original ».
 
   const lecteur = useVideoPlayer(item.url, p => {
     p.loop = true; p.timeUpdateEventInterval = 0.25
@@ -331,15 +334,20 @@ function Carte({
           <Text style={s.compteur}>{sienne ? 'Plus' : 'Partager'}</Text>
         </Pressable>
 
-        <Animated.View style={[s.disque, {
-          transform: [{
-            rotate: tour.interpolate({
-              inputRange: [0, 1], outputRange: ['0deg', '360deg'],
-            }),
-          }],
-        }]}>
-          <NoteDisque taille={24} couleur="#fff" />
-        </Animated.View>
+        {/* Le disque ouvre la feuille du son : favori ou « Utiliser ce son ». */}
+        <Pressable hitSlop={6} onPress={() => onSon(son, item.pseudo)}>
+          <Animated.View style={[s.disque, {
+            transform: [{
+              rotate: tour.interpolate({
+                inputRange: [0, 1], outputRange: ['0deg', '360deg'],
+              }),
+            }],
+          }]}>
+            {son?.pochette
+              ? <Image source={{ uri: son.pochette }} style={s.disquePochette} />
+              : <NoteDisque taille={24} couleur="#fff" />}
+          </Animated.View>
+        </Pressable>
       </View>
 
       <View style={s.infos}>
@@ -401,7 +409,7 @@ function Carte({
 }
 
 export default function Fil({
-  onVisiter, onRechercher, videos, indexInitial = 0, recherche, onRetour,
+  onVisiter, onRechercher, videos, indexInitial = 0, recherche, onRetour, onUtiliserSon,
 }: {
   onVisiter?: (pseudo: string) => void
   onRechercher?: () => void
@@ -413,6 +421,8 @@ export default function Fil({
   // categories ; le chevron de retour l'accompagne.
   recherche?: string
   onRetour?: () => void
+  // « Utiliser ce son » : la creation s'ouvre avec ce son.
+  onUtiliserSon?: (son: Son) => void
 }) {
   const { profil } = useAuth()
   const [categorie, setCategorie] = useState('Pour toi')
@@ -428,6 +438,22 @@ export default function Fil({
   const [chargement, setChargement] = useState(!autonome)
   const [erreur, setErreur] = useState('')
   const liste = videos ?? listeApi
+
+  // Sons Deezer des publications : resolus avant de monter les cartes, pour
+  // que chacune connaisse sa musique des le depart (adresse d'extrait fraiche).
+  const [sonsDeezer, setSonsDeezer] = useState<Record<string, Son | null>>({})
+  useEffect(() => {
+    const manquants = [...new Set(liste.map(v => v.sonId).filter(
+      (id): id is string => !!id && id.startsWith('dz:') && !(id in sonsDeezer)))]
+    manquants.forEach(id => sonDeezer(id).then(son =>
+      setSonsDeezer(m => ({ ...m, [id]: son }))))
+  }, [liste, sonsDeezer])
+  const sonDe = (v: VideoFil): Son | null =>
+    v.sonId?.startsWith('dz:') ? sonsDeezer[v.sonId] ?? null : sonParId(v.sonId)
+  const sonEnAttente = (v: VideoFil) => !!v.sonId?.startsWith('dz:') && !(v.sonId in sonsDeezer)
+
+  // Feuille du son ouverte depuis le disque d'une carte.
+  const [feuilleSon, setFeuilleSon] = useState<{ son: Son | null; pseudo: string } | null>(null)
   // « Suivis » et « Pour toi » lisent deux routes distinctes : l'onglet
   // demande fait donc partie des dependances du chargement.
   const filApi = categorie === 'Suivis' ? 'Suivis' : 'Pour toi'
@@ -558,12 +584,16 @@ export default function Fil({
             setIndex(Math.round(e.nativeEvent.contentOffset.y / hauteur))}
           scrollEventThrottle={16}
           onScroll={finDefilementWeb}
-          renderItem={({ item, index: i }) => (
+          renderItem={({ item, index: i }) => sonEnAttente(item)
+            ? <View style={{ height: hauteur, backgroundColor: '#000' }} />
+            : (
             <Carte item={item} actif={i === index} hauteur={hauteur}
               sienne={item.pseudo === profil?.pseudo}
               suivi={suivis.has(item.pseudo)} onSuivi={marquerSuivi}
               nbCommentaires={item.nbCommentaires + (ajouts[item.id] ?? 0)}
               onErreur={setErreur}
+              son={sonDe(item)}
+              onSon={(son, pseudo) => setFeuilleSon({ son, pseudo })}
               onCommenter={setVideoCom} onVisiter={onVisiter} />
           )}
         />
@@ -628,6 +658,10 @@ export default function Fil({
           <Text style={s.bandeauTexte}>{erreur}</Text>
         </Pressable>
       )}
+
+      <FeuilleSon visible={!!feuilleSon} son={feuilleSon?.son ?? null}
+        pseudo={feuilleSon?.pseudo ?? ''} onFermer={() => setFeuilleSon(null)}
+        onUtiliser={son => onUtiliserSon?.(son)} />
 
       {videoCom && (
         <Commentaires
@@ -723,6 +757,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 2,
   },
   disqueActif: {},
+  disquePochette: { width: 28, height: 28, borderRadius: 14 },
   disqueLettre: { color: '#fff', fontSize: 13, fontWeight: '700' },
 
   // .fil-ecran .infos : left 12px, right 68px, bottom 24px.

@@ -45,6 +45,15 @@ function Application() {
   // Lecteur plein ecran ouvert depuis la grille d'un profil.
   const [lecture, setLecture] = useState<{ videos: Video[]; index: number } | null>(null)
 
+  // « Utiliser ce son » depuis le disque d'une video : la camera s'ouvre
+  // avec ce son deja retenu.
+  const utiliserSon = (son: Son) => {
+    setLecture(null)
+    setVideoChoisie(null); setMontage(false)
+    setSonChoisi(son)
+    setOnglet('publier')
+  }
+
   const visiter = (pseudo: string) => {
     // Le lecteur se referme : sinon il recouvrirait le profil visite.
     setLecture(null)
@@ -72,7 +81,8 @@ function Application() {
     <View style={s.app}>
       <View style={s.contenu}>
         {onglet === 'fil' && (
-          <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')} />
+          <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')}
+            onUtiliserSon={utiliserSon} />
         )}
         {onglet === 'amis' && (
           lecture
@@ -81,6 +91,7 @@ function Application() {
                 indexInitial={lecture.index}
                 onRetour={() => setLecture(null)}
                 onVisiter={visiter}
+                onUtiliserSon={utiliserSon}
               />
             : <AmisEcran
                 onVisiter={visiter}
@@ -115,7 +126,8 @@ function Application() {
                   }}
                 />
             : <Camera
-                onFermer={() => setOnglet('fil')}
+                sonInitial={sonChoisi}
+                onFermer={() => { setSonChoisi(null); setOnglet('fil') }}
                 onChoisir={(uri, son) => {
                   setVideoChoisie(uri); setSonChoisi(son ?? null); setMontage(true)
                 }}
@@ -129,6 +141,7 @@ function Application() {
                 recherche={profilVisite ?? profil.pseudo}
                 onRetour={() => setLecture(null)}
                 onVisiter={visiter}
+                onUtiliserSon={utiliserSon}
               />
           : brouillons
             ? <Brouillons

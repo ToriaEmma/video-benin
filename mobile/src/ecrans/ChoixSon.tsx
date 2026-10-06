@@ -3,19 +3,30 @@
 // se deploie quand on tire la poignee vers le haut.
 // ============================================================
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import {
   View, StyleSheet, Pressable, FlatList, Modal, Animated, PanResponder,
-  useWindowDimensions, ScrollView, ActivityIndicator,
+  useWindowDimensions, ScrollView, ActivityIndicator, Image,
 } from 'react-native'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
-import { Text } from '../composants/Texte'
+import { Text, TextInput } from '../composants/Texte'
 import {
   Loupe, Egaliseur, Ciseaux, MarquePage,
 } from '../composants/Icones'
 import {
   SONS, parPopularite, abregerPublications, dureeLisible, type Son,
 } from '../lib/sons'
+import { rechercherSons, sonsPopulaires, sonsPourToi } from '../lib/deezer'
+import { basculerFavoriSon, useFavorisSons } from '../lib/favorisSons'
+
+// Derniers sons retenus, pour l'onglet « Récents » (le temps de la session).
+const recents: Son[] = []
+export function noterRecent(son: Son) {
+  const i = recents.findIndex(x => x.id === son.id)
+  if (i >= 0) recents.splice(i, 1)
+  recents.unshift(son)
+  if (recents.length > 30) recents.pop()
+}
 
 const ONGLETS = ['Populaire', 'Pour toi', 'Favoris', 'Récents']
 
@@ -46,9 +57,10 @@ function Ligne({ son, choisi, etat, rang, favori, onChoisir, onFavori }: {
 
       <View style={[s.pochette, { backgroundColor: son.couleur },
         choisi && s.pochetteChoisie]}>
+        {son.pochette && <Image source={{ uri: son.pochette }} style={s.pochetteImage} />}
         {charge
           ? <ActivityIndicator size="small" color="#fff" />
-          : <Text style={s.pochetteLettre}>{son.titre.charAt(0).toUpperCase()}</Text>}
+          : !son.pochette && <Text style={s.pochetteLettre}>{son.titre.charAt(0).toUpperCase()}</Text>}
       </View>
 
       <View style={s.ligneCorps}>
@@ -126,13 +138,49 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
 
   const [onglet, setOnglet] = useState('Pour toi')
   const [zone, setZone] = useState<'Bénin' | 'Mondial'>('Bénin')
-  const [choisi, setChoisi] = useState<string | null>(SONS[0].id)
-  const [favoris, setFavoris] = useState<string[]>([])
+  const [choisiSon, setChoisiSon] = useState<Son | null>(null)
+  const choisi = choisiSon?.id ?? null
+  const { favoris, estFavori } = useFavorisSons()
+
+  // Listes Deezer chargees a l'ouverture ; le catalogue libre de droits
+  // prend le relais si Deezer ne repond pas.
+  const [populaires, setPopulaires] = useState<Son[] | null>(null)
+  const [pourToi, setPourToi] = useState<Son[] | null>(null)
+  const [erreurListe, setErreurListe] = useState(false)
+  useEffect(() => {
+    if (!visible || pourToi) return
+    let annule = false
+    sonsPourToi()
+      .then(l => { if (!annule) { setPourToi(l); setChoisiSon(c => c ?? l[0] ?? null) } })
+      .catch(() => { if (!annule) { setPourToi(SONS); setErreurListe(true); setChoisiSon(c => c ?? SONS[0]) } })
+    sonsPopulaires()
+      .then(l => { if (!annule) setPopulaires(l) })
+      .catch(() => { if (!annule) setPopulaires(parPopularite(SONS)) })
+    return () => { annule = true }
+  }, [visible, pourToi])
+
+  // Recherche : la loupe ouvre le champ, les resultats remplacent l'onglet.
+  const [rechercheOuverte, setRechercheOuverte] = useState(false)
+  const [terme, setTerme] = useState('')
+  const [resultats, setResultats] = useState<Son[] | null>(null)
+  const [recherchant, setRecherchant] = useState(false)
+  const delai = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (delai.current) clearTimeout(delai.current)
+    if (!terme.trim()) { setResultats(null); setRecherchant(false); return }
+    setRecherchant(true)
+    delai.current = setTimeout(() => {
+      rechercherSons(terme)
+        .then(l => setResultats(l))
+        .catch(() => setResultats([]))
+        .finally(() => setRecherchant(false))
+    }, 350)
+  }, [terme])
 
   // Apercu du son retenu. Les pistes du catalogue depassent la minute et
   // demie : la boucle est inutile pour un apercu, et la muter ici serait
   // modifier la valeur rendue par le hook.
-  const son = SONS.find(x => x.id === choisi)
+  const son = choisiSon
   // `downloadFirst` est laisse a faux : attendre le fichier entier rendrait
   // l'apercu muet le temps du telechargement, ce qui est le defaut corrige ici.
   const lecteur = useAudioPlayer(son ? { uri: son.url } : null)
@@ -171,20 +219,21 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
     if (choisi === x.id) {
       // Second appui : on valide et on referme, sauf si rien ne s'est joue.
       if (etat === 'echec') return
+      noterRecent(x)
       onChoisir(x); onFermer(); return
     }
     setAbandonne(null)
-    setChoisi(x.id)
+    setChoisiSon(x)
   }
 
-  const basculerFavori = (id: string) => setFavoris(l =>
-    l.includes(id) ? l.filter(x => x !== id) : [...l, id])
-
-  // Chaque onglet trie la meme bibliotheque differemment.
-  const liste = onglet === 'Populaire' ? parPopularite(SONS)
-    : onglet === 'Favoris' ? SONS.filter(x => favoris.includes(x.id))
-    : onglet === 'Récents' ? [...SONS].reverse()
-    : SONS
+  // Chaque onglet a sa liste ; une recherche en cours les remplace toutes.
+  const enRecherche = rechercheOuverte && !!terme.trim()
+  const liste: Son[] | null = enRecherche ? resultats
+    : onglet === 'Populaire' ? (zone === 'Mondial' ? populaires : (pourToi && parPopularite(pourToi)))
+    : onglet === 'Favoris' ? favoris
+    : onglet === 'Récents' ? [...recents]
+    : pourToi
+  const enChargement = liste === null || (enRecherche && recherchant && !resultats)
 
   return (
     <Modal visible={visible} transparent animationType="slide"
@@ -212,13 +261,24 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
                 </Pressable>
               ))}
             </ScrollView>
-            <Pressable style={s.loupe} hitSlop={8}>
+            <Pressable style={s.loupe} hitSlop={8}
+              onPress={() => { setRechercheOuverte(v => !v); setTerme('') }}>
               <Loupe taille={24} couleur="#111" />
             </Pressable>
           </View>
 
+          {rechercheOuverte && (
+            <View style={s.recherche}>
+              <Loupe taille={18} couleur="#9a9a9c" />
+              <TextInput style={s.rechercheChamp} value={terme} onChangeText={setTerme}
+                placeholder="Rechercher un son ou un artiste" placeholderTextColor="#9a9a9c"
+                autoFocus returnKeyType="search" />
+              {recherchant && <ActivityIndicator size="small" color="#9a9a9c" />}
+            </View>
+          )}
+
           {/* « Populaire » ajoute le choix du territoire */}
-          {onglet === 'Populaire' && (
+          {onglet === 'Populaire' && !enRecherche && (
             <View style={s.zones}>
               {(['Bénin', 'Mondial'] as const).map(z => (
                 <Pressable key={z} onPress={() => setZone(z)}
@@ -231,23 +291,31 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
             </View>
           )}
 
+          {erreurListe && !enRecherche && (
+            <Text style={s.avis}>Deezer ne répond pas : sons libres de droits en attendant.</Text>
+          )}
+
           <FlatList
-            data={liste}
+            data={liste ?? []}
             keyExtractor={x => x.id}
             contentContainerStyle={s.liste}
-            ListEmptyComponent={
+            keyboardShouldPersistTaps="handled"
+            ListEmptyComponent={enChargement
+              ? <ActivityIndicator style={s.attente} color="#9a9a9c" />
+              : (
               <Text style={s.vide}>
-                {onglet === 'Favoris'
-                  ? 'Aucun son enregistré'
+                {enRecherche ? 'Aucun son trouvé'
+                  : onglet === 'Favoris' ? 'Aucun son enregistré'
+                  : onglet === 'Récents' ? 'Aucun son utilisé récemment'
                   : 'Aucun son pour le moment'}
               </Text>
-            }
+            )}
             renderItem={({ item, index }) => (
               <Ligne son={item} choisi={choisi === item.id} etat={etat}
-                rang={onglet === 'Populaire' ? index + 1 : undefined}
-                favori={favoris.includes(item.id)}
+                rang={onglet === 'Populaire' && !enRecherche ? index + 1 : undefined}
+                favori={estFavori(item.id)}
                 onChoisir={() => retenir(item)}
-                onFavori={() => basculerFavori(item.id)} />
+                onFavori={() => basculerFavoriSon(item)} />
             )}
           />
         </Animated.View>
@@ -292,10 +360,17 @@ const s = StyleSheet.create({
   ligneChoisie: { backgroundColor: '#f7f7f8', borderBottomColor: 'transparent' },
   rang: { width: 18, fontSize: 15, color: '#9a9a9c', fontStyle: 'italic' },
 
-  pochette: { width: 49, height: 49, borderRadius: 9,
+  pochette: { width: 49, height: 49, borderRadius: 9, overflow: 'hidden',
     alignItems: 'center', justifyContent: 'center' },
   pochetteChoisie: { borderWidth: 2, borderColor: '#ff2856' },
   pochetteLettre: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  pochetteImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 7 },
+
+  recherche: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16,
+    marginTop: 12, paddingHorizontal: 12, height: 40, borderRadius: 10, backgroundColor: '#f1f1f2' },
+  rechercheChamp: { flex: 1, fontSize: 15, color: '#111', paddingVertical: 0 },
+  avis: { fontSize: 12, color: '#9a9a9c', paddingHorizontal: 16, paddingTop: 10 },
+  attente: { padding: 40 },
 
   ligneCorps: { flex: 1, gap: 4 },
   ligneTitreGroupe: { flexDirection: 'row', alignItems: 'center', gap: 5 },
