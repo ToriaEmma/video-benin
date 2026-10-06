@@ -352,7 +352,7 @@ function Carte({
 
       <View style={s.infos}>
         <Pressable onPress={() => onVisiter?.(item.pseudo)}>
-          <Text style={s.pseudo}>@{item.pseudo}</Text>
+          <Text style={s.pseudo}>{item.pseudo}</Text>
         </Pressable>
         {!!item.legende && (
           <Pressable onPress={() => setDeveloppe(!developpe)}>
