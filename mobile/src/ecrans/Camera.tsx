@@ -17,6 +17,8 @@ import {
   OutilVitesse, OutilPlus,
 } from '../composants/Icones'
 import ChoixSon from './ChoixSon'
+import VignetteFiltre from '../composants/VignetteFiltre'
+import { useApercuCamera } from '../lib/apercus'
 import type { Son } from '../lib/sons'
 
 
@@ -245,6 +247,8 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
 
   useEffect(() => () => { chrono.arreter(); chrono.poser(0) }, [])
   const camera = useRef<CameraView>(null)
+  // Image vivante de la camera, posee dans les vignettes des filtres.
+  const apercuFiltres = useApercuCamera()
   // Apercu de la derniere video de la pellicule, pose dans le cadre « galerie ».
   const [apercuGalerie, setApercuGalerie] = useState<string | null>(null)
   const [outilsDeplies, setOutilsDeplies] = useState(false)
@@ -529,12 +533,16 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
             if (enregistrement || clips.length > 0) return null
             return (
               <Pressable key={decalage} style={[s.vignetteFiltre, tailleVignette]}
-                onPress={() => { setFiltre(i); setModeEffets(true) }} />
+                onPress={() => { setFiltre(i); setModeEffets(true) }}>
+                <VignetteFiltre image={apercuFiltres} voile={FILTRES[i].voile} melange={FILTRES[i].melange} />
+              </Pressable>
             )
           })}
           {clips.length > 0 && !enregistrement && (
             <Pressable style={s.filtreEnPause}
-              onPress={() => { setFiltre(f => (f + 1) % FILTRES.length); setModeEffets(true) }} />
+              onPress={() => { setFiltre(f => (f + 1) % FILTRES.length); setModeEffets(true) }}>
+              <VignetteFiltre image={apercuFiltres} voile={FILTRES[filtre].voile} melange={FILTRES[filtre].melange} />
+            </Pressable>
           )}
           {clips.length > 0 && (
             <View style={s.montage} pointerEvents="box-none">
@@ -675,7 +683,7 @@ const s = StyleSheet.create({
   // Vignette du filtre pendant la pause : carre arrondi cale a gauche.
   filtreEnPause: { position: 'absolute', left: 16, top: '50%',
     width: 62, height: 62, marginTop: -31, borderRadius: 12,
-    backgroundColor: '#956d84' },
+    backgroundColor: '#956d84', overflow: 'hidden' },
 
   montage: { position: 'absolute', right: 16, top: 0, bottom: 0,
     flexDirection: 'row', alignItems: 'center', gap: 14 },

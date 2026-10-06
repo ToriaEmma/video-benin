@@ -35,6 +35,7 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
   const enregistreur = useRef<MediaRecorder | null>(null)
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null)
   const facingRef = useRef(facing)
+  const apercu = useRef<ReturnType<typeof setInterval> | null>(null)
   facingRef.current = facing
 
   // Ouvre la camera demandee ; on rouvre a chaque changement de face.
@@ -50,6 +51,20 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
         flux.current = s
         if (video.current) { video.current.srcObject = s; await video.current.play().catch(() => {}) }
         onCameraReady?.()
+        // Petite image vivante, reprise par les vignettes des filtres.
+        const capturer = () => {
+          const v = video.current
+          if (!v || !v.videoWidth) return
+          const t = document.createElement('canvas'); t.width = 120; t.height = 120
+          const c = Math.min(v.videoWidth, v.videoHeight)
+          const g = t.getContext('2d')!
+          if (facing === 'front') { g.translate(120, 0); g.scale(-1, 1) }
+          g.drawImage(v, (v.videoWidth - c) / 2, (v.videoHeight - c) / 2, c, c, 0, 0, 120, 120)
+          ;(window as unknown as { __apercuCamera?: string }).__apercuCamera = t.toDataURL('image/jpeg', 0.7)
+          window.dispatchEvent(new Event('apercu-camera'))
+        }
+        setTimeout(capturer, 400)
+        apercu.current = setInterval(capturer, 1500)
       } catch (e) {
         onMountError?.({ message: (e as Error).message })
       }
@@ -57,6 +72,7 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
     ouvrir()
     return () => {
       annule = true
+      if (apercu.current) clearInterval(apercu.current)
       flux.current?.getTracks().forEach(t => t.stop())
       flux.current = null
     }
@@ -77,7 +93,9 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
       // Les cameras livrent souvent une image en paysage : on enregistre une
       // image verticale 9:16 recadree au centre, comme l'apercu (object-fit: cover).
       const toile = document.createElement('canvas')
-      toile.width = 720; toile.height = 1280
+      // 540x960 : net sur un telephone, et leger a envoyer (cahier des charges :
+      // donnees mobiles cheres au Benin).
+      toile.width = 540; toile.height = 960
       const ctx = toile.getContext('2d')!
       let actif = true
       const dessiner = () => {
@@ -100,7 +118,10 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
       const type = typeEnregistrement()
       const morceaux: Blob[] = []
       let rec: MediaRecorder
-      try { rec = type ? new MediaRecorder(s, { mimeType: type }) : new MediaRecorder(s) } catch (e) { return rejeter(e) }
+      // Debit fixe : sans lui, Chrome enregistrait a ~37 Mbit/s (70 Mo pour
+      // quelques secondes). 1 Mbit/s donne ~2 Mo pour 15 s.
+      const reglages: MediaRecorderOptions = { videoBitsPerSecond: 1_000_000, audioBitsPerSecond: 96_000 }
+      try { rec = new MediaRecorder(s, type ? { ...reglages, mimeType: type } : reglages) } catch (e) { return rejeter(e) }
       enregistreur.current = rec
       rec.ondataavailable = e => { if (e.data && e.data.size) morceaux.push(e.data) }
       rec.onerror = () => rejeter(new Error('Enregistrement impossible'))

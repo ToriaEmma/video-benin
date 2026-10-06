@@ -220,7 +220,7 @@ const typeDepuisUri = (uri: string) => {
 // que l'autorisation d'envoi.
 export async function televerser(
   uri: string,
-  surEtape?: (etape: 'preparation' | 'envoi' | 'fini') => void,
+  surEtape?: (etape: 'preparation' | 'envoi' | 'fini', pourcentage?: number) => void,
 ): Promise<string> {
   surEtape?.('preparation')
 
@@ -234,27 +234,31 @@ export async function televerser(
     throw new Error('Vidéo introuvable sur l’appareil')
   }
 
-  const type = TYPES_VIDEO.includes(blob.type) ? blob.type : typeDepuisUri(uri)
+  // « video/webm;codecs=vp9,opus » : le type de base seul compte.
+  const typeBrut = blob.type.split(';')[0]
+  const type = TYPES_VIDEO.includes(typeBrut) ? typeBrut : typeDepuisUri(uri)
 
   const depot = await requete<AutorisationDepot>('/televersements', {
     methode: 'POST',
     corps: { type, taille: blob.size },
   })
 
-  surEtape?.('envoi')
-  let reponse: Response
-  try {
-    reponse = await fetch(depot.url, {
-      method: 'PUT',
-      headers: { 'Content-Type': type },
-      body: blob,
-    })
-  } catch {
-    throw new Error('L’envoi de la vidéo a échoué : vérifiez votre connexion')
-  }
-  if (!reponse.ok) {
-    throw new Error(`Le stockage a refusé la vidéo (erreur ${reponse.status})`)
-  }
+  // XMLHttpRequest plutot que fetch : lui seul donne l'avancement de l'envoi,
+  // affiche en pourcentage sur l'ecran de publication.
+  surEtape?.('envoi', 0)
+  await new Promise<void>((resoudre, rejeter) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', depot.url)
+    xhr.setRequestHeader('Content-Type', type)
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) surEtape?.('envoi', Math.min(99, Math.round(e.loaded / e.total * 100)))
+    }
+    xhr.onload = () => xhr.status >= 200 && xhr.status < 300
+      ? resoudre()
+      : rejeter(new Error(`Le stockage a refusé la vidéo (erreur ${xhr.status})`))
+    xhr.onerror = () => rejeter(new Error('L’envoi de la vidéo a échoué : vérifiez votre connexion'))
+    xhr.send(blob)
+  })
 
   surEtape?.('fini')
   return depot.urlPublique

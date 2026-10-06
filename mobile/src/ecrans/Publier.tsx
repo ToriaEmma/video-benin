@@ -111,8 +111,9 @@ export default function Publier({
     if (!uri || envoi) return
     setEnvoi(true)
     try {
-      const url = await televerser(uri, (e) =>
-        setEtape(e === 'preparation' ? 'Préparation…' : 'Envoi de la vidéo…'))
+      const url = await televerser(uri, (e, pct) =>
+        setEtape(e === 'preparation' ? 'Préparation…'
+          : `Envoi de la vidéo…${pct != null ? ` ${pct} %` : ''}`))
 
       setEtape('Publication…')
       await apiVideos.creer({
@@ -156,8 +157,9 @@ export default function Publier({
     try {
       // Un brouillon porte lui aussi un fichier : sans televersement il
       // serait perdu des la reinstallation de l'application.
-      const url = await televerser(uri, (e) =>
-        setEtape(e === 'preparation' ? 'Préparation…' : 'Envoi de la vidéo…'))
+      const url = await televerser(uri, (e, pct) =>
+        setEtape(e === 'preparation' ? 'Préparation…'
+          : `Envoi de la vidéo…${pct != null ? ` ${pct} %` : ''}`))
       await apiBrouillons.creer(url, legende.trim(), octets)
       setUri(null)
       setLegende('')

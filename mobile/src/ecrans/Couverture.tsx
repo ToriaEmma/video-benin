@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, ScrollView, useWindowDimensions,
+  Platform,
 } from 'react-native'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView, type VideoThumbnail } from 'expo-video'
+import { imagesVideoWeb } from '../lib/apercus'
 import Svg, { Circle, Path } from 'react-native-svg'
 import { Text, TextInput } from '../composants/Texte'
 import { TexteCadre, TexteAlignement } from '../composants/Icones'
@@ -47,7 +49,7 @@ export default function Couverture({ uri, onAnnuler, onEnregistrer }: {
 }) {
   const { width } = useWindowDimensions()
   const lecteur = useVideoPlayer(uri, p => { p.muted = true })
-  const [vignettes, setVignettes] = useState<VideoThumbnail[]>([])
+  const [vignettes, setVignettes] = useState<(VideoThumbnail | { uri: string })[]>([])
   const [choisie, setChoisie] = useState(0)
   // Couverture prise dans la pellicule, qui prime sur les images extraites.
   const [importee, setImportee] = useState<string | null>(null)
@@ -79,7 +81,10 @@ export default function Couverture({ uri, onAnnuler, onEnregistrer }: {
           { length: NB_VIGNETTES },
           (_, i) => (duree * i) / NB_VIGNETTES,
         )
-        const images = await lecteur.generateThumbnailsAsync(instants)
+        // Sur le web, le navigateur extrait lui-meme les images de la video.
+        const images = Platform.OS === 'web'
+          ? (await imagesVideoWeb(uri, NB_VIGNETTES)).map(i => ({ uri: i }))
+          : await lecteur.generateThumbnailsAsync(instants)
         if (!annule) setVignettes(images)
       } catch { /* Extraction impossible : la bande reste vide. */ }
     }
@@ -230,14 +235,14 @@ export default function Couverture({ uri, onAnnuler, onEnregistrer }: {
               {nom === 'Standard' && <Text style={s.styleAa}>Aa</Text>}
               {nom === 'Vector' && (
                 <View style={s.badgeVector}>
-                  <Text style={s.badgeTexteBlanc}>TikTok</Text>
+                  <Text style={s.badgeTexteBlanc}>TockTick</Text>
                 </View>
               )}
               {nom === 'Glitch' && (
                 <View style={s.badgeGlitchFond}>
                   <View style={s.badgeGlitchRouge} />
                   <View style={s.badgeGlitchNoir}>
-                    <Text style={s.badgeTexteBlanc}>TikTok</Text>
+                    <Text style={s.badgeTexteBlanc}>TockTick</Text>
                   </View>
                 </View>
               )}
@@ -245,13 +250,13 @@ export default function Couverture({ uri, onAnnuler, onEnregistrer }: {
                 <View style={s.badgeTintFond}>
                   <View style={s.badgeTintCyan} />
                   <View style={s.badgeTintBlanc}>
-                    <Text style={s.badgeTexteNoir}>TikTok</Text>
+                    <Text style={s.badgeTexteNoir}>TockTick</Text>
                   </View>
                 </View>
               )}
               {nom === 'Emboss' && (
                 <View style={s.badgeEmboss}>
-                  <Text style={s.badgeTexteBlanc}>TikTok</Text>
+                  <Text style={s.badgeTexteBlanc}>TockTick</Text>
                 </View>
               )}
             </View>

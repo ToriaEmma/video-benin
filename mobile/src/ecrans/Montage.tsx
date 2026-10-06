@@ -10,6 +10,8 @@ import { Text, TextInput } from '../composants/Texte'
 import Feuille from '../composants/Feuille'
 import Interrupteur from '../composants/Interrupteur'
 import ChoixSon from './ChoixSon'
+import VignetteFiltre from '../composants/VignetteFiltre'
+import { useVignetteVideo } from '../lib/apercus'
 import { etat, enregistrer } from '../lib/demo'
 import { feuille as F } from '../lib/theme'
 import type { Son } from '../lib/sons'
@@ -171,6 +173,8 @@ export default function Montage({
   const [menuSortie, setMenuSortie] = useState(false)
   const [outilsDeplies, setOutilsDeplies] = useState(false)
   const lecteur = useVideoPlayer(uri, p => { p.loop = true; p.muted = false })
+  // Image de la video, reprise dans les vignettes des filtres.
+  const imageVideo = useVignetteVideo(uri)
 
   // Avis passager, affiche en bas de l'apercu.
   const [message, setMessage] = useState('')
@@ -455,8 +459,10 @@ export default function Montage({
             {FILTRES.map((f, i) => (
               <Pressable key={f.nom} onPress={() => setFiltre(i)} style={s.filtre}>
                 <View style={[s.filtreRond,
-                  f.voile !== 'transparent' && { backgroundColor: f.voile },
-                  i === filtre && s.filtreRondChoisi]} />
+                  !imageVideo && f.voile !== 'transparent' && { backgroundColor: f.voile },
+                  i === filtre && s.filtreRondChoisi]}>
+                  <VignetteFiltre image={imageVideo} voile={f.voile} melange={f.melange} />
+                </View>
                 <Text style={[s.filtreNom, i === filtre && s.filtreNomChoisi]}
                   numberOfLines={1}>{f.nom}</Text>
               </Pressable>
@@ -661,7 +667,7 @@ const s = StyleSheet.create({
   bandeListe: { gap: 14, paddingHorizontal: 16 },
 
   filtre: { width: 62, alignItems: 'center', gap: 6 },
-  filtreRond: { width: 48, height: 48, borderRadius: 24, borderWidth: 2,
+  filtreRond: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden',
     borderColor: 'rgba(255,255,255,.35)', backgroundColor: '#2a2a2a' },
   filtreRondChoisi: { borderColor: '#fff', borderWidth: 3 },
   filtreNom: { color: 'rgba(255,255,255,.7)', fontSize: 11.5, textAlign: 'center' },
