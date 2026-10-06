@@ -34,6 +34,8 @@ function Application() {
   // Son retenu au viseur ou au montage, qui accompagne cette video
   // jusqu'a la publication : le fichier video ne le porte pas.
   const [sonChoisi, setSonChoisi] = useState<Son | null>(null)
+  // Vrai quand le fil affiche son espace LIVE.
+  const [enLive, setEnLive] = useState(false)
   // Vrai tant qu'on est sur l'ecran de montage, avant la publication.
   const [montage, setMontage] = useState(false)
   // Pseudo du profil consulte. Null = on est sur son propre profil.
@@ -68,6 +70,8 @@ function Application() {
   // barre de navigation dessous.
   const camera = onglet === 'publier'
     || (onglet === 'profil' && (brouillons || !!lecture))
+    // L'espace LIVE du fil occupe tout l'ecran, sans barre de navigation.
+    || (onglet === 'fil' && enLive)
   const teinte = clair ? '#111' : '#fff'
   const teinteAttenuee = clair ? 'rgba(17,17,17,.55)' : 'rgba(255,255,255,.62)'
 
@@ -82,7 +86,7 @@ function Application() {
       <View style={s.contenu}>
         {onglet === 'fil' && (
           <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')}
-            onUtiliserSon={utiliserSon} />
+            onUtiliserSon={utiliserSon} onLive={setEnLive} />
         )}
         {onglet === 'amis' && (
           lecture

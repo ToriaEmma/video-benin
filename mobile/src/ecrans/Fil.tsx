@@ -409,7 +409,7 @@ function Carte({
 }
 
 export default function Fil({
-  onVisiter, onRechercher, videos, indexInitial = 0, recherche, onRetour, onUtiliserSon,
+  onVisiter, onRechercher, videos, indexInitial = 0, recherche, onRetour, onUtiliserSon, onLive,
 }: {
   onVisiter?: (pseudo: string) => void
   onRechercher?: () => void
@@ -423,9 +423,16 @@ export default function Fil({
   onRetour?: () => void
   // « Utiliser ce son » : la creation s'ouvre avec ce son.
   onUtiliserSon?: (son: Son) => void
+  // Previent l'application de l'entree et de la sortie de l'espace LIVE.
+  onLive?: (actif: boolean) => void
 }) {
   const { profil } = useAuth()
   const [categorie, setCategorie] = useState('Pour toi')
+  // Espace LIVE : la barre de navigation de l'application s'efface.
+  useEffect(() => {
+    onLive?.(categorie === 'LIVE')
+    return () => { if (categorie === 'LIVE') onLive?.(false) }
+  }, [categorie])
   const [index, setIndex] = useState(indexInitial)
   // `hauteur` est lue au moment de l'appel (rappel rafraichi a chaque rendu).
   const finDefilementWeb = useFinDefilementWeb(y => {
