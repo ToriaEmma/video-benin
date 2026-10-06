@@ -22,7 +22,12 @@ export function preparerWeb(): boolean {
   document.documentElement.lang = 'fr'
   document.title = 'TockTick'
 
-  const surOrdinateur = window.innerWidth > 640 && window.self === window.top && !matchMedia('(pointer: coarse)').matches
+  // Installable comme application : une fois installee, Chrome autorise le
+  // son des la lecture, sans toucher prealable.
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {})
+
+  const installee = matchMedia('(display-mode: standalone)').matches
+  const surOrdinateur = !installee && window.innerWidth > 640 && window.self === window.top && !matchMedia('(pointer: coarse)').matches
   if (surOrdinateur) {
     afficherCadreTelephone()
     return true
