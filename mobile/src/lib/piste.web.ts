@@ -15,6 +15,8 @@ export type Piste = {
   play: () => void
   pause: () => void
   seekTo: (secondes: number) => Promise<void>
+  // Vitesse de lecture (0,5 = deux fois plus lent).
+  regler: (debit: number) => void
 }
 
 // Silence de 0,1 s (WAV 8 kHz) : de quoi demarrer la platine pendant le
@@ -62,6 +64,7 @@ if (typeof window !== 'undefined') obtenirPlatine()
 class PisteWeb implements Piste {
   // Position voulue avant d'avoir la platine (ex. carte remise au debut).
   private depart = 0
+  private debit = 1
 
   constructor(private readonly url: string | null) {}
 
@@ -75,6 +78,7 @@ class PisteWeb implements Piste {
       proprietaire = this
       p.loop = true
       if (p.src !== this.url) { p.src = this.url; p.load() }
+      p.playbackRate = this.debit
       const position = this.depart
       if (p.readyState >= 1) p.currentTime = position
       else p.addEventListener('loadedmetadata', () => { if (this.aLaMain) p.currentTime = position }, { once: true })
@@ -102,10 +106,16 @@ class PisteWeb implements Piste {
     else p.addEventListener('loadedmetadata', () => { if (this.aLaMain) p.currentTime = secondes }, { once: true })
   }
 
+  regler(debit: number) {
+    this.debit = debit
+    if (this.aLaMain) platine!.playbackRate = debit
+  }
+
   // Ecran demonte : on rend la platine, silencieuse.
   liberer() {
     if (!this.aLaMain) return
     platine!.pause()
+    platine!.playbackRate = 1
     proprietaire = null
   }
 }

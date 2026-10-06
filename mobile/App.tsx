@@ -34,6 +34,8 @@ function Application() {
   // Son retenu au viseur ou au montage, qui accompagne cette video
   // jusqu'a la publication : le fichier video ne le porte pas.
   const [sonChoisi, setSonChoisi] = useState<Son | null>(null)
+  // Vitesse choisie a la camera, appliquee par le montage.
+  const [vitesseChoisie, setVitesseChoisie] = useState(1)
   // Vrai quand le fil affiche son espace LIVE.
   const [enLive, setEnLive] = useState(false)
   // Vrai tant qu'on est sur l'ecran de montage, avant la publication.
@@ -110,10 +112,22 @@ function Application() {
                   uri={videoChoisie}
                   pseudo={profil.pseudo}
                   sonInitial={sonChoisi}
+                  vitesseInitiale={vitesseChoisie}
                   onRetour={() => {
                     setMontage(false); setVideoChoisie(null); setSonChoisi(null)
                   }}
-                  onSuivant={son => { setSonChoisi(son ?? null); setMontage(false) }}
+                  onSuivant={(son, video) => {
+                    setSonChoisi(son); setVideoChoisie(video); setVitesseChoisie(1); setMontage(false)
+                  }}
+                  onBrouillon={() => {
+                    setMontage(false); setVideoChoisie(null); setSonChoisi(null); setProfilVisite(null)
+                    setMessageProfil('Brouillon enregistré')
+                    setOnglet('profil')
+                  }}
+                  onStory={() => {
+                    setMontage(false); setVideoChoisie(null); setSonChoisi(null)
+                    setCleFil(v => v + 1); setOnglet('fil')
+                  }}
                 />
               : <Publier
                   uriInitiale={videoChoisie}
@@ -132,8 +146,8 @@ function Application() {
             : <Camera
                 sonInitial={sonChoisi}
                 onFermer={() => { setSonChoisi(null); setOnglet('fil') }}
-                onChoisir={(uri, son) => {
-                  setVideoChoisie(uri); setSonChoisi(son ?? null); setMontage(true)
+                onChoisir={(uri, son, vitesse) => {
+                  setVideoChoisie(uri); setSonChoisi(son ?? null); setVitesseChoisie(vitesse ?? 1); setMontage(true)
                 }}
               />
         )}

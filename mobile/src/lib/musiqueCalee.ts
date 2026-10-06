@@ -22,7 +22,13 @@ const FIGEE_MS = 400
 
 // `ecartMax` : ecart tolere avant recalage. Une musique en memoire se recale
 // sans a-coup, on peut alors etre plus exigeant.
-export function useMusiqueCalee(video: Video, musique: Musique | null, actif: boolean, duree: number, ecartMax = 0.3) {
+// `vitesse` et `origine` : quand l'apercu joue la video accelere ou
+// decoupee, la musique suit le temps de la video finale,
+// (position - origine) / vitesse.
+export function useMusiqueCalee(
+  video: Video, musique: Musique | null, actif: boolean, duree: number,
+  ecartMax = 0.3, vitesse = 1, origine = 0,
+) {
   useEffect(() => {
     if (!actif || !musique) return
     let dernier = -1
@@ -45,7 +51,8 @@ export function useMusiqueCalee(video: Video, musique: Musique | null, actif: bo
       }
       immobile = 0
       // Extrait plus court que la video : la musique repart en boucle.
-      const cible = duree > 0 ? v % duree : v
+      const temps = Math.max(0, (v - origine) / vitesse)
+      const cible = duree > 0 ? temps % duree : temps
       const tolerance = precis > 0 ? Math.min(0.12, ecartMax) : ecartMax
       if (precis > 0) precis--
       if (calme > 0 && !boucle) calme--
@@ -57,7 +64,7 @@ export function useMusiqueCalee(video: Video, musique: Musique | null, actif: bo
       if (!musique.playing) musique.play()
     }, PAS)
     return () => clearInterval(minuteur)
-  }, [actif, video, musique, duree, ecartMax])
+  }, [actif, video, musique, duree, ecartMax, vitesse, origine])
 }
 
 // Musique chargee entierement en memoire (web) : les retours au debut de la

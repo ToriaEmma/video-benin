@@ -19,7 +19,15 @@ type Props = ViewProps & {
   mute?: boolean
   onCameraReady?: () => void
   onMountError?: (e: { message: string }) => void
+  // Web : filtre et retouche graves dans l'enregistrement (l'apercu les
+  // montre deja ; sans ceci, la video sortirait sans eux).
+  voile?: { couleur: string; melange: string }
+  retouche?: boolean
 }
+
+type Habillage = { voile?: { couleur: string; melange: string }; retouche?: boolean }
+// Retouche du teint : lumiere un peu relevee, contraste adouci, grain lisse.
+const FILTRE_RETOUCHE = 'brightness(1.06) contrast(.94) saturate(1.06) blur(.5px)'
 
 export type CameraViewRef = {
   recordAsync: (o?: { maxDuration?: number }) => Promise<{ uri: string } | undefined>
@@ -33,8 +41,10 @@ export type CameraViewRef = {
 }
 
 export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
-  { facing = 'back', enableTorch = false, mute = false, onCameraReady, onMountError, style, ...reste }, ref,
+  { facing = 'back', enableTorch = false, mute = false, onCameraReady, onMountError, voile, retouche, style, ...reste }, ref,
 ) {
+  const habillage = useRef<Habillage>({})
+  useEffect(() => { habillage.current = { voile, retouche } }, [voile, retouche])
   const video = useRef<HTMLVideoElement | null>(null)
   const flux = useRef<MediaStream | null>(null)
   const session = useRef<Session | null>(null)
@@ -99,7 +109,7 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
       if (!source || !v) return rejeter(new Error('Caméra indisponible'))
       let ses = session.current
       if (!ses || ses.fini) {
-        try { ses = new Session(v, source, facingRef) } catch (e) { return rejeter(e) }
+        try { ses = new Session(v, source, facingRef, habillage) } catch (e) { return rejeter(e) }
         session.current = ses
       }
       ses.prise(resoudre, rejeter)
@@ -133,6 +143,7 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
         style: {
           position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
           transform: facing === 'front' ? 'scaleX(-1)' : undefined,
+          filter: retouche ? FILTRE_RETOUCHE : undefined,
         },
       })}
     </View>
@@ -188,7 +199,10 @@ class Session {
   private flux: MediaStream
   private enCours: { resoudre: (r: { uri: string } | undefined) => void; rejeter: (e: Error) => void } | null = null
 
-  constructor(private v: HTMLVideoElement, source: MediaStream, private face: { current: CameraType }) {
+  constructor(
+    private v: HTMLVideoElement, source: MediaStream,
+    private face: { current: CameraType }, private habillage: { current: Habillage },
+  ) {
     // 540x960 : net sur un telephone, et leger a envoyer (cahier des charges :
     // donnees mobiles cheres au Benin).
     const toile = document.createElement('canvas')
@@ -200,11 +214,20 @@ class Session {
       if (vw && vh) {
         const echelle = Math.max(toile.width / vw, toile.height / vh)
         const w = vw * echelle, h = vh * echelle
+        const { voile, retouche } = this.habillage.current
         g.save()
         // Camera avant : meme sens que l'apercu (effet miroir).
         if (this.face.current === 'front') { g.translate(toile.width, 0); g.scale(-1, 1) }
+        if (retouche) g.filter = FILTRE_RETOUCHE
         g.drawImage(v, (toile.width - w) / 2, (toile.height - h) / 2, w, h)
         g.restore()
+        if (voile && voile.couleur !== 'transparent') {
+          g.save()
+          g.globalCompositeOperation = (voile.melange === 'normal' ? 'source-over' : voile.melange) as GlobalCompositeOperation
+          g.fillStyle = voile.couleur
+          g.fillRect(0, 0, toile.width, toile.height)
+          g.restore()
+        }
       }
       requestAnimationFrame(dessiner)
     }

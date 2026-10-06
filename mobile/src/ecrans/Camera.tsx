@@ -3,12 +3,16 @@ import {
   View, Pressable, StyleSheet, useWindowDimensions, SafeAreaView, Alert, Image, Platform,
   ActivityIndicator,
 } from 'react-native'
-import { Text } from '../composants/Texte'
+import { Text, TextInput } from '../composants/Texte'
+import Feuille from '../composants/Feuille'
 import { CameraView, useCameraPermissions, type CameraType } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
 import * as MediaLibrary from 'expo-media-library'
 import { usePiste } from '../lib/piste'
 import { assemblerVideos } from '../lib/assemblage'
+import { videoFixe, dessinerHabillage, chargerImage } from '../lib/rendu'
+import { televerser, apiBrouillons } from '../lib/api'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import Svg, { Circle, Line } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import {
@@ -35,26 +39,19 @@ const FILTRES = [
   { nom: 'Noir & blanc', voile: 'rgba(128,128,128,.62)', melange: 'saturation' as const },
 ]
 const DUREES = ['10 min', '60 s', '15 s', 'PHOTO', 'TEXTE']
-// Pourquoi chaque outil reste muet. Filmer, choisir un filtre et allumer
-// la lampe fonctionnent ; le reste demande un vrai moteur de montage, que
-// TockTick n'a pas. Chaque bouton le dit plutot que de promettre une suite.
-const RAISONS_OUTILS: Record<string, string> = {
-  Minuteur: 'le déclenchement différé n’est pas encore en place.',
-  Disposition: 'les modèles de disposition demandent un moteur de montage.',
-  Retouche: 'la retouche du visage demande un moteur de montage.',
-  Vitesse: 'le ralenti et l’accéléré demandent un moteur de montage.',
-  "Plus d'outils": 'il n’y a pas d’autre outil pour l’instant.',
-  'Enregistrer l’effet': 'les effets ne sont pas encore enregistrables.',
-  Agrandir: 'l’aperçu agrandi n’est pas encore en place.',
-  'Diffusion LIVE': 'TockTick n’a pas encore de diffusion en direct.',
-  'Envoyer à des amis': 'partage ta vidéo une fois publiée.',
-  Créer: 'il n’y a pas d’autre mode de création pour l’instant.',
-}
+// Vitesses de prise, comme sur TikTok : a 2×, la musique joue deux fois
+// plus lentement pendant la prise, et la video finale est acceleree.
+const VITESSES = [0.5, 1, 2, 3]
+// Minuteur : delai avant le debut de la prise, en secondes (0 = aucun).
+const MINUTEURS = [0, 3, 10]
+// Fonds du mode TEXTE.
+const FONDS_TEXTE = ['#ff2856', '#111111', '#3f7ff0', '#ef8d3c', '#c43cc0', '#1fa774']
+const CLE_EFFETS_FAVORIS = 'tocktick-effets-favoris-v1'
 
 const OUTILS = [
   { nom: 'Flash', Icone: OutilFlash },
   { nom: 'Minuteur', Icone: OutilMinuteur },
-  { nom: 'Disposition', Icone: OutilDisposition },
+  { nom: 'Grille', Icone: OutilDisposition },
   { nom: 'Retouche', Icone: OutilRetouche },
   { nom: 'Filtres', Icone: OutilFiltres },
   { nom: 'Vitesse', Icone: OutilVitesse },
@@ -104,8 +101,11 @@ type CameraSeance = { terminerSession: () => Promise<string | undefined> }
 const seanceWeb = (c: unknown): CameraSeance | null =>
   c && typeof (c as Partial<CameraSeance>).terminerSession === 'function' ? c as CameraSeance : null
 
-function MusiquePrise({ son, enCours }: { son: Son; enCours: boolean }) {
+function MusiquePrise({ son, enCours, vitesse }: { son: Son; enCours: boolean; vitesse: number }) {
   const musique = usePiste(son.url)
+  // A 2×, la musique joue a 0,5× pendant la prise : une fois la video
+  // acceleree, elle retrouve son rythme normal.
+  useEffect(() => { musique.regler(1 / vitesse) }, [musique, vitesse])
   // Le son est deja mis en memoire pour l'apercu du montage (sauf un son
   // original : c'est la piste d'une video, trop lourde pour ca).
   useEffect(() => { if (!son.original) prechargerSon(son.url) }, [son.url, son.original])
@@ -120,13 +120,14 @@ function MusiquePrise({ son, enCours }: { son: Son; enCours: boolean }) {
       }
       if (annule) return
       // Duree inconnue (son original) : on suit le chronometre sans boucler.
-      const position = son.duree > 0 ? chrono.valeur % son.duree : chrono.valeur
+      const temps = chrono.valeur / vitesse
+      const position = son.duree > 0 ? temps % son.duree : temps
       await musique.seekTo(position).catch(() => { /* Position refusee. */ })
       if (!annule) musique.play()
     }
     lancer()
     return () => { annule = true }
-  }, [enCours, musique, son.duree])
+  }, [enCours, musique, son.duree, vitesse])
   return null
 }
 
@@ -141,18 +142,30 @@ const Chronometre = React.memo(function Chronometre() {
   )
 })
 
-const Viseur = React.memo(function Viseur({ cameraRef, face, filtre, torche }: {
+const Viseur = React.memo(function Viseur({ cameraRef, face, filtre, torche, retouche, grille }: {
   cameraRef: React.RefObject<CameraView | null>; face: CameraType
   // Index du filtre applique : son voile se pose sur l'apercu.
   filtre: number
   // Lampe allumee : seule la camera arriere en porte une.
   torche: boolean
+  retouche: boolean
+  // Grille de cadrage (regle des tiers), jamais enregistree.
+  grille: boolean
 }) {
   const choisi = FILTRES[filtre]
+  // Web : filtre et retouche sont aussi graves dans l'enregistrement.
+  const habillage = { voile: { couleur: choisi.voile, melange: choisi.melange }, retouche }
   return (
     <>
       <CameraView ref={cameraRef} style={StyleSheet.absoluteFill}
-        facing={face} mode="video" enableTorch={torche} />
+        facing={face} mode="video" enableTorch={torche}
+        {...(habillage as object)} />
+      {grille && (
+        <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+          {[1, 2].map(i => <View key={`v${i}`} style={[s.grilleTrait, { left: `${(i * 100) / 3}%`, top: 0, bottom: 0, width: StyleSheet.hairlineWidth }]} />)}
+          {[1, 2].map(i => <View key={`h${i}`} style={[s.grilleTrait, { top: `${(i * 100) / 3}%`, left: 0, right: 0, height: StyleSheet.hairlineWidth }]} />)}
+        </View>
+      )}
       {choisi.voile !== 'transparent' && (
         <View pointerEvents="none" style={[
           StyleSheet.absoluteFill,
@@ -215,7 +228,8 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   sonInitial?: Son | null
   // Le son retenu voyage avec la video : sans lui, le choix fait ici
   // serait perdu entre le viseur et la publication.
-  onChoisir: (uri: string, son?: Son | null) => void
+  // `vitesse` : vitesse de prise, appliquee par le montage.
+  onChoisir: (uri: string, son?: Son | null, vitesse?: number) => void
 }) {
   // Mesure reactive plutot que lue au chargement du module : la vignette
   // suit ainsi la largeur reelle, y compris a la rotation.
@@ -245,10 +259,33 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   const [clips, setClips] = useState<{ uri: string; fin: number }[]>([])
   const [cumul, setCumul] = useState(0)
 
-  // Duree maximale selon le mode choisi, qui borne aussi l'arc de progression.
+  const [vitesse, setVitesse] = useState(1)
+  const [barreVitesse, setBarreVitesse] = useState(false)
+  const [minuteur, setMinuteur] = useState(0)
+  // Compte a rebours du minuteur en cours (secondes restantes), ou null.
+  const [decompte, setDecompte] = useState<number | null>(null)
+  const [retouche, setRetouche] = useState(false)
+  const [grille, setGrille] = useState(false)
+  // Panneau de tous les effets (« Agrandir ») et effets mis en favoris.
+  const [panneauEffets, setPanneauEffets] = useState(false)
+  const [effetsFavoris, setEffetsFavoris] = useState<string[]>([])
+  useEffect(() => {
+    AsyncStorage.getItem(CLE_EFFETS_FAVORIS)
+      .then(brut => { if (brut) setEffetsFavoris(JSON.parse(brut)) })
+      .catch(() => { /* Stockage illisible : aucun favori. */ })
+  }, [])
+  // Mode TEXTE : texte saisi et couleur de fond.
+  const [texte, setTexte] = useState('')
+  const [fondTexte, setFondTexte] = useState(0)
+  // Travail en cours (preparation ou envoi), affiche par-dessus le viseur.
+  const [travail, setTravail] = useState<string | null>(null)
+
+  // Duree maximale de la video finale selon le mode choisi.
   const dureeMax = mode === '10 min' ? 600 : mode === '60 s' ? 60 : 15
   // Avec un son, la video s'arrete a la fin du morceau, comme sur TikTok.
-  const limite = son && son.duree > 0 ? Math.min(dureeMax, son.duree) : dureeMax
+  // La limite est exprimee en temps de prise : a 2×, on filme deux fois
+  // plus longtemps pour une meme duree finale.
+  const limite = (son && son.duree > 0 ? Math.min(dureeMax, son.duree) : dureeMax) * vitesse
   // Web : les prises s'enchainent dans un enregistrement continu (seance).
   // Supprimer une prise clot la seance ; on garde sa partie utile, et la
   // validation raccorde les seances. `debutSeance` : chrono au debut de la
@@ -296,22 +333,53 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   const depart = useRef<number | null>(null)
   const franchi = useRef(0)
 
+  const avertir = (texteAvis: string, duree = 2600) => {
+    setMessage(texteAvis)
+    setTimeout(() => setMessage(''), duree)
+  }
+
   const outil = (nom: string) => {
-    if (nom === 'Filtres' || nom === 'Effets') {
-      setFiltre(v => (v + 1) % FILTRES.length); setMessage(''); return
-    }
-    // La lampe est une vraie capacite de l'appareil : seule la camera
-    // arriere en porte une, d'ou le refus explicite en facade.
-    if (nom === 'Flash') {
-      if (face === 'front') {
-        setMessage('La caméra avant n’a pas de lampe.')
-        setTimeout(() => setMessage(''), 2600)
-        return
+    switch (nom) {
+      case 'Filtres':
+      case 'Effets':
+        setFiltre(v => (v + 1) % FILTRES.length); setModeEffets(true); setMessage(''); return
+      case 'Flash':
+        // La lampe est une vraie capacite de l'appareil : seule la camera
+        // arriere en porte une, d'ou le refus explicite en facade.
+        if (face === 'front') return avertir('La caméra avant n’a pas de lampe.')
+        setTorche(v => !v); setMessage(''); return
+      case 'Minuteur': {
+        const suivant = MINUTEURS[(MINUTEURS.indexOf(minuteur) + 1) % MINUTEURS.length]
+        setMinuteur(suivant)
+        return avertir(suivant ? `Minuteur : la prise démarre ${suivant} s après l’appui.` : 'Minuteur désactivé.')
       }
-      setTorche(v => !v); setMessage(''); return
+      case 'Grille':
+        setGrille(v => !v); return
+      case 'Retouche':
+        setRetouche(v => !v)
+        return avertir(retouche ? 'Retouche désactivée.' : 'Retouche activée : teint lissé et lumineux.')
+      case 'Vitesse':
+        if (clips.length > 0) return avertir('La vitesse se choisit avant la première prise.')
+        setBarreVitesse(v => !v); return
+      case 'Enregistrer l’effet': {
+        const nomFiltre = FILTRES[filtre].nom
+        const favoris = effetsFavoris.includes(nomFiltre)
+          ? effetsFavoris.filter(n => n !== nomFiltre)
+          : [nomFiltre, ...effetsFavoris]
+        setEffetsFavoris(favoris)
+        AsyncStorage.setItem(CLE_EFFETS_FAVORIS, JSON.stringify(favoris)).catch(() => {})
+        return avertir(favoris.includes(nomFiltre)
+          ? `« ${nomFiltre} » ajouté à tes effets favoris.`
+          : `« ${nomFiltre} » retiré de tes effets favoris.`)
+      }
+      case 'Agrandir':
+        setPanneauEffets(true); return
+      case 'Diffusion LIVE':
+        // Meme regle que TikTok : le direct s'ouvre a partir de 1 000 abonnes.
+        return avertir('Le LIVE s’ouvre à partir de 1 000 abonnés.', 3200)
+      case 'Créer':
+        setMode('TEXTE'); return
     }
-    setMessage(`${nom} : ${RAISONS_OUTILS[nom] ?? 'pas encore en place.'}`)
-    setTimeout(() => setMessage(''), 3200)
   }
 
   const galerie = async () => {
@@ -324,14 +392,12 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
     if (!r.canceled && r.assets[0]) onChoisir(r.assets[0].uri, son)
   }
 
-  const filmer = async () => {
+  const prendre = async () => {
     if (!camera.current) return
-    if (enregistrement) { camera.current.stopRecording(); return }
     const restant = limite - chrono.valeur
     if (restant < 0.3) {
-      setMessage(son && son.duree > 0 && limite === son.duree ? 'Le son est terminé : valide ta vidéo.' : 'Durée maximale atteinte.')
-      setTimeout(() => setMessage(''), 2600)
-      return
+      return avertir(son && son.duree > 0 && limite === son.duree * vitesse
+        ? 'Le son est terminé : valide ta vidéo.' : 'Durée maximale atteinte.')
     }
     setEnregistrement(true)
     if (seanceWeb(camera.current) && debutSeance.current === null) debutSeance.current = chrono.valeur
@@ -344,6 +410,84 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
       setEnregistrement(false)
       setCumul(chrono.valeur)
     }
+  }
+
+  // Bouton rond : arrete la prise en cours, annule un compte a rebours, ou
+  // lance la prise (apres le minuteur s'il est regle).
+  const minuteurEnCours = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => () => { if (minuteurEnCours.current) clearInterval(minuteurEnCours.current) }, [])
+  const filmer = () => {
+    if (!camera.current) return
+    if (enregistrement) { camera.current.stopRecording(); return }
+    if (decompte !== null) {
+      if (minuteurEnCours.current) clearInterval(minuteurEnCours.current)
+      setDecompte(null); return
+    }
+    setBarreVitesse(false)
+    if (!minuteur) { prendre(); return }
+    let reste = minuteur
+    setDecompte(reste)
+    minuteurEnCours.current = setInterval(() => {
+      reste -= 1
+      if (reste > 0) { setDecompte(reste); return }
+      if (minuteurEnCours.current) clearInterval(minuteurEnCours.current)
+      setDecompte(null)
+      prendre()
+    }, 1000)
+  }
+
+  // Mode PHOTO : la photo devient une video de 5 s (leger zoom), sur
+  // laquelle la musique choisie s'ajoute comme pour toute video.
+  const photographier = async () => {
+    if (!camera.current || travail) return
+    try {
+      const photo = await camera.current.takePictureAsync()
+      if (!photo?.uri) return
+      setTravail('Préparation de la photo')
+      const image = await chargerImage(photo.uri)
+      const voile = FILTRES[filtre]
+      const uri = await videoFixe((g, l, h, t) => {
+        const e = Math.max(l / image.width, h / image.height) * (1 + 0.06 * t)
+        const w = image.width * e, hh = image.height * e
+        g.save()
+        if (face === 'front') { g.translate(l, 0); g.scale(-1, 1) }
+        if (retouche) g.filter = 'brightness(1.06) contrast(.94) saturate(1.06) blur(.5px)'
+        g.drawImage(image, (l - w) / 2, (h - hh) / 2, w, hh)
+        g.restore()
+        if (voile.voile !== 'transparent') {
+          g.save()
+          g.globalCompositeOperation = (voile.melange === 'normal' ? 'source-over' : voile.melange) as GlobalCompositeOperation
+          g.fillStyle = voile.voile
+          g.fillRect(0, 0, l, h)
+          g.restore()
+        }
+      })
+      onChoisir(uri, son, 1)
+    } catch {
+      avertir('La photo n’a pas pu être prise. Réessaie.')
+    } finally { setTravail(null) }
+  }
+
+  // Mode TEXTE : le texte sur fond de couleur devient une video de 5 s.
+  const publierTexte = async () => {
+    const propre = texte.trim()
+    if (!propre) return avertir('Écris d’abord ton texte.')
+    if (travail) return
+    setTravail('Préparation du texte')
+    try {
+      const fond = FONDS_TEXTE[fondTexte]
+      const uri = await videoFixe((g, l, h) => {
+        g.fillStyle = fond
+        g.fillRect(0, 0, l, h)
+        dessinerHabillage(g, l, h, { calques: [{
+          genre: 'texte', contenu: propre, couleur: '#fff', x: 0.5, y: 0.5,
+          taille: propre.length > 120 ? 0.055 : propre.length > 40 ? 0.07 : 0.09,
+        }] })
+      })
+      onChoisir(uri, son, 1)
+    } catch {
+      avertir('Le texte n’a pas pu être préparé. Réessaie.')
+    } finally { setTravail(null) }
   }
 
   // `⊗` : retire la derniere prise, apres confirmation comme sur TikTok.
@@ -379,27 +523,64 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   }
 
   // La coche valide le montage et passe a la publication.
-  const valider = async () => {
-    if (!clips.length || assemblage || enregistrement) return
+  // Video de toutes les prises : sur le web, l'enregistrement continu est
+  // clos, et les seances separees par une suppression sont raccordees.
+  const videoFinale = async (): Promise<string> => {
     const cam = seanceWeb(camera.current)
     // Mobile : chaque prise est un fichier, la camera rend la derniere.
-    if (!cam) return onChoisir(clips[clips.length - 1].uri, son)
+    if (!cam) return clips[clips.length - 1].uri
+    if (debutSeance.current !== null) {
+      const debut = debutSeance.current
+      debutSeance.current = null
+      const uri = await cam.terminerSession()
+      if (uri) seances.current.push({ uri, debut, fin: chrono.valeur, entiere: true })
+    }
+    const morceaux = seances.current
+    if (!morceaux.length) throw new Error('Aucune prise')
+    if (morceaux.length === 1 && morceaux[0].entiere) return morceaux[0].uri
     setAssemblage(true)
     try {
-      if (debutSeance.current !== null) {
-        const debut = debutSeance.current
-        debutSeance.current = null
-        const uri = await cam.terminerSession()
-        if (uri) seances.current.push({ uri, debut, fin: chrono.valeur, entiere: true })
-      }
-      const morceaux = seances.current
-      if (!morceaux.length) throw new Error('Aucune prise')
-      if (morceaux.length === 1 && morceaux[0].entiere) return onChoisir(morceaux[0].uri, son)
-      onChoisir(await assemblerVideos(morceaux.map(m => ({ uri: m.uri, duree: m.fin - m.debut }))), son)
-    } catch {
-      setMessage('Impossible de préparer la vidéo. Réessaie.')
-    } finally {
-      setAssemblage(false)
+      const uri = await assemblerVideos(morceaux.map(m => ({ uri: m.uri, duree: m.fin - m.debut })))
+      // Le raccord devient l'unique morceau : une seconde validation le reprend.
+      seances.current = [{ uri, debut: 0, fin: chrono.valeur, entiere: true }]
+      return uri
+    } finally { setAssemblage(false) }
+  }
+
+  // La coche valide le montage et passe a la publication.
+  const valider = async () => {
+    if (!clips.length || assemblage || enregistrement || travail) return
+    try { onChoisir(await videoFinale(), son, vitesse) }
+    catch { setMessage('Impossible de préparer la vidéo. Réessaie.') }
+  }
+
+  // Menu de sortie : « Recommencer » efface les prises sans quitter.
+  const recommencer = async () => {
+    setMenuSortie(false)
+    await seanceWeb(camera.current)?.terminerSession()
+    debutSeance.current = null
+    seances.current = []
+    setClips([]); chrono.poser(0); setCumul(0)
+  }
+
+  // Menu de sortie : les prises rejoignent les brouillons (envoyes au
+  // compte, retrouves dans le profil).
+  const enregistrerBrouillon = async () => {
+    setMenuSortie(false)
+    if (!clips.length || travail) return
+    try {
+      const video = await videoFinale()
+      setTravail('Envoi du brouillon')
+      const url = await televerser(video, (etape, pct) => {
+        if (etape === 'envoi') setTravail(`Envoi du brouillon… ${pct ?? 0} %`)
+      })
+      await apiBrouillons.creer(url, '')
+      setTravail(null)
+      avertir('Brouillon enregistré.')
+      setTimeout(onFermer, 900)
+    } catch (e) {
+      setTravail(null)
+      avertir(e instanceof Error ? e.message : 'Le brouillon n’a pas pu être enregistré.')
     }
   }
 
@@ -413,7 +594,7 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
           <IconeCamera taille={56} couleur="rgba(255,255,255,.6)" />
           <Text style={s.centreTitre}>Autorisez la caméra</Text>
           <Text style={s.centreTexte}>
-            Pour filmer une vidéo, autorisez l'accès à la caméra et au micro.
+            Pour filmer une vidéo, autorisez l’accès à la caméra et au micro.
           </Text>
           <Pressable style={s.autoriser} onPress={demander}>
             <Text style={s.autoriserTexte}>Autoriser</Text>
@@ -429,14 +610,44 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
   return (
     <View style={[s.page, { paddingTop: marges.top + 40 }]}>
       <View style={s.viseur}>
-        {son && <MusiquePrise key={son.id} son={son} enCours={enregistrement} />}
+        {son && <MusiquePrise key={son.id} son={son} enCours={enregistrement} vitesse={vitesse} />}
         <Viseur cameraRef={camera} face={face} filtre={filtre}
-          torche={torche && face === 'back'} />
+          torche={torche && face === 'back'} retouche={retouche} grille={grille} />
+
+        {decompte !== null && (
+          <View style={s.decompte} pointerEvents="none">
+            <Text style={s.decompteTexte}>{decompte}</Text>
+          </View>
+        )}
+
+        {mode === 'TEXTE' && !enregistrement && clips.length === 0 && (
+          <View style={[s.texteMode, { backgroundColor: FONDS_TEXTE[fondTexte] }]}>
+            <TextInput style={s.texteSaisie} value={texte} onChangeText={setTexte}
+              multiline maxLength={300} placeholder="Appuie pour écrire"
+              placeholderTextColor="rgba(255,255,255,.6)" />
+            <View style={s.texteActions}>
+              <Pressable style={s.texteCouleur} onPress={() => setFondTexte(i => (i + 1) % FONDS_TEXTE.length)}>
+                <View style={[s.texteCouleurRond, { backgroundColor: FONDS_TEXTE[(fondTexte + 1) % FONDS_TEXTE.length] }]} />
+                <Text style={s.texteCouleurNom}>Couleur</Text>
+              </Pressable>
+              <Pressable style={[s.texteSuivant, !texte.trim() && s.inactif]} onPress={publierTexte}>
+                <Text style={s.texteSuivantTexte}>Suivant</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {(travail || assemblage) && (
+          <View style={s.travail}>
+            <ActivityIndicator color="#fff" size="large" />
+            <Text style={s.messageTexte}>{travail ?? 'Préparation de la vidéo…'}</Text>
+          </View>
+        )}
 
       {/* Barre du haut : fermer, ajouter un son, retourner */}
       {!enregistrement && <SafeAreaView style={s.hautZone}>
         <View style={s.haut}>
-          <Pressable hitSlop={12}
+          <Pressable hitSlop={12} accessibilityRole="button" accessibilityLabel="Quitter"
             onPress={() => clips.length > 0 ? setMenuSortie(true) : onFermer()}>
             {clips.length > 0
               ? <Chevron taille={26} couleur="#fff" />
@@ -449,6 +660,7 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
             </Text>
           </Pressable>
           <Pressable hitSlop={12} disabled={enregistrement}
+            accessibilityRole="button" accessibilityLabel="Retourner la caméra"
             onPress={() => {
               // La facade n'a pas de lampe : la torche s'eteint avec le
               // retournement, pour ne pas rester allumee en apparence.
@@ -464,26 +676,19 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
         <>
           <Pressable style={s.menuVoile} onPress={() => setMenuSortie(false)} />
           <View style={s.menuSortie}>
-            <Pressable style={s.menuLigne} onPress={() => {
-              setMenuSortie(false); setClips([]); chrono.poser(0); setCumul(0); onFermer()
-            }}>
-              <Corbeille taille={20} couleur="#ed2753" />
-              <Text style={[s.menuTexte, s.menuSupprimer]}>Supprimer</Text>
+            <Pressable style={s.menuLigne} onPress={recommencer}>
+              <Retourner taille={20} couleur="#111" />
+              <Text style={s.menuTexte}>Recommencer</Text>
             </Pressable>
-            <Pressable style={s.menuLigne} onPress={() => {
-              setMenuSortie(false)
-              setMessage('Brouillon enregistré.')
-              setTimeout(() => setMessage(''), 2200)
-              onFermer()
-            }}>
+            <Pressable style={s.menuLigne} onPress={enregistrerBrouillon}>
               <Brouillon taille={20} couleur="#111" />
               <Text style={s.menuTexte}>Enregistrer le brouillon</Text>
             </Pressable>
-            <Pressable style={s.menuLigne} onPress={() => {
-              setMenuSortie(false); outil('Envoyer à des amis')
+            <Pressable style={s.menuLigne} onPress={async () => {
+              await recommencer(); onFermer()
             }}>
-              <View style={s.menuAvatar} />
-              <Text style={s.menuTexte}>Envoyer à des amis</Text>
+              <Corbeille taille={20} couleur="#ed2753" />
+              <Text style={[s.menuTexte, s.menuSupprimer]}>Supprimer</Text>
             </Pressable>
           </View>
         </>
@@ -499,6 +704,7 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
           if (dernier) {
             return (
               <Pressable key={nom} style={s.outil} hitSlop={6}
+                accessibilityRole="button" accessibilityLabel={outilsDeplies ? 'Moins d’outils' : 'Plus d’outils'}
                 onPress={() => setOutilsDeplies(v => !v)}>
                 <View style={outilsDeplies ? s.chevronHaut : undefined}>
                   <Icone taille={26} couleur="#fff" />
@@ -508,6 +714,7 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
           }
           return (
             <Pressable key={nom} style={[s.outilLigne, i === 0 && s.outilPremier]}
+              accessibilityRole="button" accessibilityLabel={nom}
               onPress={() => outil(nom)} hitSlop={6}>
               {outilsDeplies && !modeEffets && i > 0 && (
                 <Text style={s.outilNom} numberOfLines={1}>{nom}</Text>
@@ -515,9 +722,15 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
               <View style={s.outil}>
                 {/* Lampe allumee : l'icone passe au jaune, sans quoi rien
                     ne distinguerait les deux etats du flash. */}
+                {/* Outil actif en jaune : sans cela, rien ne distinguerait
+                    ses deux etats (lampe, retouche, grille, minuteur). */}
                 <Icone taille={26}
-                  couleur={nom === 'Flash' && torche && face === 'back'
+                  couleur={(nom === 'Flash' && torche && face === 'back')
+                    || (nom === 'Retouche' && retouche) || (nom === 'Grille' && grille)
+                    || (nom === 'Minuteur' && minuteur > 0) || (nom === 'Vitesse' && vitesse !== 1)
                     ? '#fcd116' : '#fff'} />
+                {nom === 'Minuteur' && minuteur > 0 && <Text style={s.outilBadge}>{minuteur}s</Text>}
+                {nom === 'Vitesse' && vitesse !== 1 && <Text style={s.outilBadge}>{vitesse}×</Text>}
                 {i === 0 && <View style={s.outilFilet} />}
               </View>
             </Pressable>
@@ -537,18 +750,21 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
 
       {/* Bas : durees, carrousel, modes */}
       <SafeAreaView style={s.basZone}>
+        {barreVitesse && !enregistrement && (
+          <View style={s.vitesses}>
+            {VITESSES.map(v => (
+              <Pressable key={v} style={[s.vitesse, v === vitesse && s.vitesseChoisie]}
+                onPress={() => setVitesse(v)}>
+                <Text style={[s.vitesseTexte, v === vitesse && s.vitesseTexteChoisi]}>{v}×</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {enregistrement || clips.length > 0 ? (
           <Chronometre />
         ) : <View style={s.durees}>
           {DUREES.map(d => (
-            <Pressable key={d} disabled={enregistrement} onPress={() => {
-              if (d === '10 min' || d === 'PHOTO' || d === 'TEXTE') {
-                setMessage('Ce format n’est pas encore disponible. Tu peux importer une vidéo de 90 secondes maximum.')
-                setTimeout(() => setMessage(''), 2200)
-                return
-              }
-              setMode(d)
-            }}>
+            <Pressable key={d} disabled={enregistrement} onPress={() => setMode(d)}>
               <Text style={[s.duree, mode === d && s.dureeActive]}>{d}</Text>
             </Pressable>
           ))}
@@ -576,19 +792,24 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
                   // Pendant la prise : carre rouge (= arreter), entoure de
                   // l'arc de progression. En pause : disque rouge plein
                   // (= reprendre), l'arc gardant l'avancement acquis.
-                  <Pressable key="filmer" onPress={filmer}>
+                  <Pressable key="filmer" onPress={filmer} accessibilityRole="button"
+                    accessibilityLabel={enregistrement ? 'Arrêter la prise' : 'Reprendre la prise'}>
                     <DisqueEnregistrement taille={tailleFilmer}
                       dureeMax={limite} enCours={enregistrement}
                       separations={clips.map(c => c.fin / limite)} />
                   </Pressable>
                 ) : (
-                  <Pressable key="filmer" disabled={!camera}
+                  <Pressable key="filmer" disabled={!camera || mode === 'TEXTE'}
+                    accessibilityRole="button"
+                    accessibilityLabel={mode === 'PHOTO' ? 'Prendre une photo' : decompte !== null ? 'Annuler le minuteur' : 'Enregistrer'}
                     style={[s.filmer, {
                       width: tailleFilmer, height: tailleFilmer,
                       borderRadius: tailleFilmer / 2,
-                    }]}
-                    onPress={filmer}>
-                    <View style={modeEffets ? s.disqueEffet : s.disqueRouge} />
+                    }, mode === 'TEXTE' && s.inactif]}
+                    onPress={mode === 'PHOTO' ? photographier : filmer}>
+                    {decompte !== null
+                      ? <View style={s.carreRouge} />
+                      : <View style={mode === 'PHOTO' ? s.disqueBlanc : modeEffets ? s.disqueEffet : s.disqueRouge} />}
                   </Pressable>
                 )
               )
@@ -610,11 +831,13 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
           {clips.length > 0 && (
             <View style={s.montage} pointerEvents="box-none">
               {!enregistrement && (
-                <Pressable style={s.montageSupprimer} onPress={supprimerDernier}>
+                <Pressable style={s.montageSupprimer} onPress={supprimerDernier}
+                  accessibilityRole="button" accessibilityLabel="Supprimer la dernière prise">
                   <SupprimerClip taille={22} couleur="#111" />
                 </Pressable>
               )}
-              <Pressable style={s.montageValider} onPress={valider}>
+              <Pressable style={s.montageValider} onPress={valider}
+                accessibilityRole="button" accessibilityLabel="Valider">
                 <CocheValider taille={26} couleur="#fff" />
               </Pressable>
             </View>
@@ -630,7 +853,7 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
       {/* `.creation-camera > footer` : hors du viseur, sur le fond noir. */}
       <View style={[s.pied, { paddingBottom: marges.bottom }]}>
         {!enregistrement && clips.length === 0 && <>
-        <Pressable style={s.galerie} onPress={galerie}>
+        <Pressable style={s.galerie} onPress={galerie} accessibilityRole="button" accessibilityLabel="Galerie">
           {apercuGalerie
             ? <Image source={{ uri: apercuGalerie }} style={s.galerieApercu} />
             : <Galerie taille={20} couleur="#fff" />}
@@ -640,11 +863,13 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
           {/* Barre « Effets » : elle remplace LIVE / PUBLIER / CREER tant
               qu'un filtre est applique. */}
           <View style={s.barreEffets}>
-            <Pressable hitSlop={8} onPress={() => outil('Enregistrer l’effet')}>
+            <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel="Enregistrer l’effet"
+              onPress={() => outil('Enregistrer l’effet')}>
               <EffetEnregistrer taille={24} couleur="#fff" />
             </Pressable>
             <Text style={s.barreEffetsTitre}>Effets</Text>
-            <Pressable hitSlop={8} onPress={() => outil('Agrandir')}>
+            <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel="Tous les effets"
+              onPress={() => outil('Agrandir')}>
               <EffetDeplier taille={22} couleur="#fff" />
             </Pressable>
           </View>
@@ -664,6 +889,25 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
         </>}
       </View>
 
+      {/* « Agrandir » : tous les effets, favoris en tete (etoile). */}
+      <Feuille visible={panneauEffets} titre="Effets" onFermer={() => setPanneauEffets(false)}>
+        <View style={s.panneau}>
+          {[...FILTRES.keys()]
+            .sort((a, b) => Number(effetsFavoris.includes(FILTRES[b].nom)) - Number(effetsFavoris.includes(FILTRES[a].nom)))
+            .map(i => (
+              <Pressable key={FILTRES[i].nom} style={s.panneauEffet}
+                onPress={() => { setFiltre(i); setModeEffets(i !== 0); setPanneauEffets(false) }}>
+                <View style={[s.panneauVignette, i === filtre && s.panneauChoisi]}>
+                  <VignetteFiltre image={apercuFiltres} voile={FILTRES[i].voile} melange={FILTRES[i].melange} />
+                </View>
+                <Text style={s.panneauNom} numberOfLines={1}>
+                  {effetsFavoris.includes(FILTRES[i].nom) ? '★ ' : ''}{FILTRES[i].nom}
+                </Text>
+              </Pressable>
+            ))}
+        </View>
+      </Feuille>
+
       <ChoixSon visible={choixSon} onFermer={() => setChoixSon(false)}
         onChoisir={setSon} />
     </View>
@@ -672,6 +916,39 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
 
 const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#000' },
+  grilleTrait: { position: 'absolute', backgroundColor: 'rgba(255,255,255,.45)' },
+  decompte: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 8,
+    alignItems: 'center', justifyContent: 'center' },
+  decompteTexte: { color: '#fff', fontSize: 120, fontWeight: '800',
+    textShadowColor: 'rgba(0,0,0,.4)', textShadowRadius: 12 },
+  travail: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,.6)', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  inactif: { opacity: .45 },
+  // Mode TEXTE : le viseur devient une carte de couleur a ecrire.
+  texteMode: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 4,
+    alignItems: 'center', justifyContent: 'center', padding: 28 },
+  texteSaisie: { color: '#fff', fontSize: 30, fontWeight: '700', textAlign: 'center',
+    alignSelf: 'stretch', minHeight: 120 },
+  texteActions: { position: 'absolute', bottom: 190, left: 20, right: 20,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  texteCouleur: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  texteCouleurRond: { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: '#fff' },
+  texteCouleurNom: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  texteSuivant: { backgroundColor: '#fff', borderRadius: 22, paddingVertical: 10, paddingHorizontal: 22 },
+  texteSuivantTexte: { color: '#111', fontSize: 15, fontWeight: '700' },
+  outilBadge: { position: 'absolute', bottom: -10, color: '#fcd116', fontSize: 10, fontWeight: '700' },
+  vitesses: { flexDirection: 'row', alignSelf: 'center', backgroundColor: 'rgba(0,0,0,.45)',
+    borderRadius: 10, padding: 3, marginBottom: 12 },
+  vitesse: { paddingVertical: 7, paddingHorizontal: 16, borderRadius: 8 },
+  vitesseChoisie: { backgroundColor: '#fff' },
+  vitesseTexte: { color: '#fff', fontSize: 14, fontWeight: '600' },
+  vitesseTexteChoisi: { color: '#111' },
+  disqueBlanc: { width: '82%', height: '82%', borderRadius: 999, backgroundColor: '#fff' },
+  panneau: { flexDirection: 'row', flexWrap: 'wrap', gap: 14, paddingHorizontal: 16, paddingBottom: 24 },
+  panneauEffet: { width: 76, alignItems: 'center', gap: 6 },
+  panneauVignette: { width: 64, height: 64, borderRadius: 12, overflow: 'hidden', backgroundColor: '#222' },
+  panneauChoisi: { borderWidth: 3, borderColor: '#ff2856' },
+  panneauNom: { fontSize: 12, color: '#111' },
   // `.creation-viseur` : coins arrondis 22px sur fond #171717, le pied est
   // rendu en dehors.
   viseur: { flex: 1, minHeight: 0, borderRadius: 22, backgroundColor: '#171717',

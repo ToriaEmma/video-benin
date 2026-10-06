@@ -1,24 +1,24 @@
 import React, { useEffect, useState } from 'react'
 import {
-  View, StyleSheet, Pressable, ScrollView, PanResponder, Animated,
+  View, StyleSheet, Pressable, ScrollView, PanResponder, Animated, ActivityIndicator,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useVideoPlayer, VideoView, type VideoPlayer } from 'expo-video'
 import { useMusiqueCalee, useSonEnMemoire } from '../lib/musiqueCalee'
 import { usePiste } from '../lib/piste'
-import { File } from 'expo-file-system'
+import { rendreVideo, dimensionsVideo, type Calque as CalqueRendu } from '../lib/rendu'
+import { televerser, apiBrouillons, apiStories } from '../lib/api'
 import { Text, TextInput } from '../composants/Texte'
 import Feuille from '../composants/Feuille'
 import Interrupteur from '../composants/Interrupteur'
 import ChoixSon from './ChoixSon'
 import VignetteFiltre from '../composants/VignetteFiltre'
 import { useVignetteVideo } from '../lib/apercus'
-import { etat, enregistrer } from '../lib/demo'
 import { feuille as F } from '../lib/theme'
 import type { Son } from '../lib/sons'
 import {
   Chevron, Croix, SonNote, Corbeille, Brouillon, CocheValider,
-  MontageReglages, MontagePartage, MontageDuree, MontageClips,
+  MontageReglages, MontageDuree,
   MontageTexte, MontageSticker, MontageEffets, MontageVoix,
   MontageFiltres, MontageSousTitres, OutilPlus, Vitesse, Emoji,
 } from '../composants/Icones'
@@ -26,9 +26,7 @@ import {
 // Colonne de droite : chaque entree ouvre un reglage de montage.
 const OUTILS = [
   { nom: 'Paramètres', Icone: MontageReglages },
-  { nom: 'Partager', Icone: MontagePartage },
   { nom: 'Modifier', Icone: MontageDuree, groupe: 2 },
-  { nom: 'Modèles', Icone: MontageClips },
   { nom: 'Texte', Icone: MontageTexte },
   { nom: 'Stickers', Icone: MontageSticker },
   { nom: 'Effets', Icone: MontageEffets },
@@ -68,12 +66,13 @@ const VITESSES = [0.5, 1, 1.5, 2]
 // Les effets vocaux jouent sur le debit et la hauteur de la piste. Ceux
 // qui demandent un vrai traitement du signal sont signales « aperçu »
 // plutot que de ne rien faire en silence.
-const EFFETS_VOCAUX = [
+const EFFETS_VOCAUX: { nom: string; debit: number; hauteur: boolean; voix?: 'robot' | 'echo' }[] = [
   { nom: 'Normal', debit: 1, hauteur: true },
   { nom: 'Grave', debit: 0.78, hauteur: false },
   { nom: 'Aigu', debit: 1.35, hauteur: false },
-  { nom: 'Robot', debit: 1, hauteur: true, apercu: true },
-  { nom: 'Écho', debit: 1, hauteur: true, apercu: true },
+  // Traites par le rendu final (Web Audio) : l'apercu ne les fait pas entendre.
+  { nom: 'Robot', debit: 1, hauteur: true, voix: 'robot' },
+  { nom: 'Écho', debit: 1, hauteur: true, voix: 'echo' },
 ]
 
 // Les reglages sont poses sur le lecteur ici, hors du composant : une
@@ -92,8 +91,6 @@ function reglerLecture(p: {
 // de purete interdit de lire pendant le rendu.
 const compteur = { n: 0, suivant() { this.n += 1; return this.n } }
 
-// Horodatage du brouillon, lu hors du rendu pour la meme raison.
-const horloge = () => Date.now()
 
 // Un texte ou un sticker pose sur l'apercu, deplacable au doigt.
 type Calque = {
@@ -145,17 +142,22 @@ function CalquePose({ calque, onOuvrir }: {
 
 // Apercu du montage avec le son retenu : la musique tourne par-dessus la
 // video, comme elle sera jouee dans le fil une fois publiee.
-function MusiqueApercu({ son, url, lecteur, actif }: { son: Son; url: string; lecteur: VideoPlayer; actif: boolean }) {
+function MusiqueApercu({ son, url, lecteur, actif, vitesse, origine }: {
+  son: Son; url: string; lecteur: VideoPlayer; actif: boolean
+  // Debit de l'apercu et debut de la decoupe : la musique suit le temps de
+  // la video finale, pas celui du fichier source.
+  vitesse: number; origine: number
+}) {
   const musique = usePiste(url)
   // La musique suit l'apercu : meme instant, meme boucle, arret si la video fige.
   // Elle se tait pendant le choix d'un autre son (qui fait son propre apercu).
-  useMusiqueCalee(lecteur, musique, actif, son.duree, son.original ? 0.3 : 0.08)
+  useMusiqueCalee(lecteur, musique, actif, son.duree, son.original ? 0.3 : 0.08, vitesse, origine)
   useEffect(() => { if (!actif) musique.pause() }, [actif, musique])
   return null
 }
 
 export default function Montage({
-  uri, pseudo, sonInitial, onRetour, onSuivant, onOutil,
+  uri, pseudo, sonInitial, vitesseInitiale = 1, onRetour, onSuivant, onBrouillon, onStory, onOutil,
 }: {
   uri: string
   pseudo: string
@@ -165,7 +167,12 @@ export default function Montage({
   onRetour: () => void
   // Le son suit la video vers la publication : c'est la seule etape qui
   // le transmet, le fichier ne le portant pas.
-  onSuivant: (son?: Son | null) => void
+  // Recoit aussi la video finale, retouches gravees.
+  onSuivant: (son: Son | null, video: string) => void
+  // Vitesse choisie a la camera : appliquee d'emblee, modifiable ici.
+  vitesseInitiale?: number
+  onBrouillon?: () => void
+  onStory?: () => void
   // Reserve aux actions qui sortent du montage ; le reste est traite ici.
   onOutil?: (nom: string) => void
 }) {
@@ -180,14 +187,14 @@ export default function Montage({
   // Avis passager, affiche en bas de l'apercu.
   const [message, setMessage] = useState('')
   // Barre ouverte sous l'apercu : filtres, vitesse ou saisie de sous-titre.
-  const [barre, setBarre] = useState<'filtres' | 'vitesse' | 'sousTitres' | null>(null)
+  const [barre, setBarre] = useState<'filtres' | 'vitesse' | 'sousTitres' | 'decoupe' | null>(null)
   // Feuille ouverte : reglages, stickers ou effets vocaux.
   const [feuilleOuverte, setFeuilleOuverte] = useState<'reglages' | 'stickers' | 'voix' | null>(null)
   const [choixSon, setChoixSon] = useState(false)
   const [son, setSon] = useState<Son | null>(sonInitial ?? null)
 
   const [filtre, setFiltre] = useState(0)
-  const [vitesse, setVitesse] = useState(1)
+  const [vitesse, setVitesse] = useState(vitesseInitiale)
   const [effetVocal, setEffetVocal] = useState(0)
   const [boucle, setBoucle] = useState(true)
   const [coupe, setCoupe] = useState(false)
@@ -200,6 +207,42 @@ export default function Montage({
 
   const [sousTitre, setSousTitre] = useState('')
   const [sousTitresActifs, setSousTitresActifs] = useState(false)
+
+  // Decoupe (outil « Modifier ») : debut et fin gardes, en secondes.
+  const [duree, setDuree] = useState(0)
+  const [debut, setDebut] = useState(0)
+  const [fin, setFin] = useState<number | null>(null)
+  // Taille de l'apercu et de la video : de quoi convertir la position des
+  // textes et stickers en position dans l'image finale.
+  const [boite, setBoite] = useState({ l: 0, h: 0 })
+  const [dims, setDims] = useState<{ l: number; h: number } | null>(null)
+  useEffect(() => { dimensionsVideo(uri).then(setDims).catch(() => {}) }, [uri])
+  // Rendu en cours : etape affichee et avancement (0 a 1), ou null.
+  const [travail, setTravail] = useState<{ etape: string; part: number } | null>(null)
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      const d = lecteur.duration
+      if (d > 0 && Number.isFinite(d)) { setDuree(d); clearInterval(t) }
+    }, 200)
+    return () => clearInterval(t)
+  }, [lecteur])
+
+  // L'apercu ne joue que la partie gardee.
+  const finEffective = fin ?? duree
+  useEffect(() => {
+    if (!(debut > 0 || fin !== null)) return
+    const t = setInterval(() => {
+      const v = lecteur.currentTime
+      if (v < debut - 0.05 || (finEffective > 0 && v > finEffective)) reglerLecture(lecteur, { position: debut })
+    }, 100)
+    return () => clearInterval(t)
+  }, [lecteur, debut, fin, finEffective])
+
+  // Vitesse choisie a la camera, posee sur le lecteur des le depart.
+  useEffect(() => {
+    if (vitesseInitiale !== 1) reglerLecture(lecteur, { debit: vitesseInitiale })
+  }, [lecteur, vitesseInitiale])
 
   // Avec un son, l'apercu attend que la musique soit chargee en memoire,
   // puis video et musique partent ensemble du debut.
@@ -277,24 +320,94 @@ export default function Montage({
     avertir('Sticker ajouté — fais-le glisser.')
   }
 
-  // Menu de sortie : la video rejoint les brouillons conserves.
-  const enregistrerBrouillon = () => {
-    let octets = 0
-    try {
-      const fichier = new File(uri)
-      if (fichier.exists) octets = fichier.size
-    } catch { /* Poids illisible : la tuile n'affichera pas de taille. */ }
+  // Positions des textes et stickers, de l'apercu vers l'image finale :
+  // l'apercu montre la video entiere (« contain ») au centre de la boite.
+  const calquesPourRendu = (): CalqueRendu[] => {
+    const v = dims ?? { l: 9, h: 16 }
+    const e = Math.min(boite.l / v.l, boite.h / v.h) || 1
+    const rl = v.l * e, rh = v.h * e
+    const rx = (boite.l - rl) / 2, ry = (boite.h - rh) / 2
+    const lire = (a: Animated.Value) => (a as unknown as { _value: number })._value
+    return calques.filter(c => c.contenu).map(c => ({
+      genre: c.genre,
+      contenu: c.contenu,
+      couleur: COULEURS[c.couleur],
+      x: (boite.l / 2 + lire(c.position.x) - rx) / rl,
+      y: (boite.h / 2 + lire(c.position.y) - ry) / rh,
+      taille: (c.genre === 'sticker' ? 54 : 26) / rl,
+    }))
+  }
 
-    const legende = calques.filter(c => c.genre === 'texte')
-      .map(c => c.contenu).join(' ').trim()
-    const date = horloge()
-    etat.brouillons.unshift({
-      id: `b${date}`, url: uri, legende, octets, date,
-      etiquette: son ? { type: 'son', nom: son.titre } : undefined,
-    })
-    enregistrer()
+  const debit = vitesse * EFFETS_VOCAUX[effetVocal].debit
+  const sousTitreGrave = sousTitresActifs ? sousTitre.trim() : ''
+  const modifie = filtre !== 0 || debit !== 1 || coupe || !!EFFETS_VOCAUX[effetVocal].voix
+    || calques.some(c => c.contenu) || !!sousTitreGrave || debut > 0 || fin !== null
+
+  // Video finale : les retouches sont gravees (version web) ; sans retouche,
+  // le fichier part tel quel.
+  const finaliser = async (): Promise<string> => {
+    if (!modifie) return uri
+    lecteur.pause()
+    setTravail({ etape: 'Préparation de la vidéo', part: 0 })
+    try {
+      return await rendreVideo([{ uri, debut, fin: fin ?? undefined }], {
+        voile: { couleur: FILTRES[filtre].voile, melange: FILTRES[filtre].melange },
+        debit,
+        hauteurPreservee: EFFETS_VOCAUX[effetVocal].hauteur,
+        voix: EFFETS_VOCAUX[effetVocal].voix,
+        calques: calquesPourRendu(),
+        sousTitre: sousTitreGrave,
+        sansSon: coupe,
+        surProgression: part => setTravail({ etape: 'Préparation de la vidéo', part }),
+      })
+    } finally {
+      setTravail(null)
+      lecteur.play()
+    }
+  }
+
+  // Video finale envoyee au stockage, avec l'avancement de l'envoi.
+  const envoyer = async () => {
+    const video = await finaliser()
+    setTravail({ etape: 'Envoi de la vidéo', part: 0 })
+    try {
+      return await televerser(video, (etape, pourcentage) => {
+        if (etape === 'envoi') setTravail({ etape: 'Envoi de la vidéo', part: (pourcentage ?? 0) / 100 })
+      })
+    } finally { setTravail(null) }
+  }
+
+  const suivant = async () => {
+    if (travail) return
+    try { onSuivant(son, await finaliser()) }
+    catch (e) { avertir(e instanceof Error ? e.message : 'La préparation a échoué.') }
+  }
+
+  // Menu de sortie : la video (retouches comprises) rejoint les brouillons.
+  const enregistrerBrouillon = async () => {
     setMenuSortie(false)
-    onRetour()
+    if (travail) return
+    try {
+      const url = await envoyer()
+      const legende = calques.filter(c => c.genre === 'texte').map(c => c.contenu).join(' ').trim()
+      await apiBrouillons.creer(url, legende)
+      if (onBrouillon) onBrouillon()
+      else onRetour()
+    } catch (e) {
+      avertir(e instanceof Error ? e.message : 'Le brouillon n’a pas pu être enregistré.')
+    }
+  }
+
+  // « Ta Story » : publiee pour 24 h, visible des abonnes.
+  const publierStory = async () => {
+    if (travail) return
+    try {
+      await apiStories.publier(await envoyer())
+      if (onStory) onStory()
+      else avertir('Publié dans ta Story.')
+    } catch (e) {
+      avertir(e instanceof Error ? e.message : 'La Story n’a pas pu être publiée.')
+    }
   }
 
   const outilChoisi = (nom: string) => {
@@ -306,13 +419,13 @@ export default function Montage({
       case 'Filtres': setBarre(b => (b === 'filtres' ? null : 'filtres')); return
       case 'Vitesse': setBarre(b => (b === 'vitesse' ? null : 'vitesse')); return
       case 'Sous-titres': setBarre(b => (b === 'sousTitres' ? null : 'sousTitres')); return
+      case 'Modifier': setBarre(b => (b === 'decoupe' ? null : 'decoupe')); return
       case 'Effets':
         // Les effets visuels reprennent les voiles des filtres.
         setBarre('filtres')
         avertir('Les effets reprennent les filtres pour le moment.')
         return
       default:
-        avertir(`${nom} : pas encore disponible dans cette version.`)
         onOutil?.(nom)
     }
   }
@@ -321,8 +434,10 @@ export default function Montage({
 
   return (
     <View style={[s.page, { paddingTop: marges.top }]}>
-      <View style={s.viseur}>
-        {son && sonLocal && <MusiqueApercu key={son.id + sonLocal} son={son} url={sonLocal} lecteur={lecteur} actif={!choixSon} />}
+      <View style={s.viseur}
+        onLayout={e => setBoite({ l: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+        {son && sonLocal && <MusiqueApercu key={son.id + sonLocal} son={son} url={sonLocal} lecteur={lecteur}
+          actif={!choixSon && !travail} vitesse={debit} origine={debut} />}
         <VideoView player={lecteur} style={StyleSheet.absoluteFill}
           contentFit="contain" nativeControls={false} />
 
@@ -350,7 +465,8 @@ export default function Montage({
 
         {/* Barre du haut : retour, son choisi, puis la colonne d'outils */}
         <View style={s.haut}>
-          <Pressable onPress={() => setMenuSortie(true)} hitSlop={12} style={s.hautBouton}>
+          <Pressable onPress={() => setMenuSortie(true)} hitSlop={12} style={s.hautBouton}
+            accessibilityRole="button" accessibilityLabel="Retour">
             <Chevron taille={28} couleur="#fff" />
           </Pressable>
           <View style={s.son}>
@@ -375,6 +491,7 @@ export default function Montage({
         <View style={s.outils}>
           {OUTILS.map(({ nom, Icone, groupe }, i) => (
             <Pressable key={nom} onPress={() => outilChoisi(nom)} hitSlop={6}
+              accessibilityRole="button" accessibilityLabel={nom}
               style={[s.outilLigne, groupe === 2 && s.outilGroupe]}>
               {groupe === 2 && <View style={s.outilFilet} />}
               {outilsDeplies && i > 1 && (
@@ -406,13 +523,6 @@ export default function Montage({
                 <Brouillon taille={20} couleur="#111" />
                 <Text style={s.menuTexte}>Enregistrer le brouillon</Text>
               </Pressable>
-              <Pressable style={s.menuLigne} onPress={() => {
-                setMenuSortie(false)
-                avertir('Envoyer à des amis : pas encore disponible.')
-              }}>
-                <View style={s.menuAvatar} />
-                <Text style={s.menuTexte}>Envoyer à des amis</Text>
-              </Pressable>
             </View>
           </>
         )}
@@ -443,12 +553,11 @@ export default function Montage({
           </View>
         )}
 
-        {!barre && !enEdition && (
-          <Pressable style={s.autocut}
-            onPress={() => avertir('AutoCut : pas encore disponible dans cette version.')}>
-            <MontageEffets taille={17} couleur="#fff" />
-            <Text style={s.autocutTexte}>AutoCut</Text>
-          </Pressable>
+        {travail && (
+          <View style={s.travail}>
+            <ActivityIndicator color="#fff" size="large" />
+            <Text style={s.travailTexte}>{travail.etape}… {Math.round(travail.part * 100)} %</Text>
+          </View>
         )}
       </View>
 
@@ -499,6 +608,32 @@ export default function Montage({
         </View>
       )}
 
+      {barre === 'decoupe' && (
+        <View style={s.bande}>
+          <View style={s.bandeEntete}>
+            <Text style={s.bandeTitre}>Découper · {(finEffective - debut).toFixed(1)} s gardées</Text>
+            <Pressable hitSlop={10} onPress={() => setBarre(null)}>
+              <CocheValider taille={22} couleur="#fff" />
+            </Pressable>
+          </View>
+          {[
+            { nom: 'Début', valeur: debut, poser: (v: number) => setDebut(Math.max(0, Math.min(v, finEffective - 1))) },
+            { nom: 'Fin', valeur: finEffective, poser: (v: number) => { const f = Math.min(duree, Math.max(v, debut + 1)); setFin(f >= duree ? null : f) } },
+          ].map(r => (
+            <View key={r.nom} style={s.decoupeLigne}>
+              <Text style={s.decoupeNom}>{r.nom}</Text>
+              <Pressable hitSlop={8} style={s.decoupeBouton} onPress={() => r.poser(r.valeur - 0.5)}>
+                <Text style={s.decoupeBoutonTexte}>−</Text>
+              </Pressable>
+              <Text style={s.decoupeValeur}>{r.valeur.toFixed(1)} s</Text>
+              <Pressable hitSlop={8} style={s.decoupeBouton} onPress={() => r.poser(r.valeur + 0.5)}>
+                <Text style={s.decoupeBoutonTexte}>+</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      )}
+
       {barre === 'sousTitres' && (
         <View style={s.bande}>
           <View style={s.bandeEntete}>
@@ -519,14 +654,13 @@ export default function Montage({
 
       {/* Pied : story a gauche, « Suivant » a droite */}
       <View style={[s.pied, { paddingBottom: 10 + marges.bottom }]}>
-        <Pressable style={s.story}
-          onPress={() => avertir('Ta Story : pas encore disponible dans cette version.')}>
+        <Pressable style={s.story} onPress={publierStory}>
           <View style={s.storyAvatar}>
             <Text style={s.storyLettre}>{pseudo.charAt(0).toUpperCase()}</Text>
           </View>
           <Text style={s.storyTexte}>Ta Story</Text>
         </Pressable>
-        <Pressable style={s.suivant} onPress={() => onSuivant(son)}>
+        <Pressable style={[s.suivant, !!travail && s.suivantInactif]} onPress={suivant} disabled={!!travail}>
           <Text style={s.suivantTexte}>Suivant</Text>
         </Pressable>
       </View>
@@ -572,12 +706,12 @@ export default function Montage({
         {EFFETS_VOCAUX.map((e, i) => (
           <Pressable key={e.nom} style={s.voixLigne} onPress={() => {
             poserDebit(vitesse, i)
-            if (e.apercu) avertir(`${e.nom} : aperçu, l’effet n’est pas encore rendu.`)
+            if (e.voix) avertir(`${e.nom} : appliqué à la vidéo finale.`)
           }}>
             <Emoji taille={F.icone} couleur="#111" />
             <View style={s.voixCorps}>
               <Text style={s.voixNom}>{e.nom}</Text>
-              {e.apercu && <Text style={s.voixApercu}>aperçu</Text>}
+              {e.voix && <Text style={s.voixApercu}>appliqué à la vidéo finale</Text>}
             </View>
             {i === effetVocal && <CocheValider taille={20} couleur="#111" />}
           </Pressable>
@@ -630,13 +764,18 @@ const s = StyleSheet.create({
   menuSupprimer: { color: '#ed2753' },
   menuAvatar: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#d9c3a8' },
 
-  autocut: { position: 'absolute', bottom: 18, alignSelf: 'center',
-    flexDirection: 'row', alignItems: 'center', gap: 7,
-    backgroundColor: 'rgba(51,51,51,.6)', borderRadius: 20,
-    paddingVertical: 9, paddingHorizontal: 16 },
-  autocutTexte: { color: '#fff', fontSize: 15, fontWeight: '600' },
 
   // Calques poses sur la video : ils partent du centre de l'apercu.
+  travail: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 20,
+    backgroundColor: 'rgba(0,0,0,.6)', alignItems: 'center', justifyContent: 'center', gap: 14 },
+  travailTexte: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  suivantInactif: { opacity: .5 },
+  decoupeLigne: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 6 },
+  decoupeNom: { color: '#fff', fontSize: 14, width: 48 },
+  decoupeBouton: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,.14)',
+    alignItems: 'center', justifyContent: 'center' },
+  decoupeBoutonTexte: { color: '#fff', fontSize: 20, fontWeight: '600' },
+  decoupeValeur: { color: '#fff', fontSize: 15, fontVariant: ['tabular-nums'], minWidth: 56, textAlign: 'center' },
   calques: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center' },
   calque: { position: 'absolute' },
