@@ -3,6 +3,8 @@ import {
   View, FlatList, Pressable, StyleSheet, ActivityIndicator, PanResponder,
   Animated, Easing,
 } from 'react-native'
+import { BARRE_ETAT_WEB } from '../lib/theme'
+import { useFinDefilementWeb } from '../lib/finDefilement'
 import { Text } from '../composants/Texte'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
@@ -415,6 +417,10 @@ export default function Fil({
   const { profil } = useAuth()
   const [categorie, setCategorie] = useState('Pour toi')
   const [index, setIndex] = useState(indexInitial)
+  // `hauteur` est lue au moment de l'appel (rappel rafraichi a chaque rendu).
+  const finDefilementWeb = useFinDefilementWeb(y => {
+    if (hauteur > 0) setIndex(Math.round(y / hauteur))
+  })
   const autonome = videos !== undefined
   // Fil general : la liste vient de l'API. En mode autonome, l'appelant
   // fournit la sienne et aucune requete n'est lancee.
@@ -550,6 +556,8 @@ export default function Fil({
             { length: hauteur, offset: hauteur * i, index: i })}
           onMomentumScrollEnd={e => hauteur > 0 &&
             setIndex(Math.round(e.nativeEvent.contentOffset.y / hauteur))}
+          scrollEventThrottle={16}
+          onScroll={finDefilementWeb}
           renderItem={({ item, index: i }) => (
             <Carte item={item} actif={i === index} hauteur={hauteur}
               sienne={item.pseudo === profil?.pseudo}
@@ -645,13 +653,13 @@ const s = StyleSheet.create({
   entete: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 3,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    gap: 12, paddingHorizontal: 12, paddingTop: 58, paddingBottom: 24,
+    gap: 12, paddingHorizontal: 12, paddingTop: 58 - BARRE_ETAT_WEB, paddingBottom: 24,
   },
   // Barre du lecteur ouvert depuis le profil : retour et champ de recherche.
   enteteRecherche: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 3,
     flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 10, paddingTop: 56, paddingBottom: 20,
+    paddingHorizontal: 10, paddingTop: 56 - BARRE_ETAT_WEB, paddingBottom: 20,
   },
   retour: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   champ: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 9,

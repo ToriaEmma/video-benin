@@ -19,6 +19,8 @@ import {
   ActivityIndicator,
   type NativeSyntheticEvent, type NativeScrollEvent,
 } from 'react-native'
+import { BARRE_ETAT_WEB } from '../lib/theme'
+import { useFinDefilementWeb } from '../lib/finDefilement'
 import { Text } from '../composants/Texte'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -57,7 +59,7 @@ const SEUIL_LATERAL = 55
 // Hauteur de l'entete (zone sure comprise) et de la rangee de stories.
 // Deployee, la carte repousse la video d'autant, pour que les bulles ne la
 // recouvrent pas ; repliee, la video remonte sous l'entete.
-const HAUT_ENTETE = 54 + 20 + 10
+const HAUT_ENTETE = 54 - BARRE_ETAT_WEB + 20 + 10
 const HAUT_STORIES = 76 + 7 + 18 + 12
 
 // Habillage de demonstration des cartes : effet, son et liste de lecture
@@ -588,6 +590,15 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
   // Le repli se decide sur le geste, jamais dans un effet : l'etat suit
   // directement la main. Il ne se deploie a nouveau qu'une fois revenu
   // tout en haut de la premiere video.
+  // Fin d'un geste de defilement : la carte posee devient la carte active.
+  const changerCarte = (y: number) => {
+    if (hauteur <= 0) return
+    const n = Math.round(y / hauteur)
+    if (n === index) return
+    setIndex(n); setPassage(v => v + 1)
+  }
+  // Sur le web, la fin du geste est detectee a l'arret du defilement.
+  const finDefilementWeb = useFinDefilementWeb(changerCarte)
   const auDefilement = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     if (e.nativeEvent.contentOffset.y <= 0) setReplie(false)
   }
@@ -653,15 +664,10 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
           snapToInterval={hauteur || undefined}
           decelerationRate="fast"
           scrollEventThrottle={16}
-          onScroll={auDefilement}
+          onScroll={e => { auDefilement(e); finDefilementWeb(e) }}
           getItemLayout={(_, i) => (
             { length: hauteur, offset: hauteur * i, index: i })}
-          onMomentumScrollEnd={e => {
-            if (hauteur <= 0) return
-            const n = Math.round(e.nativeEvent.contentOffset.y / hauteur)
-            if (n === index) return
-            setIndex(n); setPassage(v => v + 1)
-          }}
+          onMomentumScrollEnd={e => changerCarte(e.nativeEvent.contentOffset.y)}
           renderItem={({ item, index: i }) => (
             <Carte item={item} actif={i === index} passage={passage}
               hauteur={hauteur} arrondi={!replie}
@@ -725,7 +731,7 @@ const s = StyleSheet.create({
   // quand la video remonte derriere elle.
   entete: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5,
-    paddingTop: 54, paddingBottom: 10,
+    paddingTop: 54 - BARRE_ETAT_WEB, paddingBottom: 10,
     alignItems: 'center', justifyContent: 'center',
   },
   enteteVoilee: { backgroundColor: 'rgba(0,0,0,.42)' },
@@ -773,7 +779,7 @@ const s = StyleSheet.create({
   },
   // Pastille bleue « + », en bas a droite de la bulle « Creer ».
   pastillePlus: {
-    position: 'absolute', right: 1, top: 54,
+    position: 'absolute', right: 1, top: 54 - BARRE_ETAT_WEB,
     width: 23, height: 23, borderRadius: 12, backgroundColor: '#1ec0f0',
     borderWidth: 2, borderColor: '#000',
     alignItems: 'center', justifyContent: 'center',
@@ -787,7 +793,7 @@ const s = StyleSheet.create({
 
   // --- Grappe tassee ---
   grappeBoite: {
-    position: 'absolute', top: 52, left: 12, zIndex: 6,
+    position: 'absolute', top: 52 - BARRE_ETAT_WEB, left: 12, zIndex: 6,
   },
   grappe: { flexDirection: 'row', alignItems: 'center' },
   grappeMoi: { width: 34, height: 34, marginRight: 6 },

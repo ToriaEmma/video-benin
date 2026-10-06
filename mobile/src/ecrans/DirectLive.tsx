@@ -15,6 +15,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   View, Pressable, StyleSheet, ScrollView, Animated, Easing,
 } from 'react-native'
+import { BARRE_ETAT_WEB } from '../lib/theme'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Text, TextInput } from '../composants/Texte'
@@ -354,7 +355,7 @@ const s = StyleSheet.create({
   // --- Etat A : feuille « Découvrir » ---
   enteteDecouvrir: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingTop: 58, paddingBottom: 14,
+    paddingHorizontal: 14, paddingTop: 58 - BARRE_ETAT_WEB, paddingBottom: 14,
   },
   titreDecouvrir: { color: '#fff', fontSize: 16.5, fontWeight: '700' },
 
@@ -406,7 +407,7 @@ const s = StyleSheet.create({
   voileBas: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 300 },
 
   rangeeHaute: {
-    position: 'absolute', left: 8, right: 8, top: 54, zIndex: 3,
+    position: 'absolute', left: 8, right: 8, top: 54 - BARRE_ETAT_WEB, zIndex: 3,
     flexDirection: 'row', alignItems: 'center', gap: 6,
   },
   pilleDiffuseur: {

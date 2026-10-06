@@ -12,6 +12,7 @@ import React, { useMemo } from 'react'
 import {
   View, ScrollView, Pressable, StyleSheet, useWindowDimensions,
 } from 'react-native'
+import { BARRE_ETAT_WEB } from '../lib/theme'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Text } from '../composants/Texte'
 import {
@@ -141,7 +142,7 @@ const s = StyleSheet.create({
   // Le haut laisse passer la barre des categories, qui se superpose.
   contenu: {
     flexDirection: 'row', gap: GOUTTIERE,
-    paddingHorizontal: MARGE, paddingTop: 108, paddingBottom: 24,
+    paddingHorizontal: MARGE, paddingTop: 108 - BARRE_ETAT_WEB, paddingBottom: 24,
   },
   colonne: { flex: 1, gap: INTERCARTE },
 

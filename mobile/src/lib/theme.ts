@@ -1,3 +1,5 @@
+import { Platform } from 'react-native'
+
 // Jeu de couleurs partage avec la version web : ce sont les variables
 // `:root` de app/src/index.css, reprises a l'identique pour que les deux
 // plateformes affichent rigoureusement les memes teintes.
@@ -61,3 +63,7 @@ export const feuille = {
   interligne: 14,     // l'ecart entre l'icone et le texte
   hauteurLigne: 13,   // le retrait vertical d'une ligne
 } as const
+
+// Hauteur reservee a la barre d'etat du telephone dans les en-tetes poses en
+// absolu. Un navigateur n'en a pas : sur le web, on remonte d'autant.
+export const BARRE_ETAT_WEB = Platform.OS === 'web' ? 40 : 0
