@@ -667,6 +667,9 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
           onScroll={e => { auDefilement(e); finDefilementWeb(e) }}
           getItemLayout={(_, i) => (
             { length: hauteur, offset: hauteur * i, index: i })}
+          windowSize={3}
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
           onMomentumScrollEnd={e => changerCarte(e.nativeEvent.contentOffset.y)}
           renderItem={({ item, index: i }) => (
             <Carte item={item} actif={i === index} passage={passage}

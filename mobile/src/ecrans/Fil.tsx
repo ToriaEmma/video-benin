@@ -15,6 +15,7 @@ import { sonParId, sonOriginal, libelleSon, type Son } from '../lib/sons'
 import { estSonDistant, resoudreSon } from '../lib/resolutionSons'
 import FeuilleSon from '../composants/FeuilleSon'
 import { useAvatar } from '../lib/avatars'
+import { useMusiqueCalee } from '../lib/musiqueCalee'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Suggestions from '../composants/Suggestions'
@@ -155,6 +156,9 @@ function Carte({
       if (!actif) musique.seekTo(0).catch(() => { /* Position refusee. */ })
     }
   }, [actif, isPlaying, musique, son])
+
+  // Calage permanent : la musique suit la video (chargement, boucle, reprise).
+  useMusiqueCalee(lecteur, son ? musique : null, actif, son?.duree ?? 0)
 
   // Morceau fini avant la video : on le reprend au debut. `loop` ferait
   // la meme chose, mais muter ce que rend un hook est proscrit ici.
@@ -346,7 +350,9 @@ function Carte({
 
         {/* Le disque ouvre la feuille du son : favori ou « Utiliser ce son ». */}
         <Pressable hitSlop={6} onPress={() => onSon(son ?? sonOriginal(item), item.pseudo)}>
-          <Animated.View style={[s.disque, {
+          {/* Le disque tourne sous le doigt : il ne capte pas l'appui, la
+              pochette non plus, c'est le bouton qui le recoit. */}
+          <Animated.View pointerEvents="none" style={[s.disque, {
             transform: [{
               rotate: tour.interpolate({
                 inputRange: [0, 1], outputRange: ['0deg', '360deg'],
@@ -602,6 +608,12 @@ export default function Fil({
           initialScrollIndex={hauteur > 0 ? index : undefined}
           getItemLayout={(_, i) => (
             { length: hauteur, offset: hauteur * i, index: i })}
+          // Seules la video regardee et ses voisines sont montees : sinon
+          // toutes les videos du fil se chargeaient en meme temps et se
+          // partageaient la connexion.
+          windowSize={3}
+          initialNumToRender={2}
+          maxToRenderPerBatch={2}
           onMomentumScrollEnd={e => hauteur > 0 &&
             setIndex(Math.round(e.nativeEvent.contentOffset.y / hauteur))}
           scrollEventThrottle={16}
