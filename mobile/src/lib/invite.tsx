@@ -11,6 +11,7 @@ import { useAuth } from './auth'
 import { ListeComptes, Inscription } from '../ecrans/Connexion'
 import { useColonne } from './ecran'
 import { FenetreCodeRecuperation } from './codeRecuperation'
+import { BulleAvis } from './avis'
 
 type Exiger = (raison: string) => boolean
 
@@ -63,6 +64,7 @@ export function FournisseurInvite({ children }: { children: React.ReactNode }) {
         onConnexion={() => setFeuille('comptes')} onSucces={fermer} />
       {/* Code de recuperation : au sommet, pour survivre au changement de page. */}
       <FenetreCodeRecuperation />
+      <BulleAvis />
     </Contexte.Provider>
   )
 }

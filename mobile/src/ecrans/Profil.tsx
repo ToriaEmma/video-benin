@@ -27,6 +27,7 @@ import {
   Brouillon,
 } from '../composants/Icones'
 import OptionsVideo from '../composants/OptionsVideo'
+import { montrerAvis } from '../lib/avis'
 import AnalyseVideo from './AnalyseVideo'
 
 // Equivalent de clamp(min, valeur en vw, max) du CSS.
@@ -261,6 +262,7 @@ export default function Profil({
     envoi
       .then(r => {
         setSuivi(r.suivi)
+        montrerAvis(r.suivi ? `Vous êtes abonné(e) à ${pseudo}` : `Vous n’êtes plus abonné(e) à ${pseudo}`)
         setEntete(p => (p ? {
           ...p, nbAbonnes: Math.max(0, p.nbAbonnes + (r.suivi ? 1 : -1)),
         } : p))

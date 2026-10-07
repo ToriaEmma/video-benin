@@ -609,6 +609,13 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
           <Pressable style={s.autoriser} onPress={demander}>
             <Text style={s.autoriserTexte}>Autoriser</Text>
           </Pressable>
+          {/* Web : un refus du navigateur s'explique, sinon le bouton
+              semblerait ne rien faire. */}
+          {!!(permission as { raison?: string } | null)?.raison && (
+            <Text style={s.raisonRefus} accessibilityLiveRegion="polite">
+              {(permission as { raison?: string }).raison}
+            </Text>
+          )}
           <Pressable onPress={galerie}>
             <Text style={s.lien}>Ou choisir dans la galerie</Text>
           </Pressable>
@@ -970,6 +977,7 @@ const s = StyleSheet.create({
   centreTexte: { color: 'rgba(255,255,255,.62)', fontSize: 15, textAlign: 'center', lineHeight: 21 },
   autoriser: { backgroundColor: '#ff2856', borderRadius: 30, paddingVertical: 14,
     paddingHorizontal: 40, marginTop: 10, minHeight: 48, justifyContent: 'center' },
+  raisonRefus: { color: '#ffd166', fontSize: 14, textAlign: 'center', lineHeight: 20, marginTop: 4, maxWidth: 340 },
   autoriserTexte: { color: '#fff', fontWeight: '700', fontSize: 16 },
   lien: { color: 'rgba(255,255,255,.7)', marginTop: 14, fontSize: 14 },
 

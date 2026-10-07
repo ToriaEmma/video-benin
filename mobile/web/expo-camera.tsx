@@ -6,7 +6,11 @@ import { View, type ViewProps } from 'react-native'
 import { tailles } from './expo-file-system'
 
 export type CameraType = 'front' | 'back'
-type Permission = { granted: boolean; canAskAgain: boolean; status: 'granted' | 'denied' | 'undetermined'; expires: 'never' }
+type Permission = {
+  granted: boolean; canAskAgain: boolean; status: 'granted' | 'denied' | 'undetermined'; expires: 'never'
+  // Web : explication du refus, a montrer a l'utilisateur.
+  raison?: string
+}
 
 const TYPES = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
 const typeEnregistrement = () =>
@@ -151,6 +155,23 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
 })
 
 // [permission, demander] comme dans expo-camera.
+// Pourquoi la camera n'est pas accessible, et quoi faire : affiche sous le
+// bouton « Autoriser » (sinon un refus du navigateur passe inapercu).
+const estIPhone = () => /iPhone|iPad|iPod/.test(navigator.userAgent)
+const RAISONS_CAMERA = {
+  get indisponible() {
+    return 'Ce navigateur ne donne pas accès à la caméra. Si tu as ouvert TockTick depuis WhatsApp, Instagram ou Facebook, '
+      + 'touche ⋯ puis « Ouvrir dans le navigateur » (Safari ou Chrome).'
+  },
+  get refusee() {
+    return estIPhone()
+      ? 'L’accès a été refusé. Sur iPhone : Réglages › Safari › Caméra et Microphone › Autoriser, puis recharge la page.'
+      : 'L’accès a été refusé. Touche le cadenas à gauche de l’adresse du site › Autorisations › Caméra et micro › Autoriser, puis recharge la page.'
+  },
+  absente: 'Aucune caméra n’a été trouvée sur cet appareil.',
+  occupee: 'La caméra est déjà utilisée par une autre application. Ferme-la, puis touche à nouveau « Autoriser ».',
+}
+
 export function useCameraPermissions(): [Permission | null, () => Promise<Permission>] {
   const [etat, setEtat] = useState<Permission | null>(null)
   const fixer = (granted: boolean, refuse = false): Permission => ({
@@ -163,7 +184,7 @@ export function useCameraPermissions(): [Permission | null, () => Promise<Permis
         const r = await navigator.permissions?.query({ name: 'camera' as PermissionName })
         if (annule) return
         if (r?.state === 'granted') setEtat(fixer(true))
-        else if (r?.state === 'denied') setEtat(fixer(false, true))
+        else if (r?.state === 'denied') setEtat({ ...fixer(false, true), raison: RAISONS_CAMERA.refusee })
         else setEtat(fixer(false))
       } catch { if (!annule) setEtat(fixer(false)) }
     }
@@ -171,12 +192,23 @@ export function useCameraPermissions(): [Permission | null, () => Promise<Permis
     return () => { annule = true }
   }, [])
   const demander = useCallback(async () => {
+    // Navigateur integre (WhatsApp, Instagram, Facebook…) ou page non
+    // securisee : l'acces a la camera n'existe meme pas.
+    if (!navigator.mediaDevices?.getUserMedia) {
+      const p = { ...fixer(false, true), raison: RAISONS_CAMERA.indisponible }
+      setEtat(p); return p
+    }
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       s.getTracks().forEach(t => t.stop())
       const p = fixer(true); setEtat(p); return p
-    } catch {
-      const p = fixer(false, true); setEtat(p); return p
+    } catch (e) {
+      const nom = (e as DOMException)?.name
+      const raison = nom === 'NotFoundError' || nom === 'OverconstrainedError' ? RAISONS_CAMERA.absente
+        : nom === 'NotReadableError' || nom === 'AbortError' ? RAISONS_CAMERA.occupee
+        : RAISONS_CAMERA.refusee
+      const p = { ...fixer(false, true), raison }
+      setEtat(p); return p
     }
   }, [])
   return [etat, demander]

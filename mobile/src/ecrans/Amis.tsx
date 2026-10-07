@@ -29,6 +29,7 @@ import {
   etat, abreger, type Video as VideoType, type Story,
 } from '../lib/demo'
 import { useBascule } from '../lib/bascule'
+import { montrerAvis } from '../lib/avis'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../composants/Commentaires'
@@ -305,7 +306,7 @@ function Carte({
   const suivre = () => {
     onSuivi(item.pseudo, true)
     apiInteractions.suivre(item.pseudo)
-      .then(r => onSuivi(item.pseudo, r.suivi))
+      .then(r => { onSuivi(item.pseudo, r.suivi); if (r.suivi) montrerAvis(`Vous êtes abonné(e) à ${item.pseudo}`) })
       .catch((e: Error) => { onSuivi(item.pseudo, false); onErreur(e.message) })
   }
 

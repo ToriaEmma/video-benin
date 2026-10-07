@@ -49,28 +49,76 @@ const signalerBlocage = (bloque: boolean) => {
   window.dispatchEvent(new Event(bloque ? 'tocktick:son-bloque' : 'tocktick:son-actif'))
 }
 
-function obtenirContexte(): AudioContext {
-  if (contexte) return contexte
+// Un son attend-il de jouer ? (piste qui a la main et veut jouer)
+const sonVoulu = () => proprietaire instanceof PisteAudio && proprietaire.playing
+
+function creerContexte(): AudioContext {
   const Ctx = window.AudioContext
     || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
   // iPhone (Safari 16.4+) : jouer comme un lecteur de musique, y compris
   // interrupteur sur silencieux.
   const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
   if (session) { try { session.type = 'playback' } catch { /* Reglage refuse. */ } }
-  contexte = new Ctx()
-  sortie = contexte.createGain()
-  sortie.connect(contexte.destination)
-  // Chaque geste relance le contexte tant qu'il est suspendu (refus avant
-  // le premier toucher, ou mise en veille par le systeme).
+  const c = new Ctx()
+  sortie = c.createGain()
+  sortie.connect(c.destination)
+  // Arret par le systeme (page quittee, appel…) alors qu'un son jouait :
+  // la bulle « activer le son » revient, un toucher le relancera.
+  c.addEventListener('statechange', () => {
+    if (c !== contexte) return
+    if (c.state === 'running') signalerBlocage(false)
+    else if (sonVoulu()) signalerBlocage(true)
+  })
+  return c
+}
+
+// Sur iPhone, un contexte « interrompu » (page quittee puis revenue) refuse
+// souvent de reprendre : on le remplace par un neuf, et la musique en cours
+// repart dessus. Les extraits decodes restent valables d'un contexte a l'autre.
+function recreerContexte() {
+  const ancien = contexte
+  contexte = creerContexte()
+  ancien?.close().catch(() => { /* Deja ferme. */ })
+  if (proprietaire instanceof PisteAudio) proprietaire.relancer()
+}
+
+// Un essai de reprise a deja echoue : le prochain geste recree le contexte.
+let repriseEchouee = false
+
+function obtenirContexte(): AudioContext {
+  if (contexte) return contexte
+  contexte = creerContexte()
+  // Chaque geste relance le contexte tant qu'il n'est pas actif (refus
+  // avant le premier toucher, ou mise en veille par le systeme). Tout se
+  // fait pendant le geste : c'est la seule fenetre ou l'iPhone l'autorise.
   const reveiller = () => {
-    const c = contexte!
+    let c = contexte!
     if (c.state === 'running') return
+    if (c.state === ('interrupted' as AudioContextState) || repriseEchouee) {
+      recreerContexte()
+      c = contexte!
+      repriseEchouee = false
+    }
     c.resume().then(() => { if (c.state === 'running') signalerBlocage(false) }).catch(() => { /* Geste suivant. */ })
+    // Sans reponse rapide, la reprise est consideree comme echouee.
+    setTimeout(() => { if (c === contexte && c.state !== 'running') repriseEchouee = true }, 500)
   }
   EVENEMENTS_GESTE.forEach(e => window.addEventListener(e, reveiller, true))
-  contexte.addEventListener('statechange', () => {
-    if (contexte!.state === 'running') signalerBlocage(false)
-  })
+  // Retour sur le site (onglet ou application revenus au premier plan) :
+  // on tente la reprise ; si l'iPhone la refuse sans geste, la bulle
+  // invite a toucher l'ecran.
+  const auRetour = () => {
+    if (document.visibilityState !== 'visible' || !contexte || !sonVoulu()) return
+    const c = contexte
+    c.resume().catch(() => { /* Attend un toucher. */ })
+    setTimeout(() => {
+      if (c !== contexte || c.state === 'running') return
+      repriseEchouee = true
+      signalerBlocage(true)
+    }, 400)
+  }
+  document.addEventListener('visibilitychange', auRetour)
+  window.addEventListener('pageshow', auRetour)
   return contexte
 }
 
@@ -138,6 +186,17 @@ class PisteAudio implements Piste, Lecteur {
   }
 
   ceder() { this.voulu = false; this.arreterSource() }
+
+  // Contexte remplace : la source de l'ancien est abandonnee et la musique
+  // repart du meme endroit sur le nouveau.
+  relancer() {
+    if (this.source) {
+      this.position = this.maintenant()
+      try { this.source.disconnect() } catch { /* Contexte ferme. */ }
+      this.source = null
+    }
+    if (this.voulu) this.demarrer()
+  }
 
   get currentTime() { return this.maintenant() }
   get playing() { return this.voulu && proprietaire === this }

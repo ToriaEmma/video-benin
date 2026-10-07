@@ -28,6 +28,7 @@ import {
 } from '../composants/Icones'
 import OptionsVideo from '../composants/OptionsVideo'
 import { useExigerCompte } from '../lib/invite'
+import { montrerAvis } from '../lib/avis'
 import { allerVideo, ecouterNavigationFil } from '../lib/navigationFil'
 import AnalyseVideo from './AnalyseVideo'
 import Communaute from './Communaute'
@@ -215,7 +216,7 @@ function Carte({
   const suivre = () => {
     onSuivi(item.pseudo, true)
     apiInteractions.suivre(item.pseudo)
-      .then(r => onSuivi(item.pseudo, r.suivi))
+      .then(r => { onSuivi(item.pseudo, r.suivi); if (r.suivi) montrerAvis(`Vous êtes abonné(e) à ${item.pseudo}`) })
       .catch((e: Error) => { onSuivi(item.pseudo, false); onErreur(e.message) })
   }
 
@@ -437,7 +438,7 @@ function Carte({
 
 export default function Fil({
   onVisiter, onRechercher, videos, indexInitial = 0, recherche, onRetour, onUtiliserSon, onLive,
-  videoAOuvrir,
+  videoAOuvrir, enVeille = false,
 }: {
   onVisiter?: (pseudo: string) => void
   onRechercher?: () => void
@@ -455,6 +456,9 @@ export default function Fil({
   onLive?: (actif: boolean) => void
   // Video d'un lien partage (…/v/<id>) : montree en premier.
   videoAOuvrir?: string | null
+  // Fil garde en memoire pendant la visite d'un autre onglet : rien ne lit,
+  // et au retour la video et sa musique repartent sans rien recharger.
+  enVeille?: boolean
 }) {
   const { profil } = useAuth()
   const exiger = useExigerCompte()
@@ -687,7 +691,7 @@ export default function Fil({
           renderItem={({ item, index: i }) => sonEnAttente(item)
             ? <View style={{ height: hauteur, backgroundColor: '#000' }} />
             : (
-            <Carte item={item} actif={i === index} hauteur={hauteur}
+            <Carte item={item} actif={!enVeille && i === index} hauteur={hauteur}
               sienne={item.pseudo === profil?.pseudo}
               suivi={suivis.has(item.pseudo)} onSuivi={marquerSuivi}
               nbCommentaires={item.nbCommentaires + (ajouts[item.id] ?? 0)}

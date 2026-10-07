@@ -127,10 +127,15 @@ function Application() {
   // Le contenu de l'onglet : identique sur telephone et grand ecran.
   const contenu = (
     <View style={s.contenu}>
-      {onglet === 'fil' && (
-        <Fil key={cleFil} onVisiter={visiter} onRechercher={() => setOnglet('amis')}
+      {/* Le fil reste monte quand on visite un autre onglet : au retour, la
+          video n'est pas rechargee et le son repart aussitot. */}
+      <View style={onglet === 'fil' ? s.contenu : s.filEnVeille}
+        pointerEvents={onglet === 'fil' ? 'auto' : 'none'}
+        aria-hidden={onglet !== 'fil'}>
+        <Fil key={cleFil} enVeille={onglet !== 'fil'} onVisiter={visiter}
+          onRechercher={() => setOnglet('amis')}
           onUtiliserSon={utiliserSon} onLive={setEnLive} videoAOuvrir={videoPartagee} />
-      )}
+      </View>
       {onglet === 'amis' && (
         lecture
           ? <Fil
@@ -357,6 +362,7 @@ export default function App() {
 const s = StyleSheet.create({
   app: { flex: 1, backgroundColor: '#000' },
   contenu: { flex: 1 },
+  filEnVeille: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0, zIndex: -1 },
   large: { flexDirection: 'row' },
   scene: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 24, backgroundColor: '#000' },
   sceneClaire: { backgroundColor: '#f4f4f5' },

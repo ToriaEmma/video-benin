@@ -13,6 +13,7 @@ import { View, Image, StyleSheet, Pressable } from 'react-native'
 import { Text } from './Texte'
 import { apiInteractions, type CompteApi } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import { montrerAvis } from '../lib/avis'
 
 export default function LigneCompte({ compte, onVisiter }: {
   compte: CompteApi
@@ -35,7 +36,10 @@ export default function LigneCompte({ compte, onVisiter }: {
       ? apiInteractions.suivre(compte.pseudo)
       : apiInteractions.nePlusSuivre(compte.pseudo)
     envoyer
-      .then(r => setSuivi(r.suivi))
+      .then(r => {
+        setSuivi(r.suivi)
+        montrerAvis(r.suivi ? `Vous êtes abonné(e) à ${compte.pseudo}` : `Vous n’êtes plus abonné(e) à ${compte.pseudo}`)
+      })
       .catch(() => setSuivi(!vise))
       .finally(() => setEnvoi(false))
   }
