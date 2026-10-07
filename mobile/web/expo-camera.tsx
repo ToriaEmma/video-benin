@@ -163,10 +163,24 @@ const RAISONS_CAMERA = {
     return 'Ce navigateur ne donne pas accès à la caméra. Si tu as ouvert TockTick depuis WhatsApp, Instagram ou Facebook, '
       + 'touche ⋯ puis « Ouvrir dans le navigateur » (Safari ou Chrome).'
   },
-  get refusee() {
+  // Refus sans fenetre de demande : Safari applique un reglage deja pose
+  // (site regle sur « Refuser », ou refus plus tot dans cet onglet).
+  get bloquee() {
     return estIPhone()
-      ? 'L’accès a été refusé. Sur iPhone : Réglages › Safari › Caméra et Microphone › Autoriser, puis recharge la page.'
-      : 'L’accès a été refusé. Touche le cadenas à gauche de l’adresse du site › Autorisations › Caméra et micro › Autoriser, puis recharge la page.'
+      ? 'Safari a bloqué l’accès sans te demander : la caméra ou le micro est réglé sur « Refuser » pour ce site, '
+        + 'ou un refus a été donné plus tôt. Touche « aA » (ou l’icône à gauche de l’adresse) › Réglages du site web › '
+        + 'Caméra et Micro › « Demander » ou « Autoriser », puis recharge la page. Vérifie aussi Réglages › Safari › Caméra et Micro.'
+      : 'Le navigateur a bloqué l’accès sans te demander. Touche le cadenas à gauche de l’adresse du site › Autorisations › '
+        + 'Caméra et micro › Autoriser, puis recharge la page.'
+  },
+  get refusee() {
+    return 'Tu as répondu « Ne pas autoriser ». Recharge la page puis touche à nouveau « Autoriser » et accepte la caméra et le micro.'
+  },
+  get microRefuse() {
+    return 'La caméra est autorisée mais pas le micro (il faut les deux pour filmer avec le son). '
+      + (estIPhone()
+        ? 'Touche « aA › Réglages du site web › Micro › Autoriser », puis recharge la page.'
+        : 'Touche le cadenas › Autorisations › Micro › Autoriser, puis recharge la page.')
   },
   absente: 'Aucune caméra n’a été trouvée sur cet appareil.',
   occupee: 'La caméra est déjà utilisée par une autre application. Ferme-la, puis touche à nouveau « Autoriser ».',
@@ -184,7 +198,7 @@ export function useCameraPermissions(): [Permission | null, () => Promise<Permis
         const r = await navigator.permissions?.query({ name: 'camera' as PermissionName })
         if (annule) return
         if (r?.state === 'granted') setEtat(fixer(true))
-        else if (r?.state === 'denied') setEtat({ ...fixer(false, true), raison: RAISONS_CAMERA.refusee })
+        else if (r?.state === 'denied') setEtat({ ...fixer(false, true), raison: RAISONS_CAMERA.bloquee })
         else setEtat(fixer(false))
       } catch { if (!annule) setEtat(fixer(false)) }
     }
@@ -198,15 +212,26 @@ export function useCameraPermissions(): [Permission | null, () => Promise<Permis
       const p = { ...fixer(false, true), raison: RAISONS_CAMERA.indisponible }
       setEtat(p); return p
     }
+    const debut = Date.now()
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       s.getTracks().forEach(t => t.stop())
       const p = fixer(true); setEtat(p); return p
     } catch (e) {
       const nom = (e as DOMException)?.name
-      const raison = nom === 'NotFoundError' || nom === 'OverconstrainedError' ? RAISONS_CAMERA.absente
-        : nom === 'NotReadableError' || nom === 'AbortError' ? RAISONS_CAMERA.occupee
-        : RAISONS_CAMERA.refusee
+      let raison: string
+      if (nom === 'NotFoundError' || nom === 'OverconstrainedError') raison = RAISONS_CAMERA.absente
+      else if (nom === 'NotReadableError' || nom === 'AbortError') raison = RAISONS_CAMERA.occupee
+      else if (nom === 'NotAllowedError' || nom === 'SecurityError') {
+        // Une reponse quasi immediate veut dire qu'aucune fenetre n'a ete
+        // montree : le refus vient d'un reglage, pas d'un choix a l'instant.
+        const sansDemande = Date.now() - debut < 500
+        // Camera seule : distingue un micro refuse d'une camera refusee.
+        const cameraSeule = await navigator.mediaDevices.getUserMedia({ video: true })
+          .then(f => { f.getTracks().forEach(t => t.stop()); return true }, () => false)
+        raison = cameraSeule ? RAISONS_CAMERA.microRefuse
+          : sansDemande ? RAISONS_CAMERA.bloquee : RAISONS_CAMERA.refusee
+      } else raison = `La caméra n’a pas pu démarrer (${nom || 'erreur inconnue'}). Recharge la page et réessaie.`
       const p = { ...fixer(false, true), raison }
       setEtat(p); return p
     }
