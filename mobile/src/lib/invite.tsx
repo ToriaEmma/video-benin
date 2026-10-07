@@ -10,6 +10,7 @@ import { Text } from '../composants/Texte'
 import { useAuth } from './auth'
 import { ListeComptes, Inscription } from '../ecrans/Connexion'
 import { useColonne } from './ecran'
+import { FenetreCodeRecuperation } from './codeRecuperation'
 
 type Exiger = (raison: string) => boolean
 
@@ -60,6 +61,8 @@ export function FournisseurInvite({ children }: { children: React.ReactNode }) {
         onInscription={() => setFeuille('inscription')} onSucces={fermer} />
       <Inscription visible={feuille === 'inscription'} onFermer={fermer}
         onConnexion={() => setFeuille('comptes')} onSucces={fermer} />
+      {/* Code de recuperation : au sommet, pour survivre au changement de page. */}
+      <FenetreCodeRecuperation />
     </Contexte.Provider>
   )
 }

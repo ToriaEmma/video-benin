@@ -165,3 +165,7 @@ CREATE TABLE IF NOT EXISTS sons_favoris (
   cree_le    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (profil_id, son_id)
 );
+
+-- ---------- Recuperation de compte ----------
+-- Empreinte du code de recuperation (mot de passe oublie, sans SMS).
+ALTER TABLE profils ADD COLUMN IF NOT EXISTS code_recuperation text;

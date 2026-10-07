@@ -18,6 +18,7 @@ import {
   exigerSession,
   sessionFacultative,
   EMPREINTE_LEURRE,
+  genererCodeRecuperation,
 } from './auth.js'
 import {
   stockageConfigure,
@@ -45,6 +46,7 @@ import {
   avatarValide,
   dateFacultative,
   limiteDemandee,
+  normaliserCode,
 } from './regles.js'
 
 const app = express()
@@ -180,14 +182,33 @@ app.post('/inscription', route(async (req, res) => {
   }
 
   const empreinte = await chiffrer(motDePasse)
+  // Code de recuperation : remis une seule fois, garde haché comme un mot
+  // de passe. C'est lui qui permet de retrouver le compte sans SMS.
+  const code = genererCodeRecuperation()
   const [profil] = await sql`
-    INSERT INTO profils (pseudo, telephone, mot_de_passe)
-    VALUES (${pseudo}, ${telephone}, ${empreinte})
+    INSERT INTO profils (pseudo, telephone, mot_de_passe, code_recuperation)
+    VALUES (${pseudo}, ${telephone}, ${empreinte}, ${await chiffrer(normaliserCode(code))})
     RETURNING *
   `
   await noterEssais([ip])
-  res.status(201).json({ jeton: signerJeton(profil.id), profil: profilPrive(profil) })
+  res.status(201).json({ jeton: signerJeton(profil.id), profil: profilPrive(profil), codeRecuperation: code })
 }))
+
+// Comptes designes par un pseudo ou un numero (sous toutes ses ecritures :
+// compare sur ses 8 derniers chiffres). `cle` sert a limiter les essais.
+async function comptesDesignes(saisi, prefixe) {
+  const chiffres = saisi.replace(/\D/g, '')
+  const parPseudo = /[a-z]/i.test(saisi) || chiffres.length < 8
+  const pseudo = saisi.replace(/^@/, '').toLowerCase()
+  const cle = `${prefixe}:${parPseudo ? pseudo : finDeNumero(chiffres)}`
+  const candidats = parPseudo
+    ? await sql`SELECT * FROM profils WHERE pseudo = ${pseudo}`
+    : await sql`
+        SELECT * FROM profils
+        WHERE right(regexp_replace(telephone, '\\D', '', 'g'), 8) = ${finDeNumero(chiffres)}
+      `
+  return { cle, candidats }
+}
 
 app.post('/connexion', route(async (req, res) => {
   // Le champ s'appelle encore `telephone`, mais accepte aussi le pseudo.
@@ -195,24 +216,10 @@ app.post('/connexion', route(async (req, res) => {
   const motDePasse = typeof req.body?.motDePasse === 'string' ? req.body.motDePasse : ''
   if (!motDePasse || motDePasse.length > 200) throw new Refus(400, 'Mot de passe requis')
 
-  // Numero : compare sur ses 8 derniers chiffres, pour accepter toutes les
-  // ecritures (+229, 229, ancien numero a 8 chiffres, nouveau a 10 en 01…).
-  const chiffres = saisi.replace(/\D/g, '')
-  const parPseudo = /[a-z]/i.test(saisi) || chiffres.length < 8
-  const cleCompte = parPseudo
-    ? `connexion:${saisi.replace(/^@/, '').toLowerCase()}`
-    : `connexion:${finDeNumero(chiffres)}`
   const cleIp = `connexion-ip:${adresseClient(req)}`
+  const { cle: cleCompte, candidats } = await comptesDesignes(saisi, 'connexion')
   await verifierEssais([{ cle: cleCompte, max: 8 }, { cle: cleIp, max: 40 }])
 
-  const candidats = parPseudo
-    ? await sql`
-        SELECT * FROM profils WHERE pseudo = ${saisi.replace(/^@/, '').toLowerCase()}
-      `
-    : await sql`
-        SELECT * FROM profils
-        WHERE right(regexp_replace(telephone, '\\D', '', 'g'), 8) = ${finDeNumero(chiffres)}
-      `
   for (const profil of candidats) {
     if (await verifier(motDePasse, profil.mot_de_passe)) {
       await sql`DELETE FROM tentatives WHERE cle = ${cleCompte}`
@@ -227,6 +234,74 @@ app.post('/connexion', route(async (req, res) => {
   // compte existe.
   throw new Refus(401, 'Identifiant ou mot de passe incorrect')
 }))
+
+// ------------------------------------------------------------
+// Mot de passe oublie
+//
+// Sans service de SMS, le compte se recupere avec le code de recuperation
+// remis a l'inscription (ou regenere dans les parametres). Le code est a
+// usage unique : apres une recuperation, un nouveau code est remis.
+// ------------------------------------------------------------
+
+app.post('/mot-de-passe-oublie', route(async (req, res) => {
+  const saisi = texteRequis(req.body?.identifiant, 'identifiant', 40)
+  const code = normaliserCode(texteRequis(req.body?.code, 'code', 40))
+  const nouveau = motDePasseValide(req.body?.nouveauMotDePasse)
+
+  const cleIp = `recuperation-ip:${adresseClient(req)}`
+  const { cle, candidats } = await comptesDesignes(saisi, 'recuperation')
+  // Peu d'essais : le code est la seule cle du compte.
+  await verifierEssais([{ cle, max: 5 }, { cle: cleIp, max: 20 }])
+
+  for (const profil of candidats) {
+    if (profil.code_recuperation && await verifier(code, profil.code_recuperation)) {
+      const nouveauCode = genererCodeRecuperation()
+      const [maj] = await sql`
+        UPDATE profils SET
+          mot_de_passe = ${await chiffrer(nouveau)},
+          code_recuperation = ${await chiffrer(normaliserCode(nouveauCode))}
+        WHERE id = ${profil.id}
+        RETURNING *
+      `
+      // Les essais rates (recuperation et connexion) sont oublies.
+      await sql`DELETE FROM tentatives WHERE cle IN (${cle}, ${cle.replace('recuperation:', 'connexion:')})`
+      return res.json({ jeton: signerJeton(maj.id), profil: profilPrive(maj), codeRecuperation: nouveauCode })
+    }
+  }
+  if (!candidats.length) await verifier(code, EMPREINTE_LEURRE)
+  await noterEssais([cle, cleIp])
+  throw new Refus(401, 'Identifiant ou code de récupération incorrect')
+}))
+
+// Nouveau code de recuperation (l'ancien cesse de fonctionner). Le mot de
+// passe actuel est exige : un telephone laisse ouvert ne suffit pas.
+app.post('/moi/code-recuperation', exigerSession, route(async (req, res) => {
+  const profil = await profilAvecMotDePasse(req)
+  const code = genererCodeRecuperation()
+  await sql`UPDATE profils SET code_recuperation = ${await chiffrer(normaliserCode(code))} WHERE id = ${profil.id}`
+  res.json({ codeRecuperation: code })
+}))
+
+app.post('/moi/mot-de-passe', exigerSession, route(async (req, res) => {
+  const profil = await profilAvecMotDePasse(req)
+  const nouveau = motDePasseValide(req.body?.nouveauMotDePasse)
+  await sql`UPDATE profils SET mot_de_passe = ${await chiffrer(nouveau)} WHERE id = ${profil.id}`
+  res.json({ ok: true })
+}))
+
+// Verifie le mot de passe actuel envoye avec une action sensible.
+async function profilAvecMotDePasse(req) {
+  const cle = `sensible:${req.profilId}`
+  await verifierEssais([{ cle, max: 5 }])
+  const motDePasse = typeof req.body?.motDePasse === 'string' ? req.body.motDePasse : ''
+  const [profil] = await sql`SELECT * FROM profils WHERE id = ${req.profilId}`
+  if (!profil) throw new Refus(404, 'Compte introuvable')
+  if (!motDePasse || !(await verifier(motDePasse, profil.mot_de_passe))) {
+    await noterEssais([cle])
+    throw new Refus(401, 'Mot de passe actuel incorrect')
+  }
+  return profil
+}
 
 app.get('/moi', exigerSession, route(async (req, res) => {
   const [profil] = await sql`SELECT * FROM profils WHERE id = ${req.profilId}`

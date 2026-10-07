@@ -87,6 +87,10 @@ export const motDePasseValide = (valeur) => {
   return valeur
 }
 
+// Code de recuperation saisi : majuscules, sans tirets ni espaces, comme a
+// sa creation (« k7qm 3xrw-pz9d h4tb » vaut « K7QM3XRWPZ9DH4TB »).
+export const normaliserCode = (code) => String(code).toUpperCase().replace(/[^A-Z0-9]/g, '')
+
 // uuid attendu dans l'URL : un identifiant mal forme ferait echouer la
 // requete SQL avec une erreur de type, qu'on ne veut pas remonter.
 const MOTIF_UUID =

@@ -218,7 +218,7 @@ export function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
   // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
   const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
-  const { connecter } = useAuth()
+  const { connecter, recuperer } = useAuth()
   // Compte choisi dans la liste : le mot de passe lui est demande.
   const [choisi, setChoisi] = useState<string | null>(null)
   const [tel, setTel] = useState('')
@@ -256,6 +256,27 @@ export function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
     } finally { setOccupe(false) }
   }
 
+  // Mot de passe oublie : pseudo ou numero + code de recuperation.
+  const [oubli, setOubli] = useState(false)
+  const [code, setCode] = useState('')
+  const reinitialiser = async () => {
+    setErreur('')
+    const saisi = tel.trim()
+    if (!saisi) { setErreur('Entre ton numéro de téléphone ou ton pseudo'); return }
+    if (code.replace(/[^a-z0-9]/gi, '').length !== 16) { setErreur('Le code de récupération compte 16 caractères'); return }
+    if (mdp.length < 6) { setErreur('Le nouveau mot de passe doit faire au moins 6 caractères'); return }
+    const identifiant = /[a-z]/i.test(saisi) ? saisi.replace(/^@/, '').toLowerCase() : saisi.replace(/\D/g, '')
+    setOccupe(true)
+    try {
+      await recuperer(identifiant, code, mdp)
+      await retenirCompte(choisi ?? identifiant, identifiant)
+      setOubli(false); setCode(''); setMdp('')
+      onSucces?.(); onFermer()
+    } catch (e) {
+      setErreur(e instanceof Error ? e.message : 'Une erreur est survenue')
+    } finally { setOccupe(false) }
+  }
+
   return (
     <Modal visible={visible} transparent animationType="slide"
       onRequestClose={onFermer} statusBarTranslucent>
@@ -270,12 +291,47 @@ export function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
               contentContainerStyle={s.corpsFeuille}
               keyboardShouldPersistTaps="handled">
               <Text style={s.grandTitre}>
-                {connus.length === 0 ? 'Connexion'
+                {oubli ? 'Mot de passe oublié'
+                  : connus.length === 0 ? 'Connexion'
                   : choisi ? 'Entre ton mot de passe'
                   : 'Ravis de te revoir'}
               </Text>
 
-              {(choisi || connus.length === 0) ? <>
+              {oubli ? <>
+                <Text style={s.explication}>
+                  Entre ton pseudo ou ton numéro, le code de récupération reçu à l’inscription,
+                  puis choisis un nouveau mot de passe.
+                </Text>
+                <View style={s.champ}>
+                  <TextInput style={s.saisie} placeholder="Numéro de téléphone ou pseudo"
+                    placeholderTextColor="#aaa" autoCapitalize="none" autoCorrect={false}
+                    autoComplete="username" value={tel} onChangeText={setTel} />
+                </View>
+                <View style={s.champ}>
+                  <TextInput style={s.saisie} placeholder="Code de récupération (ex. K7QM-3XRW-PZ9D-H4TB)"
+                    placeholderTextColor="#aaa" autoCapitalize="characters" autoCorrect={false}
+                    value={code} onChangeText={setCode} />
+                </View>
+                <View style={s.champ}>
+                  <TextInput style={s.saisie} placeholder="Nouveau mot de passe (6 caractères minimum)"
+                    placeholderTextColor="#aaa" secureTextEntry autoComplete="new-password"
+                    textContentType="newPassword" value={mdp} onChangeText={setMdp}
+                    onSubmitEditing={reinitialiser} />
+                </View>
+                <Pressable style={[s.principal, occupe && s.principalInactif]}
+                  onPress={reinitialiser} disabled={occupe} accessibilityRole="button">
+                  {occupe
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={s.principalTexte}>Changer le mot de passe</Text>}
+                </Pressable>
+                <Pressable hitSlop={8} onPress={() => { setOubli(false); setErreur('') }}>
+                  <Text style={s.retourEtape}>Retour à la connexion</Text>
+                </Pressable>
+                <Text style={s.explication}>
+                  Pas de code ? Connecte-toi sur un appareil où ton compte est encore ouvert, puis
+                  va dans Paramètres › Sécurité et autorisations › Code de récupération.
+                </Text>
+              </> : (choisi || connus.length === 0) ? <>
                 <View style={s.champ}>
                   {/* Identifiants enregistres par le navigateur ou le telephone :
                       `username` / `current-password` les font remplir ici. */}
@@ -296,6 +352,11 @@ export function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
                   {occupe
                     ? <ActivityIndicator color="#fff" />
                     : <Text style={s.principalTexte}>Connexion</Text>}
+                </Pressable>
+
+                <Pressable hitSlop={8} onPress={() => { setOubli(true); setErreur(''); setMdp('') }}
+                  accessibilityRole="button">
+                  <Text style={s.lienOubli}>Mot de passe oublié ?</Text>
                 </Pressable>
 
                 {connus.length > 0 && (
@@ -442,6 +503,8 @@ const s = StyleSheet.create({
     marginBottom: 10 },
   autreTexte: { color: '#111', fontSize: 14.5, fontWeight: '600' },
 
+  lienOubli: { color: '#111', fontSize: 13.5, fontWeight: '600', textAlign: 'center', marginTop: 4 },
+  explication: { color: '#8e8e93', fontSize: 13, lineHeight: 18, textAlign: 'center' },
   retourEtape: { color: '#8e8e93', fontSize: 12.5, textAlign: 'center',
     marginTop: 14 },
   erreur: { color: '#ef4a5e', fontSize: 12.5, textAlign: 'center',

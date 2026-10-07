@@ -16,7 +16,10 @@
 import React, { useState } from 'react'
 import { View, StyleSheet, Pressable, ScrollView, Alert, Share } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { Text } from '../composants/Texte'
+import { Text, TextInput } from '../composants/Texte'
+import { apiComptes } from '../lib/api'
+import { montrerCodeRecuperation } from '../lib/codeRecuperation'
+import { lienProfil } from '../lib/lien'
 import {
   Chevron, ChevronDroit, CocheChoix, Personne, Telephone, Cle, Appareil,
 } from '../composants/Icones'
@@ -254,9 +257,85 @@ export function Compte({ onRetour }: { onRetour: () => void }) {
 // 3. Securite et autorisations
 // ------------------------------------------------------------
 
+// Formulaire d'une action sensible : le mot de passe actuel est demande,
+// puis l'action part a l'API (changement de mot de passe, nouveau code).
+function FormulaireSensible({ titre, explication, nouveau, bouton, onRetour, envoyer }: {
+  titre: string
+  explication: string
+  // Demande aussi un nouveau mot de passe (changement de mot de passe).
+  nouveau: boolean
+  bouton: string
+  onRetour: () => void
+  envoyer: (actuel: string, nouveauMotDePasse: string) => Promise<string>
+}) {
+  const [actuel, setActuel] = useState('')
+  const [suivant, setSuivant] = useState('')
+  const [message, setMessage] = useState('')
+  const [occupe, setOccupe] = useState(false)
+  const valider = async () => {
+    setMessage('')
+    if (!actuel) { setMessage('Entre ton mot de passe actuel.'); return }
+    if (nouveau && suivant.length < 6) { setMessage('Le nouveau mot de passe doit faire au moins 6 caractères.'); return }
+    setOccupe(true)
+    try {
+      setMessage(await envoyer(actuel, suivant))
+      setActuel(''); setSuivant('')
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : 'Une erreur est survenue.')
+    } finally { setOccupe(false) }
+  }
+  return (
+    <SafeAreaView style={s.page} edges={['top']}>
+      <Barre titre={titre} onRetour={onRetour} />
+      <ScrollView contentContainerStyle={s.corps} keyboardShouldPersistTaps="handled">
+        <Note>{explication}</Note>
+        <Groupe>
+          <TextInput style={s.saisieChamp} placeholder="Mot de passe actuel" placeholderTextColor="#999"
+            secureTextEntry autoComplete="current-password" value={actuel} onChangeText={setActuel} />
+          {nouveau && (
+            <TextInput style={[s.saisieChamp, s.saisieSuivante]} placeholder="Nouveau mot de passe (6 caractères minimum)"
+              placeholderTextColor="#999" secureTextEntry autoComplete="new-password"
+              value={suivant} onChangeText={setSuivant} onSubmitEditing={valider} />
+          )}
+        </Groupe>
+        <Pressable style={[s.boutonAction, occupe && s.boutonActionInactif]} onPress={valider}
+          disabled={occupe} accessibilityRole="button">
+          <Text style={s.boutonActionTexte}>{occupe ? 'Un instant…' : bouton}</Text>
+        </Pressable>
+        {!!message && <Text style={s.messageAction}>{message}</Text>}
+      </ScrollView>
+    </SafeAreaView>
+  )
+}
+
 export function Securite({ onRetour }: { onRetour: () => void }) {
-  const rafraichir = useRafraichir()
   const [appareils, setAppareils] = useState(false)
+  const [action, setAction] = useState<'motdepasse' | 'code' | null>(null)
+
+  if (action === 'motdepasse') {
+    return (
+      <FormulaireSensible titre="Changer le mot de passe" nouveau bouton="Changer le mot de passe"
+        explication="Choisis un mot de passe que tu n’utilises nulle part ailleurs."
+        onRetour={() => setAction(null)}
+        envoyer={async (actuel, suivant) => {
+          await apiComptes.changerMotDePasse(actuel, suivant)
+          return 'Mot de passe changé.'
+        }} />
+    )
+  }
+
+  if (action === 'code') {
+    return (
+      <FormulaireSensible titre="Code de récupération" nouveau={false} bouton="Générer un nouveau code"
+        explication="Le code de récupération permet de choisir un nouveau mot de passe si tu oublies le tien. En générer un nouveau rend l’ancien inutilisable."
+        onRetour={() => setAction(null)}
+        envoyer={async actuel => {
+          const { codeRecuperation } = await apiComptes.nouveauCodeRecuperation(actuel)
+          montrerCodeRecuperation(codeRecuperation)
+          return 'Nouveau code créé. L’ancien ne fonctionne plus.'
+        }} />
+    )
+  }
 
   if (appareils) {
     return (
@@ -288,12 +367,8 @@ export function Securite({ onRetour }: { onRetour: () => void }) {
       <Barre titre="Sécurité et autorisations" onRetour={onRetour} />
       <ScrollView contentContainerStyle={s.corps}>
         <Groupe titre="Connexion">
-          <LigneBascule nom="Authentification à deux facteurs"
-            detail="Un code est demandé en plus du mot de passe"
-            cle="doubleFacteur" onChange={rafraichir} />
-          <LigneBascule nom="Alertes de connexion"
-            detail="Être averti dès qu'un nouvel appareil se connecte"
-            cle="alertesConnexion" onChange={rafraichir} />
+          <LigneNav nom="Changer le mot de passe" onPress={() => setAction('motdepasse')} />
+          <LigneNav nom="Code de récupération" onPress={() => setAction('code')} />
         </Groupe>
 
         <Groupe titre="Appareils">
@@ -302,9 +377,9 @@ export function Securite({ onRetour }: { onRetour: () => void }) {
         </Groupe>
 
         <Note>
-          L&apos;authentification à deux facteurs sera appliquée lors du
-          branchement du service d&apos;envoi de SMS. Le choix fait ici est
-          déjà conservé.
+          Le code de récupération remplace la vérification par SMS : garde-le
+          en lieu sûr, il permet de retrouver ton compte si tu oublies ton mot
+          de passe.
         </Note>
       </ScrollView>
     </SafeAreaView>
@@ -749,7 +824,6 @@ export function SectionInformative({ info, onRetour }: {
 
 // Lien public du profil : il ouvre le site sur ce profil (voir lib/lien).
 export { lienProfil } from '../lib/lien'
-import { lienProfil } from '../lib/lien'
 
 export async function partagerProfil(pseudo: string) {
   const lien = lienProfil(pseudo)
@@ -766,6 +840,13 @@ export async function partagerProfil(pseudo: string) {
 // ------------------------------------------------------------
 
 const s = StyleSheet.create({
+  saisieChamp: { fontSize: 15, color: '#111', paddingVertical: 14, paddingHorizontal: 2 },
+  saisieSuivante: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#e5e5e5' },
+  boutonAction: { backgroundColor: '#ff2856', borderRadius: 8, minHeight: 46, alignItems: 'center',
+    justifyContent: 'center', marginTop: 16 },
+  boutonActionInactif: { opacity: .6 },
+  boutonActionTexte: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  messageAction: { textAlign: 'center', fontSize: 14, color: '#111', marginTop: 12 },
   page: { flex: 1, backgroundColor: '#f1f1f2' },
 
   barre: { flexDirection: 'row', alignItems: 'center', gap: 4,

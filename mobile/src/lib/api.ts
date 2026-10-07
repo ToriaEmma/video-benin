@@ -273,8 +273,9 @@ export async function televerser(
 // ------------------------------------------------------------
 
 export const apiComptes = {
+  // L'inscription remet aussi le code de recuperation, a noter.
   inscription: (telephone: string, motDePasse: string, pseudo: string) =>
-    requete<Session>('/inscription', {
+    requete<Session & { codeRecuperation: string }>('/inscription', {
       methode: 'POST',
       corps: { telephone, motDePasse, pseudo },
       sansJeton: true,
@@ -286,6 +287,22 @@ export const apiComptes = {
       corps: { telephone, motDePasse },
       sansJeton: true,
     }),
+
+  // Mot de passe oublie : pseudo ou numero, code de recuperation, nouveau
+  // mot de passe. Un nouveau code est remis (l'ancien ne sert qu'une fois).
+  motDePasseOublie: (identifiant: string, code: string, nouveauMotDePasse: string) =>
+    requete<Session & { codeRecuperation: string }>('/mot-de-passe-oublie', {
+      methode: 'POST',
+      corps: { identifiant, code, nouveauMotDePasse },
+      sansJeton: true,
+    }),
+
+  // Actions sensibles : le mot de passe actuel est exige.
+  nouveauCodeRecuperation: (motDePasse: string) =>
+    requete<{ codeRecuperation: string }>('/moi/code-recuperation', { methode: 'POST', corps: { motDePasse } }),
+
+  changerMotDePasse: (motDePasse: string, nouveauMotDePasse: string) =>
+    requete<{ ok: true }>('/moi/mot-de-passe', { methode: 'POST', corps: { motDePasse, nouveauMotDePasse } }),
 
   moi: () => requete<ProfilApi>('/moi'),
 

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { apiComptes, lireJeton, poserJeton, type ProfilApi } from './api'
 import { etat } from './demo'
 import { chargerFavorisSons } from './favorisSons'
+import { montrerCodeRecuperation } from './codeRecuperation'
 
 // Meme forme que le profil de la version web (app/src/lib/auth.tsx) : les
 // deux plateformes lisent la meme table `profils`, leurs champs doivent donc
@@ -20,6 +21,7 @@ type Contexte = {
   chargement: boolean
   inscrire: (tel: string, mdp: string, pseudo: string) => Promise<void>
   connecter: (tel: string, mdp: string) => Promise<void>
+  recuperer: (identifiant: string, code: string, nouveauMotDePasse: string) => Promise<void>
   deconnecter: () => Promise<void>
   rafraichirProfil: () => Promise<void>
   modifierProfil: (
@@ -69,8 +71,18 @@ export const FournisseurAuth = ({ children }: { children: React.ReactNode }) => 
     appliquer(versProfil(session.profil))
   }
 
+  // Le code de recuperation remis par le serveur est montre une fois.
   const inscrire = async (tel: string, mdp: string, pseudo: string) => {
-    await ouvrirSession(await apiComptes.inscription(tel, mdp, pseudo))
+    const session = await apiComptes.inscription(tel, mdp, pseudo)
+    await ouvrirSession(session)
+    if (session.codeRecuperation) montrerCodeRecuperation(session.codeRecuperation)
+  }
+
+  // Mot de passe oublie : la session s'ouvre et le nouveau code s'affiche.
+  const recuperer = async (identifiant: string, code: string, nouveauMotDePasse: string) => {
+    const session = await apiComptes.motDePasseOublie(identifiant, code, nouveauMotDePasse)
+    await ouvrirSession(session)
+    montrerCodeRecuperation(session.codeRecuperation)
   }
 
   const connecter = async (tel: string, mdp: string) => {
@@ -96,7 +108,7 @@ export const FournisseurAuth = ({ children }: { children: React.ReactNode }) => 
 
   return (
     <C.Provider value={{
-      profil, chargement, inscrire, connecter, deconnecter,
+      profil, chargement, inscrire, connecter, recuperer, deconnecter,
       rafraichirProfil, modifierProfil,
     }}>
       {children}

@@ -8,6 +8,20 @@
 
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
+import { randomInt } from 'node:crypto'
+
+// Code de recuperation : 16 caracteres tires au hasard (generateur
+// cryptographique), sans les signes faciles a confondre (0/O, 1/I/L),
+// presentes en quatre groupes : « K7QM-3XRW-PZ9D-H4TB ». 31^16 combinaisons.
+const ALPHABET_CODE = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+export function genererCodeRecuperation() {
+  let code = ''
+  for (let i = 0; i < 16; i++) {
+    if (i && i % 4 === 0) code += '-'
+    code += ALPHABET_CODE[randomInt(ALPHABET_CODE.length)]
+  }
+  return code
+}
 
 // En production, un secret manquant rendrait les jetons falsifiables
 // (n'importe qui connaitrait le secret de developpement) : le serveur

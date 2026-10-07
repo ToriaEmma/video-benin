@@ -73,3 +73,12 @@ test('pagination : date illisible ignoree, limite plafonnee', () => {
   assert.equal(limiteDemandee('100000'), 50)
   assert.equal(limiteDemandee('-3'), 20)
 })
+
+test('code de recuperation : saisie tolerante (casse, tirets, espaces)', async () => {
+  const { normaliserCode } = await import('./regles.js')
+  const { genererCodeRecuperation } = await import('./auth.js')
+  const code = genererCodeRecuperation()
+  assert.match(code, /^[A-HJ-NP-Z2-9]{4}(-[A-HJ-NP-Z2-9]{4}){3}$/)
+  assert.equal(normaliserCode(code.toLowerCase().replaceAll('-', ' ')), code.replaceAll('-', ''))
+  assert.notEqual(genererCodeRecuperation(), genererCodeRecuperation())
+})
