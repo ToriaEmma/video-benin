@@ -63,6 +63,7 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
     let annule = false
     const ouvrir = async () => {
       try {
+        if (!mute) sessionCapture(true)
         const s = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: facing === 'front' ? 'user' : 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } },
           audio: !mute,
@@ -96,6 +97,7 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
       if (apercu.current) clearInterval(apercu.current)
       flux.current?.getTracks().forEach(t => t.stop())
       flux.current = null
+      sessionCapture(false)
     }
   }, [facing, mute])
 
@@ -153,6 +155,16 @@ export const CameraView = forwardRef<CameraViewRef, Props>(function CameraView(
     </View>
   )
 })
+
+// Session audio de l'iPhone : le fil la regle en « lecture » (son meme en
+// mode silencieux), mais ce mode interdit le micro. Pendant que la camera
+// est ouverte, on passe en « lecture et enregistrement » ; le fil la remet
+// en « lecture » ensuite (src/lib/piste.web.ts).
+function sessionCapture(actif: boolean) {
+  ;(window as unknown as { __captureActive?: boolean }).__captureActive = actif
+  const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+  if (session) { try { session.type = actif ? 'play-and-record' : 'auto' } catch { /* Reglage refuse. */ } }
+}
 
 // [permission, demander] comme dans expo-camera.
 // Pourquoi la camera n'est pas accessible, et quoi faire : affiche sous le
@@ -212,6 +224,7 @@ export function useCameraPermissions(): [Permission | null, () => Promise<Permis
       const p = { ...fixer(false, true), raison: RAISONS_CAMERA.indisponible }
       setEtat(p); return p
     }
+    sessionCapture(true)
     const debut = Date.now()
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
@@ -232,6 +245,7 @@ export function useCameraPermissions(): [Permission | null, () => Promise<Permis
         raison = cameraSeule ? RAISONS_CAMERA.microRefuse
           : sansDemande ? RAISONS_CAMERA.bloquee : RAISONS_CAMERA.refusee
       } else raison = `La caméra n’a pas pu démarrer (${nom || 'erreur inconnue'}). Recharge la page et réessaie.`
+      sessionCapture(false)
       const p = { ...fixer(false, true), raison }
       setEtat(p); return p
     }

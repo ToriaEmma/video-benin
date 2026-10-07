@@ -52,13 +52,19 @@ const signalerBlocage = (bloque: boolean) => {
 // Un son attend-il de jouer ? (piste qui a la main et veut jouer)
 const sonVoulu = () => proprietaire instanceof PisteAudio && proprietaire.playing
 
+// iPhone (Safari 16.4+) : jouer comme un lecteur de musique, y compris
+// interrupteur sur silencieux. Pas pendant que la camera filme : ce mode
+// couperait le micro (web/expo-camera.tsx).
+function reglerSessionLecture() {
+  if ((window as unknown as { __captureActive?: boolean }).__captureActive) return
+  const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+  if (session && session.type !== 'playback') { try { session.type = 'playback' } catch { /* Reglage refuse. */ } }
+}
+
 function creerContexte(): AudioContext {
   const Ctx = window.AudioContext
     || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
-  // iPhone (Safari 16.4+) : jouer comme un lecteur de musique, y compris
-  // interrupteur sur silencieux.
-  const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
-  if (session) { try { session.type = 'playback' } catch { /* Reglage refuse. */ } }
+  reglerSessionLecture()
   const c = new Ctx()
   sortie = c.createGain()
   sortie.connect(c.destination)
@@ -204,6 +210,7 @@ class PisteAudio implements Piste, Lecteur {
 
   play() {
     const c = obtenirContexte()
+    reglerSessionLecture()
     prendreLaMain(this)
     this.voulu = true
     if (c.state !== 'running') {
