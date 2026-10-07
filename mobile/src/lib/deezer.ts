@@ -17,7 +17,7 @@ import type { Son } from './sons'
 
 const API = 'https://api.deezer.com'
 
-type PisteDeezer = {
+export type PisteDeezer = {
   id: number
   title: string
   title_short?: string
@@ -119,12 +119,48 @@ export async function sonsPourToi(): Promise<Son[]> {
 }
 
 // Son d'une publication : l'extrait est redemande (adresse fraiche).
+//
+// Les sons deja resolus sont gardes sur l'appareil jusqu'a l'expiration de
+// leur adresse signee (parametre « exp » de Deezer, environ un jour) : a la
+// reouverture, le fil n'attend plus Deezer avant d'afficher ses videos.
 const cache = new Map<string, Promise<Son | null>>()
+const CLE_SONS = 'tocktick-sons-deezer-v1'
+// Marge de securite : une adresse qui expire dans moins de 10 min est redemandee.
+const MARGE_EXPIRATION = 10 * 60
+
+type SonGarde = { son: Son; expire: number }
+
+function lireGardes(): Record<string, SonGarde> {
+  try { return JSON.parse(globalThis.localStorage?.getItem(CLE_SONS) ?? '{}') } catch { return {} }
+}
+
+function garderSon(id: string, son: Son) {
+  const expire = Number(/exp=(\d+)/.exec(son.url)?.[1] ?? 0)
+  if (!expire) return
+  try {
+    const maintenant = Date.now() / 1000
+    const gardes = lireGardes()
+    // Menage des sons expires au passage.
+    for (const [cle, g] of Object.entries(gardes)) if (g.expire < maintenant) delete gardes[cle]
+    gardes[id] = { son, expire }
+    globalThis.localStorage?.setItem(CLE_SONS, JSON.stringify(gardes))
+  } catch { /* Stockage plein ou indisponible : on redemandera a Deezer. */ }
+}
+
 export function sonDeezer(id: string): Promise<Son | null> {
   if (!id.startsWith('dz:')) return Promise.resolve(null)
   if (!cache.has(id)) {
+    const garde = lireGardes()[id]
+    if (garde && garde.expire - MARGE_EXPIRATION > Date.now() / 1000) {
+      cache.set(id, Promise.resolve(garde.son))
+      return cache.get(id)!
+    }
     const promesse = appeler<PisteDeezer & { error?: unknown }>(`/track/${id.slice(3)}`)
-      .then(p => (p && !p.error && p.preview ? versSon(p) : null))
+      .then(p => {
+        const son = p && !p.error && p.preview ? versSon(p) : null
+        if (son) garderSon(id, son)
+        return son
+      })
       .catch(() => { cache.delete(id); return null })
     cache.set(id, promesse)
   }

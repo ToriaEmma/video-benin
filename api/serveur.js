@@ -389,6 +389,46 @@ app.post('/televersements', exigerSession, route(async (req, res) => {
 // entre comptes qui se suivent mutuellement, 'moi' pour l'auteur.
 // ------------------------------------------------------------
 
+// Extraits Deezer des publications, resolus par le serveur et joints aux
+// videos : l'application n'a plus a interroger Deezer avant d'afficher le
+// fil (un aller-retour de moins au demarrage, sensible en 3G/4G).
+// Gardes en memoire jusqu'a l'expiration de leur adresse signee.
+const extraitsDeezer = new Map()
+const MARGE_EXTRAIT = 10 * 60
+
+async function extraitDeezer(id) {
+  const maintenant = Date.now() / 1000
+  const garde = extraitsDeezer.get(id)
+  if (garde && garde.expire - MARGE_EXTRAIT > maintenant) return garde.piste
+  try {
+    const r = await fetch(`https://api.deezer.com/track/${id}`, { signal: AbortSignal.timeout(1500) })
+    const p = await r.json()
+    if (!p?.preview) return null
+    // Seuls les champs utilises par l'application sont renvoyes.
+    const piste = {
+      id: p.id, title: p.title, title_short: p.title_short, duration: p.duration,
+      preview: p.preview, rank: p.rank,
+      artist: { name: p.artist?.name ?? '' },
+      album: { cover_medium: p.album?.cover_medium, cover_small: p.album?.cover_small },
+    }
+    const expire = Number(/exp=(\d+)/.exec(p.preview)?.[1]) || maintenant + 3600
+    extraitsDeezer.set(id, { piste, expire })
+    return piste
+  } catch {
+    // Deezer lent ou indisponible : l'application le demandera elle-meme.
+    return null
+  }
+}
+
+async function avecExtraits(videos) {
+  const ids = [...new Set(videos.map(v => /^dz:(\d{1,15})$/.exec(v.sonId ?? '')?.[1]).filter(Boolean))]
+  const pistes = new Map(await Promise.all(ids.map(async id => [id, await extraitDeezer(id)])))
+  return videos.map(v => {
+    const piste = pistes.get(/^dz:(\d{1,15})$/.exec(v.sonId ?? '')?.[1])
+    return piste ? { ...v, deezer: piste } : v
+  })
+}
+
 const listerVideos = async ({
   viewerId, auteurId, limite, avant, videoId, suivisSeuls = false, legende = null,
 }) => {
@@ -437,7 +477,7 @@ const listerVideos = async ({
     ORDER BY v.publiee_le DESC
     LIMIT ${limite}
   `
-  return lignes.map(videoPublique)
+  return avecExtraits(lignes.map(videoPublique))
 }
 
 app.get('/videos', sessionFacultative, route(async (req, res) => {

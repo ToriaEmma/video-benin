@@ -1,8 +1,11 @@
 // Garde la musique calee sur la video : la video commande, la musique suit.
 // - video figee (chargement, pause) : la musique s'arrete et attend ;
 // - video qui repart : la musique reprend au meme instant ;
-// - retour au debut de la boucle : la musique repart aussitot avec elle ;
-// - ecart de plus de 0,3 s : on recale.
+// - retour au debut de la boucle, ou grand ecart : la musique saute a la
+//   bonne position ;
+// - petit ecart : la musique accelere ou ralentit un peu (±8 %, inaudible)
+//   jusqu'a rattraper la video. Un saut s'entend comme une coupure ; un
+//   leger changement de vitesse, non.
 import { useEffect, useState } from 'react'
 import { Platform } from 'react-native'
 
@@ -13,15 +16,25 @@ type Musique = {
   play: () => void
   pause: () => void
   seekTo: (secondes: number) => Promise<void>
+  // Vitesse de lecture ; sans elle, les ecarts se corrigent par des sauts.
+  regler?: (debit: number) => void
 }
 
 // Releve frequent : un bouclage est rattrape en moins de 0,1 s.
 const PAS = 100
-// Sans progression pendant ce delai, la video est consideree figee.
-const FIGEE_MS = 400
+// Sans progression pendant ce delai, la video est consideree figee. Assez
+// long pour qu'un telephone qui met a jour la position par a-coups ne
+// fasse pas couper la musique a tort.
+const FIGEE_MS = 700
+// Au-dela de cet ecart (s), on saute ; en dessous, on ajuste la vitesse.
+const SEUIL_SAUT = 0.6
+// En dessous de cet ecart, la musique est consideree calee.
+const ECART_NUL = 0.05
+// Correction maximale de vitesse : 8 %, imperceptible a l'oreille.
+const CORRECTION_MAX = 0.08
 
-// `ecartMax` : ecart tolere avant recalage. Une musique en memoire se recale
-// sans a-coup, on peut alors etre plus exigeant.
+// `ecartMax` : ecart tolere avant un saut quand la musique ne sait pas
+// changer de vitesse.
 // `vitesse` et `origine` : quand l'apercu joue la video accelere ou
 // decoupee, la musique suit le temps de la video finale,
 // (position - origine) / vitesse.
@@ -31,39 +44,49 @@ export function useMusiqueCalee(
 ) {
   useEffect(() => {
     if (!actif || !musique) return
+    const reglable = typeof musique.regler === 'function'
+    const regler = (d: number) => musique.regler?.(d)
     let dernier = -1
     let immobile = 0
-    // Apres un saut, la musique met un instant a repartir : on la recale
-    // plus finement pendant les deux secondes qui suivent.
-    let precis = 0
-    // Relevés laisses a la musique pour se poser apres un recalage.
+    // Releves laisses a la musique pour se poser apres un saut.
     let calme = 0
+    let debit = 1
+    const poserDebit = (d: number) => {
+      if (Math.abs(d - debit) < 0.005) return
+      debit = d
+      regler(d)
+    }
     const minuteur = setInterval(() => {
       const v = video.currentTime
       const avance = Math.abs(v - dernier) > 0.005
-      // La video est revenue en arriere : elle vient de boucler.
+      // La video est revenue en arriere : elle vient de boucler (ou d'etre
+      // ramenee en arriere a la main).
       const boucle = dernier >= 0 && v < dernier - 0.3
       dernier = v
       if (!avance) {
         immobile += PAS
-        if (immobile >= FIGEE_MS && musique.playing) musique.pause()
+        if (immobile >= FIGEE_MS && musique.playing) { musique.pause(); poserDebit(1) }
         return
       }
       immobile = 0
       // Extrait plus court que la video : la musique repart en boucle.
       const temps = Math.max(0, (v - origine) / vitesse)
       const cible = duree > 0 ? temps % duree : temps
-      const tolerance = precis > 0 ? Math.min(0.12, ecartMax) : ecartMax
-      if (precis > 0) precis--
-      if (calme > 0 && !boucle) calme--
-      else if (boucle || Math.abs(musique.currentTime - cible) > tolerance) {
-        if (boucle || precis === 0) precis = 20
+      // Positif : la musique est en retard.
+      const ecart = cible - musique.currentTime
+      if (calme > 0 && !boucle) {
+        calme--
+      } else if (boucle || Math.abs(ecart) > (reglable ? SEUIL_SAUT : ecartMax)) {
         calme = 3
+        poserDebit(1)
         musique.seekTo(cible).catch(() => { /* Position refusee. */ })
+      } else if (reglable) {
+        poserDebit(Math.abs(ecart) < ECART_NUL ? 1
+          : 1 + Math.max(-CORRECTION_MAX, Math.min(CORRECTION_MAX, ecart * 0.6)))
       }
       if (!musique.playing) musique.play()
     }, PAS)
-    return () => clearInterval(minuteur)
+    return () => { clearInterval(minuteur); if (debit !== 1) regler(1) }
   }, [actif, video, musique, duree, ecartMax, vitesse, origine])
 }
 

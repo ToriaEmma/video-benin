@@ -1,6 +1,7 @@
 // ============================================================
 // Client de l'API TockTick (api/serveur.js).
 import type { Son } from './sons'
+import type { PisteDeezer } from './deezer'
 //
 // Tout l'acces reseau de l'application passe par ce fichier : les
 // ecrans appellent les enveloppes typees et n'ont jamais a connaitre
@@ -136,6 +137,8 @@ export type CompteApi = {
 // La video de l'API porte deux champs de plus que celle de demo.ts :
 // l'identifiant de l'auteur et la date de mise a la corbeille.
 export type VideoApi = Video & {
+  // Extrait Deezer du son, joint par l'API quand elle a pu le resoudre.
+  deezer?: PisteDeezer
   favori: boolean
   sonId: string | null
   supprimeeLe: string | null

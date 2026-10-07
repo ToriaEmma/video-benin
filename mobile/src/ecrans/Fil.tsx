@@ -13,9 +13,10 @@ import { useEvent } from 'expo'
 import { abreger, type Video } from '../lib/demo'
 import { sonParId, sonOriginal, libelleSon, type Son } from '../lib/sons'
 import { estSonDistant, resoudreSon } from '../lib/resolutionSons'
+import { versSon, type PisteDeezer } from '../lib/deezer'
 import FeuilleSon from '../composants/FeuilleSon'
 import { useAvatar } from '../lib/avatars'
-import { useMusiqueCalee } from '../lib/musiqueCalee'
+import { useMusiqueCalee, useSonEnMemoire } from '../lib/musiqueCalee'
 import { useBascule } from '../lib/bascule'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -37,7 +38,8 @@ const CATEGORIES = ['Communauté', 'Suivis', 'Pour toi']
 
 // Le fil general lit les videos de l'API, qui portent `favori` ; les
 // listes ouvertes depuis un autre ecran n'en ont pas toujours.
-type VideoFil = Video & { favori?: boolean }
+// `deezer` : extrait du son joint par l'API (voir avecExtraits cote serveur).
+type VideoFil = Video & { favori?: boolean; deezer?: PisteDeezer }
 
 // Position de lecture affichee pendant le glissement, en « m:ss ».
 const horloge = (secondes: number) => {
@@ -98,10 +100,24 @@ function Carte({
     p.muted = !!son
   })
 
+  // Musique chargee en memoire des que la carte est montee : la carte
+  // suivante l'est avant d'etre regardee, sa musique part donc tout de
+  // suite et se recale sans silence. Un son original (piste d'une video,
+  // lourde) reste lu en continu.
+  const sonLocal = useSonEnMemoire(son && !son.original ? son.url : null)
+  // L'adresse est choisie quand la carte devient celle qu'on regarde (la
+  // memoire si elle est prete, sinon le flux) et gardee pendant toute la
+  // lecture : en changer en cours de route couperait la musique.
+  const urlMusique = useMemo(
+    () => (son ? sonLocal ?? son.url : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [son, actif],
+  )
+
   // Musique jouee par-dessus la video, en boucle. Sur le web, une seule
   // platine pour tout le site : la carte qui joue la prend, les autres
   // ne peuvent plus faire de bruit.
-  const musique = usePiste(son ? son.url : null)
+  const musique = usePiste(urlMusique)
 
   // J'aime et favori : affiches au toucher, puis envoyes un par un
   // jusqu'a ce que le serveur porte le dernier choix (voir lib/bascule).
@@ -494,16 +510,22 @@ export default function Fil({
 
   // Sons Deezer des publications : resolus avant de monter les cartes, pour
   // que chacune connaisse sa musique des le depart (adresse d'extrait fraiche).
+  // L'API joint deja l'extrait Deezer a la plupart des videos : seuls les
+  // sons qu'elle n'a pas pu resoudre (et les sons originaux) sont demandes ici.
   const [sonsDeezer, setSonsDeezer] = useState<Record<string, Son | null>>({})
   useEffect(() => {
-    const manquants = [...new Set(liste.map(v => v.sonId).filter(
+    const manquants = [...new Set(liste.filter(v => !v.deezer).map(v => v.sonId).filter(
       (id): id is string => estSonDistant(id) && !(id in sonsDeezer)))]
     manquants.forEach(id => resoudreSon(id).then(son =>
       setSonsDeezer(m => ({ ...m, [id]: son }))))
   }, [liste, sonsDeezer])
+  // Calcules une fois par liste : un objet son recree a chaque rendu ferait
+  // croire a la carte qu'on change de musique, et la relancerait.
+  const sonsJoints = useMemo(() => new Map(liste.flatMap(v => (v.deezer ? [[v.id, versSon(v.deezer)] as const] : []))), [liste])
   const sonDe = (v: VideoFil): Son | null =>
-    estSonDistant(v.sonId) ? sonsDeezer[v.sonId] ?? null : sonParId(v.sonId)
-  const sonEnAttente = (v: VideoFil) => estSonDistant(v.sonId) && !(v.sonId in sonsDeezer)
+    sonsJoints.get(v.id)
+      ?? (estSonDistant(v.sonId) ? sonsDeezer[v.sonId] ?? null : sonParId(v.sonId))
+  const sonEnAttente = (v: VideoFil) => !v.deezer && estSonDistant(v.sonId) && !(v.sonId in sonsDeezer)
 
   // Feuille du son ouverte depuis le disque d'une carte.
   const [feuilleSon, setFeuilleSon] = useState<{ son: Son | null; pseudo: string } | null>(null)
