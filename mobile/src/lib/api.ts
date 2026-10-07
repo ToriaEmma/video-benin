@@ -371,6 +371,19 @@ export const apiVideos = {
 // Interactions
 // ------------------------------------------------------------
 
+// Abonnement change (ou que ce soit : profil, liste, fil) : les fils
+// ouverts mettent a jour la pastille « + » des cartes de ce compte.
+type EcouteSuivi = (pseudo: string, suivi: boolean) => void
+const ecoutesSuivi = new Set<EcouteSuivi>()
+export function ecouterSuivis(f: EcouteSuivi) {
+  ecoutesSuivi.add(f)
+  return () => { ecoutesSuivi.delete(f) }
+}
+function annoncerSuivi<T extends { suivi: boolean }>(pseudo: string, r: T): T {
+  ecoutesSuivi.forEach(f => f(pseudo, r.suivi))
+  return r
+}
+
 export const apiInteractions = {
   aimer: (videoId: string) =>
     requete<{ aime: boolean; nbAime: number }>(`/videos/${videoId}/jaime`, { methode: 'POST' }),
@@ -389,10 +402,12 @@ export const apiInteractions = {
   jaimees: () => requete<VideoApi[]>('/jaimees'),
 
   suivre: (pseudo: string) =>
-    requete<{ suivi: boolean }>(`/profils/${pseudoUrl(pseudo)}/abonnement`, { methode: 'POST' }),
+    requete<{ suivi: boolean }>(`/profils/${pseudoUrl(pseudo)}/abonnement`, { methode: 'POST' })
+      .then(r => annoncerSuivi(pseudo, r)),
 
   nePlusSuivre: (pseudo: string) =>
-    requete<{ suivi: boolean }>(`/profils/${pseudoUrl(pseudo)}/abonnement`, { methode: 'DELETE' }),
+    requete<{ suivi: boolean }>(`/profils/${pseudoUrl(pseudo)}/abonnement`, { methode: 'DELETE' })
+      .then(r => annoncerSuivi(pseudo, r)),
 
   profil: (pseudo: string) => requete<ProfilDetaille>(`/profils/${pseudoUrl(pseudo)}`),
 

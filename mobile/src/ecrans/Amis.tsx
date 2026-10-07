@@ -30,7 +30,7 @@ import {
 } from '../lib/demo'
 import { useBascule } from '../lib/bascule'
 import { montrerAvis } from '../lib/avis'
-import { apiInteractions, apiVideos } from '../lib/api'
+import { apiInteractions, apiVideos, ecouterSuivis } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Commentaires from '../composants/Commentaires'
 import Decouvrir from './Decouvrir'
@@ -562,6 +562,9 @@ export default function Amis({ onVisiter, onOuvrirVideo }: {
       else prochains.delete(p)
       return prochains
     })
+  // Abonnement ou desabonnement fait ailleurs (profil visite, listes) :
+  // la pastille « + » revient ou disparait sans recharger le fil.
+  useEffect(() => ecouterSuivis(marquerSuivi), [])
 
   const [index, setIndex] = useState(0)
   // Nombre de changements de carte depuis l'ouverture : il sert de numero

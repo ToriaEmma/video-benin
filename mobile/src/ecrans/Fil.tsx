@@ -18,7 +18,7 @@ import FeuilleSon from '../composants/FeuilleSon'
 import { useAvatar } from '../lib/avatars'
 import { useMusiqueCalee } from '../lib/musiqueCalee'
 import { useBascule } from '../lib/bascule'
-import { apiInteractions, apiVideos } from '../lib/api'
+import { apiInteractions, apiVideos, ecouterSuivis } from '../lib/api'
 import { useAuth } from '../lib/auth'
 import Suggestions from '../composants/Suggestions'
 import Commentaires from '../composants/Commentaires'
@@ -595,6 +595,9 @@ export default function Fil({
       else prochains.delete(pseudo)
       return prochains
     })
+  // Abonnement ou desabonnement fait ailleurs (profil visite, listes) :
+  // la pastille « + » revient ou disparait sans recharger le fil.
+  useEffect(() => ecouterSuivis(marquerSuivi), [])
 
   // Les commentaires sont comptes ici : la feuille en ajoute et en retire,
   // et le compteur de la carte doit suivre sans recharger tout le fil.
