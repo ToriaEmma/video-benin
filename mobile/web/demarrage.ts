@@ -113,8 +113,16 @@ function installerSonAutomatique() {
   // d'autre (sinon il mettrait aussi la video en pause), on l'absorbe donc
   // tant que la bulle est affichee. Android et ordinateur acceptent deja
   // le son a ce moment-la.
+  // La musique (Web Audio, src/lib/piste.web.ts) attend elle aussi un
+  // toucher : elle le signale, et la bulle s'affiche de la meme facon.
+  const sonBloque = () => (window as unknown as { __sonBloque?: boolean }).__sonBloque === true
+  window.addEventListener('tocktick:son-bloque', montrerPastille)
+  window.addEventListener('tocktick:son-actif', () => {
+    if (!sourdine.size) { pastille?.remove(); pastille = null }
+  })
+
   const debutGeste = (e: Event) => {
-    if (!sourdine.size) { pastille?.remove(); pastille = null; return }
+    if (!sourdine.size && !sonBloque()) { pastille?.remove(); pastille = null; return }
     if (pastille && e.type !== 'keydown') {
       for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.addEventListener(t, absorber, { capture: true })
       absorber(e)
@@ -150,7 +158,7 @@ function afficherDiagnostic() {
     })
     panneau.textContent = [
       `TockTick diagnostic · ${navigator.userAgent.match(/(iPhone|Android|Macintosh|Windows)[^;)]*/)?.[0] ?? '?'}`,
-      `en sourdine auto : ${sourdine.size} · a relancer : ${aRelancer.size} · bulle : ${document.body.innerText.includes('activer le son') ? 'oui' : 'non'}`,
+      `son bloque : ${(window as unknown as { __sonBloque?: boolean }).__sonBloque ? "oui" : "non"} · en sourdine auto : ${sourdine.size} · a relancer : ${aRelancer.size} · bulle : ${document.body.innerText.includes('activer le son') ? 'oui' : 'non'}`,
       ...lignes,
       ...(erreurs.length ? ['erreurs :', ...erreurs.slice(-4)] : []),
     ].join('\n')

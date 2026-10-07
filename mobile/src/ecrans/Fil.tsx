@@ -16,7 +16,7 @@ import { estSonDistant, resoudreSon } from '../lib/resolutionSons'
 import { versSon, type PisteDeezer } from '../lib/deezer'
 import FeuilleSon from '../composants/FeuilleSon'
 import { useAvatar } from '../lib/avatars'
-import { useMusiqueCalee, useSonEnMemoire } from '../lib/musiqueCalee'
+import { useMusiqueCalee } from '../lib/musiqueCalee'
 import { useBascule } from '../lib/bascule'
 import { apiInteractions, apiVideos } from '../lib/api'
 import { useAuth } from '../lib/auth'
@@ -104,26 +104,17 @@ function Carte({
   // suivante l'est avant d'etre regardee, sa musique part donc tout de
   // suite et se recale sans silence. Un son original (piste d'une video,
   // lourde) reste lu en continu.
-  // La carte regardee des son montage lit son extrait directement (le
-  // telecharger aussi en memoire le ferait venir deux fois). Les cartes
-  // voisines le prechargent, 1,5 s apres leur montage : la video en cours
-  // garde ainsi tout le debit pour demarrer.
+  // Le lecteur de musique telecharge et decode l'extrait des sa creation.
+  // La carte regardee le prepare tout de suite ; les cartes voisines
+  // attendent 1,5 s, pour laisser tout le debit a la video en cours.
   const [regardeeAuMontage] = useState(actif)
-  const [precharger, setPrecharger] = useState(false)
+  const [preparer, setPreparer] = useState(regardeeAuMontage)
   useEffect(() => {
     if (regardeeAuMontage) return
-    const t = setTimeout(() => setPrecharger(true), 1500)
+    const t = setTimeout(() => setPreparer(true), 1500)
     return () => clearTimeout(t)
   }, [regardeeAuMontage])
-  const sonLocal = useSonEnMemoire(son && !son.original && precharger ? son.url : null)
-  // L'adresse est choisie quand la carte devient celle qu'on regarde (la
-  // memoire si elle est prete, sinon le flux) et gardee pendant toute la
-  // lecture : en changer en cours de route couperait la musique.
-  const urlMusique = useMemo(
-    () => (son ? sonLocal ?? son.url : null),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [son, actif],
-  )
+  const urlMusique = son && (preparer || actif) ? son.url : null
 
   // Musique jouee par-dessus la video, en boucle. Sur le web, une seule
   // platine pour tout le site : la carte qui joue la prend, les autres

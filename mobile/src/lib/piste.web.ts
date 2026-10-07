@@ -1,11 +1,18 @@
-// Version web : toute la musique passe par une seule platine (un element
-// Audio unique).
-// - Un seul son a la fois : la piste qui joue prend la platine, les autres
-//   n'y touchent plus. Une carte quittee ne peut donc pas continuer a jouer
-//   dans le dos de la video regardee.
-// - Les navigateurs mobiles (iPhone surtout) n'autorisent le son qu'aux
-//   lecteurs deja demarres par un toucher : la platine est debloquee au
-//   premier geste, et le reste ensuite pour tous les sons.
+// Version web du lecteur de musique.
+//
+// Un seul son a la fois : la piste qui joue prend la main, la precedente
+// s'arrete net. Une carte quittee ne peut donc pas continuer a jouer dans
+// le dos de la video regardee.
+//
+// Les musiques (extraits Deezer, sons en memoire) passent par Web Audio et
+// non par un element <audio> : sur telephone, une video en cours de lecture
+// peut faire taire un autre lecteur de la page (la musique ne s'entendait
+// alors qu'en quittant le site). Web Audio mixe le son independamment des
+// videos ; il est debloque au premier toucher, et la session audio est
+// reglee en « lecture » pour jouer meme telephone en mode silencieux.
+//
+// Les sons originaux (piste d'une autre video, fichiers lourds) restent lus
+// par un element <audio> unique, la « platine ».
 import { useEffect, useMemo, useState } from 'react'
 
 export type Piste = {
@@ -19,56 +26,177 @@ export type Piste = {
   regler: (debit: number) => void
 }
 
-// Silence de 0,1 s (WAV 8 kHz) : de quoi demarrer la platine pendant le
-// premier geste.
-function silence(): string {
-  const n = 800
-  const o = new Uint8Array(44 + n)
-  const v = new DataView(o.buffer)
-  const ecrire = (pos: number, t: string) => { for (let i = 0; i < t.length; i++) o[pos + i] = t.charCodeAt(i) }
-  ecrire(0, 'RIFF'); v.setUint32(4, 36 + n, true); ecrire(8, 'WAVEfmt ')
-  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true)
-  v.setUint32(24, 8000, true); v.setUint32(28, 8000, true); v.setUint16(32, 1, true); v.setUint16(34, 8, true)
-  ecrire(36, 'data'); v.setUint32(40, n, true); o.fill(128, 44)
-  let b = ''
-  o.forEach(x => { b += String.fromCharCode(x) })
-  return 'data:audio/wav;base64,' + btoa(b)
+// Lecteur qui a la main ; il la cede quand un autre commence a jouer.
+type Lecteur = { ceder: () => void }
+let proprietaire: Lecteur | null = null
+const prendreLaMain = (l: Lecteur) => {
+  if (proprietaire && proprietaire !== l) proprietaire.ceder()
+  proprietaire = l
 }
+
+// ------------------------------------------------------------
+// Web Audio
+// ------------------------------------------------------------
+
+const EVENEMENTS_GESTE = ['pointerdown', 'touchend', 'click', 'keydown']
+let contexte: AudioContext | null = null
+let sortie: GainNode | null = null
+
+// Indique a web/demarrage.ts qu'un son attend un toucher (bulle « activer
+// le son », toucher absorbe pour ne pas mettre la video en pause).
+const signalerBlocage = (bloque: boolean) => {
+  ;(window as unknown as { __sonBloque?: boolean }).__sonBloque = bloque
+  window.dispatchEvent(new Event(bloque ? 'tocktick:son-bloque' : 'tocktick:son-actif'))
+}
+
+function obtenirContexte(): AudioContext {
+  if (contexte) return contexte
+  const Ctx = window.AudioContext
+    || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  // iPhone (Safari 16.4+) : jouer comme un lecteur de musique, y compris
+  // interrupteur sur silencieux.
+  const session = (navigator as unknown as { audioSession?: { type: string } }).audioSession
+  if (session) { try { session.type = 'playback' } catch { /* Reglage refuse. */ } }
+  contexte = new Ctx()
+  sortie = contexte.createGain()
+  sortie.connect(contexte.destination)
+  // Chaque geste relance le contexte tant qu'il est suspendu (refus avant
+  // le premier toucher, ou mise en veille par le systeme).
+  const reveiller = () => {
+    const c = contexte!
+    if (c.state === 'running') return
+    c.resume().then(() => { if (c.state === 'running') signalerBlocage(false) }).catch(() => { /* Geste suivant. */ })
+  }
+  EVENEMENTS_GESTE.forEach(e => window.addEventListener(e, reveiller, true))
+  contexte.addEventListener('statechange', () => {
+    if (contexte!.state === 'running') signalerBlocage(false)
+  })
+  return contexte
+}
+
+// Extraits decodes, gardes pour les 4 derniers sons (un extrait de 30 s
+// decode pese ~10 Mo : on n'en garde pas davantage).
+const tampons = new Map<string, Promise<AudioBuffer>>()
+function tampon(url: string): Promise<AudioBuffer> {
+  const existant = tampons.get(url)
+  if (existant) {
+    tampons.delete(url); tampons.set(url, existant)
+    return existant
+  }
+  const c = obtenirContexte()
+  const promesse = fetch(url)
+    .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.arrayBuffer() })
+    // Forme a rappels : les anciens Safari ne rendent pas de promesse.
+    .then(donnees => new Promise<AudioBuffer>((ok, ko) => c.decodeAudioData(donnees, ok, ko)))
+  promesse.catch(() => tampons.delete(url))
+  tampons.set(url, promesse)
+  while (tampons.size > 4) tampons.delete(tampons.keys().next().value!)
+  return promesse
+}
+
+class PisteAudio implements Piste, Lecteur {
+  private tampon: AudioBuffer | null = null
+  private source: AudioBufferSourceNode | null = null
+  // Position (s) au dernier depart, et heure du contexte a ce moment-la.
+  private position = 0
+  private depart = 0
+  private debit = 1
+  private voulu = false
+
+  constructor(private readonly url: string) {
+    // Decodage lance des la creation : la piste est prete quand on la joue.
+    tampon(url).then(t => { this.tampon = t; if (this.voulu && proprietaire === this) this.demarrer() })
+      .catch(() => { /* Extrait illisible : la video reste sans musique. */ })
+  }
+
+  private get duree() { return this.tampon?.duration ?? 0 }
+
+  private maintenant(): number {
+    if (!this.source || !contexte) return this.position
+    const p = this.position + (contexte.currentTime - this.depart) * this.debit
+    return this.duree > 0 ? p % this.duree : p
+  }
+
+  private demarrer() {
+    if (!this.tampon || this.source || !contexte || !sortie) return
+    const s = contexte.createBufferSource()
+    s.buffer = this.tampon
+    s.loop = true
+    s.playbackRate.value = this.debit
+    s.connect(sortie)
+    s.start(0, this.duree > 0 ? this.position % this.duree : 0)
+    this.depart = contexte.currentTime
+    this.source = s
+  }
+
+  private arreterSource() {
+    if (!this.source) return
+    this.position = this.maintenant()
+    try { this.source.stop() } catch { /* Deja arretee. */ }
+    this.source.disconnect()
+    this.source = null
+  }
+
+  ceder() { this.voulu = false; this.arreterSource() }
+
+  get currentTime() { return this.maintenant() }
+  get playing() { return this.voulu && proprietaire === this }
+  get isLoaded() { return !!this.tampon }
+
+  play() {
+    const c = obtenirContexte()
+    prendreLaMain(this)
+    this.voulu = true
+    if (c.state !== 'running') {
+      signalerBlocage(true)
+      c.resume().then(() => { if (c.state === 'running') signalerBlocage(false) }).catch(() => { /* Attend un toucher. */ })
+    }
+    this.demarrer()
+  }
+
+  pause() {
+    this.voulu = false
+    this.arreterSource()
+  }
+
+  async seekTo(secondes: number) {
+    const relancer = !!this.source
+    this.arreterSource()
+    this.position = Math.max(0, secondes)
+    if (relancer) this.demarrer()
+  }
+
+  regler(debit: number) {
+    if (this.source && contexte) {
+      this.position = this.maintenant()
+      this.depart = contexte.currentTime
+      this.source.playbackRate.value = debit
+    }
+    this.debit = debit
+  }
+
+  liberer() {
+    if (proprietaire !== this) return
+    this.ceder()
+    proprietaire = null
+  }
+}
+
+// ------------------------------------------------------------
+// Platine (element <audio>), pour les sons originaux
+// ------------------------------------------------------------
 
 let platine: HTMLAudioElement | null = null
-let proprietaire: PisteWeb | null = null
-
 function obtenirPlatine(): HTMLAudioElement {
-  if (platine) return platine
-  platine = new Audio()
-  platine.preload = 'auto'
-  platine.loop = true
-  // Premiers gestes : la platine joue un instant de silence, ce qui
-  // l'autorise pour la suite. Les ecouteurs ne sont retires qu'apres un
-  // essai reussi : sur iPhone, le contact du doigt (pointerdown) est refuse,
-  // seule la fin du toucher (touchend, click) autorise le son.
-  const EVENEMENTS = ['pointerdown', 'touchend', 'click', 'keydown']
-  let debloquee = false
-  const debloquer = () => {
-    const p = platine!
-    // Une vraie piste occupe la platine : la sourdine automatique
-    // (web/demarrage.ts) se charge de lui rendre le son.
-    if (debloquee || proprietaire) return
-    p.src = silence()
-    p.play()
-      .then(() => {
-        debloquee = true
-        EVENEMENTS.forEach(e => window.removeEventListener(e, debloquer, true))
-        if (!proprietaire) p.pause()
-      })
-      .catch(() => { /* Refus : le geste suivant reessaiera. */ })
+  if (!platine) {
+    platine = new Audio()
+    platine.preload = 'auto'
+    platine.loop = true
   }
-  EVENEMENTS.forEach(e => window.addEventListener(e, debloquer, true))
   return platine
 }
-if (typeof window !== 'undefined') obtenirPlatine()
 
-class PisteWeb implements Piste {
+class PisteElement implements Piste, Lecteur {
   // Position voulue avant d'avoir la platine (ex. carte remise au debut).
   private depart = 0
   private debit = 1
@@ -77,12 +205,13 @@ class PisteWeb implements Piste {
 
   private get aLaMain() { return proprietaire === this }
 
-  // Prend la platine : la piste precedente s'arrete net.
+  ceder() { platine?.pause() }
+
   private prendre(): HTMLAudioElement | null {
     if (!this.url) return null
     const p = obtenirPlatine()
     if (!this.aLaMain) {
-      proprietaire = this
+      prendreLaMain(this)
       p.loop = true
       if (p.src !== this.url) { p.src = this.url; p.load() }
       p.playbackRate = this.debit
@@ -98,13 +227,10 @@ class PisteWeb implements Piste {
   get isLoaded() { return this.aLaMain && platine!.readyState >= 2 }
 
   play() {
-    const p = this.prendre()
-    p?.play().catch(() => { /* Refus du navigateur : rattrape au prochain geste. */ })
+    this.prendre()?.play().catch(() => { /* Refus : rattrape au prochain geste (web/demarrage.ts). */ })
   }
 
-  pause() {
-    if (this.aLaMain) platine!.pause()
-  }
+  pause() { if (this.aLaMain) platine!.pause() }
 
   async seekTo(secondes: number) {
     if (!this.aLaMain) { this.depart = secondes; return }
@@ -118,7 +244,6 @@ class PisteWeb implements Piste {
     if (this.aLaMain) platine!.playbackRate = debit
   }
 
-  // Ecran demonte : on rend la platine, silencieuse.
   liberer() {
     if (!this.aLaMain) return
     platine!.pause()
@@ -127,17 +252,39 @@ class PisteWeb implements Piste {
   }
 }
 
+// ------------------------------------------------------------
+
+// Musiques legeres (extrait Deezer, son deja en memoire) : Web Audio.
+// Piste d'une video (son original) : la platine.
+const decodable = (url: string) =>
+  url.startsWith('blob:') || url.startsWith('data:') || /dzcdn\.net|\.mp3(\?|$)/.test(url)
+
+type PisteLiberable = Piste & { liberer: () => void }
+
+const PISTE_MUETTE: PisteLiberable = {
+  currentTime: 0, playing: false, isLoaded: false,
+  play: () => {}, pause: () => {}, seekTo: async () => {}, regler: () => {}, liberer: () => {},
+}
+
 export function usePiste(url: string | null): Piste {
-  const piste = useMemo(() => new PisteWeb(url), [url])
+  const piste = useMemo<PisteLiberable>(
+    () => (!url ? PISTE_MUETTE : decodable(url) ? new PisteAudio(url) : new PisteElement(url)),
+    [url],
+  )
   useEffect(() => () => piste.liberer(), [piste])
   return piste
 }
 
-// Etat « en lecture », relu regulierement pour l'affichage.
+// Etat « en lecture » (son reellement audible), relu pour l'affichage.
 export function usePisteJoue(piste: Piste): boolean {
   const [joue, setJoue] = useState(false)
   useEffect(() => {
-    const t = setInterval(() => setJoue(piste.playing && (platine?.readyState ?? 0) >= 3), 150)
+    const t = setInterval(() => {
+      const audible = piste instanceof PisteAudio
+        ? piste.playing && piste.isLoaded && contexte?.state === 'running'
+        : piste.playing && (platine?.readyState ?? 0) >= 3
+      setJoue(audible)
+    }, 150)
     return () => clearInterval(t)
   }, [piste])
   return joue
