@@ -28,6 +28,7 @@ import {
   TAILLE_MAX_IMAGE,
   construireCle,
   urlPubliqueDe,
+  urlDiffusion,
   signerDepot,
   supprimerFichier,
   prefixeDepot,
@@ -94,7 +95,7 @@ const profilPrive = (p) => ({ ...profilPublic(p), telephone: p.telephone })
 // Mise en forme attendue par l'application mobile (mobile/src/lib/demo.ts).
 const videoPublique = (v) => ({
   id: v.id,
-  url: v.url,
+  url: urlDiffusion(v.url),
   legende: v.legende,
   vues: v.vues,
   pseudo: v.pseudo,
@@ -109,7 +110,7 @@ const videoPublique = (v) => ({
   departement: v.departement,
   sonId: v.son_id,
   // Image de couverture (aperçu des liens partages, grille du profil).
-  miniature: v.miniature_url ?? null,
+  miniature: urlDiffusion(v.miniature_url) ?? null,
   supprimeeLe: v.supprimee_le,
   auteurId: v.auteur_id,
 })

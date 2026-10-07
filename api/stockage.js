@@ -60,6 +60,16 @@ export const construireCle = (profilId, type) =>
 export const urlPubliqueDe = (cle) =>
   `${POINT_DACCES}/${SEAU}/${cle}`
 
+// Adresse de lecture : le meme fichier, servi par le CDN du site (cache
+// proche des spectateurs, au lieu du stockage en Allemagne, 5 a 20 fois
+// plus lent depuis le Benin). La base garde l'adresse du stockage, qui
+// sert aux controles de propriete et a la suppression.
+const CDN_MEDIAS = process.env.CDN_MEDIAS ?? 'https://tocktick-web.vercel.app/media'
+export const urlDiffusion = (url) => {
+  const base = urlPubliqueDe('')
+  return url && CDN_MEDIAS && url.startsWith(base) ? `${CDN_MEDIAS}/${url.slice(base.length)}` : url
+}
+
 // L'URL signee expire : elle ne sert qu'au televersement qui suit
 // immediatement, pas a un acces durable.
 // La taille annoncee est signee avec l'autorisation : le stockage refuse
