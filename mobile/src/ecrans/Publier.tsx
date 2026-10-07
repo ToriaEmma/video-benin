@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { compresserSiLourde } from '../lib/compression'
 import {
   View, Pressable, StyleSheet, ScrollView, SafeAreaView,
   ActivityIndicator, Alert
@@ -101,7 +102,13 @@ export default function Publier({
         Alert.alert('Vidéo trop longue', `Maximum ${DUREE_MAX} secondes.`)
         return
       }
-      setUri(a.uri)
+      // Video lourde : compressee avant l'envoi (le bouton suit l'avancement).
+      setEnvoi(true); setEtape('Compression… 0 %')
+      try {
+        setUri(await compresserSiLourde(a.uri, part => setEtape(`Compression… ${Math.round(part * 100)} %`)))
+      } catch {
+        setUri(a.uri)
+      } finally { setEnvoi(false); setEtape('') }
     }
   }
 

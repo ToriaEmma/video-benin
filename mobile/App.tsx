@@ -1,14 +1,14 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { View, Pressable, StyleSheet, StatusBar, ActivityIndicator, useWindowDimensions } from 'react-native'
 import { FournisseurColonne, useMiseEnPageLarge } from './src/lib/ecran'
 import MenuLateral, { type Destination } from './src/composants/MenuLateral'
 import { allerVideo } from './src/lib/navigationFil'
-import { Text, TextInput } from './src/composants/Texte'
+import { Text } from './src/composants/Texte'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { setAudioModeAsync } from 'expo-audio'
 import { FournisseurAuth, useAuth } from './src/lib/auth'
 import { FournisseurInvite, useExigerCompte } from './src/lib/invite'
-import { videoDuLien, oublierLien } from './src/lib/lien'
+import { videoDuLien, profilDuLien, oublierLien } from './src/lib/lien'
 import Connexion from './src/ecrans/Connexion'
 import Fil from './src/ecrans/Fil'
 import Publier from './src/ecrans/Publier'
@@ -29,7 +29,10 @@ function Application() {
   const exiger = useExigerCompte()
   // Video ouverte par un lien partage (…/v/<id>) : le fil la montre d'abord.
   const [videoPartagee] = useState(videoDuLien)
-  useEffect(() => { if (videoPartagee) oublierLien() }, [videoPartagee])
+  // Profil partage (…/@pseudo) : ouvert des que la session est connue.
+  const [profilPartage] = useState(profilDuLien)
+  const profilOuvert = useRef(false)
+  useEffect(() => { if (videoPartagee || profilPartage) oublierLien() }, [videoPartagee, profilPartage])
   // Vrai tant que l'etat enregistre n'a pas ete relu : afficher avant
   // montrerait les donnees d'origine, puis les ferait sauter.
   const [restauration, setRestauration] = useState(true)
@@ -93,6 +96,17 @@ function Application() {
     setProfilVisite(pseudo)
     setOnglet('profil')
   }
+
+  useEffect(() => {
+    if (!profilPartage || chargement || profilOuvert.current) return
+    profilOuvert.current = true
+    // Sans compte, le profil demande une connexion (le fil reste ouvert).
+    // Ouverture unique, declenchee par un lien externe une fois la session
+    // connue : l'etat ne peut pas etre calcule avant.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (exiger('voir ce profil')) visiter(profilPartage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profilPartage, chargement])
 
   // Profil et Messages passent la barre en theme clair, comme la regle
   // `:has(.page-profil)` de la version web.

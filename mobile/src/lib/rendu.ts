@@ -38,7 +38,7 @@ export async function rendreVideo(morceaux: Morceau[], _r: Reglages = {}): Promi
 }
 
 // Dimensions de la video (web) ; inconnues sur mobile.
-export async function dimensionsVideo(_uri: string): Promise<{ l: number; h: number } | null> {
+export async function dimensionsVideo(_uri: string): Promise<{ l: number; h: number; duree: number } | null> {
   return null
 }
 

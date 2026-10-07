@@ -152,12 +152,15 @@ function brancherVoix(ctx: AudioContext, source: AudioNode, vers: AudioNode, voi
 }
 
 // Dimensions naturelles d'une video, lues sans la jouer.
-export function dimensionsVideo(uri: string): Promise<{ l: number; h: number } | null> {
+export function dimensionsVideo(uri: string): Promise<{ l: number; h: number; duree: number } | null> {
   return new Promise(resoudre => {
     const v = document.createElement('video')
     v.preload = 'metadata'
     v.muted = true
-    v.onloadedmetadata = () => { resoudre(v.videoWidth ? { l: v.videoWidth, h: v.videoHeight } : null); v.removeAttribute('src'); v.load() }
+    v.onloadedmetadata = () => {
+      resoudre(v.videoWidth ? { l: v.videoWidth, h: v.videoHeight, duree: Number.isFinite(v.duration) ? v.duration : 0 } : null)
+      v.removeAttribute('src'); v.load()
+    }
     v.onerror = () => resoudre(null)
     v.src = uri
   })

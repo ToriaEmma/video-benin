@@ -60,11 +60,19 @@ export const urlPubliqueDe = (cle) =>
 // immediatement, pas a un acces durable.
 // La taille annoncee est signee avec l'autorisation : le stockage refuse
 // un fichier d'une autre taille, ce qui empeche de contourner TAILLE_MAX.
+//
+// Un fichier publie ne change jamais (chaque envoi a sa propre cle) : les
+// navigateurs peuvent le garder un an. Une video revue n'est donc pas
+// retelechargee, ce qui economise les donnees du visiteur et le transfert
+// de l'hebergement. Le client doit renvoyer exactement ENTETES_DEPOT.
+export const CACHE_FICHIER = 'public, max-age=31536000, immutable'
+export const entetesDepot = (type) => ({ 'Content-Type': type, 'Cache-Control': CACHE_FICHIER })
+
 export const signerDepot = (cle, type, taille) =>
   getSignedUrl(
     client,
-    new PutObjectCommand({ Bucket: SEAU, Key: cle, ContentType: type, ContentLength: taille }),
-    { expiresIn: 600, signableHeaders: new Set(['content-type', 'content-length']) },
+    new PutObjectCommand({ Bucket: SEAU, Key: cle, ContentType: type, ContentLength: taille, CacheControl: CACHE_FICHIER }),
+    { expiresIn: 600, signableHeaders: new Set(['content-type', 'content-length', 'cache-control']) },
   )
 
 // Dossier des fichiers d'un compte : une publication ne peut pointer que

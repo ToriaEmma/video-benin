@@ -11,6 +11,7 @@ import * as ImagePicker from 'expo-image-picker'
 import * as MediaLibrary from 'expo-media-library'
 import { usePiste } from '../lib/piste'
 import { assemblerVideos } from '../lib/assemblage'
+import { compresserSiLourde } from '../lib/compression'
 import { videoFixe, dessinerHabillage, chargerImage } from '../lib/rendu'
 import { televerser, apiBrouillons } from '../lib/api'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -390,7 +391,15 @@ export default function Camera({ onFermer, onChoisir, sonInitial }: {
       mediaTypes: ImagePicker.MediaTypeOptions.Videos,
       videoMaxDuration: 90, quality: 0.7,
     })
-    if (!r.canceled && r.assets[0]) onChoisir(r.assets[0].uri, son)
+    if (r.canceled || !r.assets[0]) return
+    // Video lourde (telephone recent) : compressee avant le montage.
+    setTravail('Compression de la vidéo… 0 %')
+    try {
+      const uri = await compresserSiLourde(r.assets[0].uri, part => setTravail(`Compression de la vidéo… ${Math.round(part * 100)} %`))
+      onChoisir(uri, son)
+    } catch {
+      onChoisir(r.assets[0].uri, son)
+    } finally { setTravail(null) }
   }
 
   const prendre = async () => {

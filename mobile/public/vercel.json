@@ -39,6 +39,10 @@
     {
       "source": "/v/:id",
       "destination": "/index.html"
+    },
+    {
+      "source": "/@:pseudo",
+      "destination": "/index.html"
     }
   ]
 }

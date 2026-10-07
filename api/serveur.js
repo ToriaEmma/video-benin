@@ -28,6 +28,7 @@ import {
   signerDepot,
   supprimerFichier,
   prefixeDepot,
+  entetesDepot,
 } from './stockage.js'
 import {
   Refus,
@@ -298,6 +299,8 @@ app.post('/televersements', exigerSession, route(async (req, res) => {
   const cle = construireCle(req.profilId, type)
   res.status(201).json({
     url: await signerDepot(cle, type, taille),
+    // En-tetes a envoyer tels quels avec le fichier (ils sont signes).
+    entetes: entetesDepot(type),
     cle,
     urlPublique: urlPubliqueDe(cle),
   })

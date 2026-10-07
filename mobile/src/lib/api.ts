@@ -203,6 +203,8 @@ export type AutorisationDepot = {
   url: string
   cle: string
   urlPublique: string
+  // En-tetes signes avec l'autorisation, a renvoyer tels quels.
+  entetes?: Record<string, string>
 }
 
 const TYPES_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm']
@@ -250,7 +252,8 @@ export async function televerser(
   await new Promise<void>((resoudre, rejeter) => {
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', depot.url)
-    xhr.setRequestHeader('Content-Type', type)
+    Object.entries(depot.entetes ?? { 'Content-Type': type })
+      .forEach(([nom, valeur]) => xhr.setRequestHeader(nom, valeur))
     xhr.upload.onprogress = e => {
       if (e.lengthComputable) surEtape?.('envoi', Math.min(99, Math.round(e.loaded / e.total * 100)))
     }

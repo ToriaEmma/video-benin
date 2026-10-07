@@ -747,16 +747,15 @@ export function SectionInformative({ info, onRetour }: {
 // 9. Partager le profil
 // ------------------------------------------------------------
 
-// Lien public du profil. Le domaine est celui de l'application, meme si
-// la page web n'existe pas encore : c'est l'adresse qui sera servie.
-export const lienProfil = (pseudo: string) =>
-  `https://videobenin.bj/@${pseudo}`
+// Lien public du profil : il ouvre le site sur ce profil (voir lib/lien).
+export { lienProfil } from '../lib/lien'
+import { lienProfil } from '../lib/lien'
 
 export async function partagerProfil(pseudo: string) {
   const lien = lienProfil(pseudo)
   try {
     await Share.share({
-      message: `Retrouve @${pseudo} sur TockTick\n${lien}`,
+      message: `Retrouve ${pseudo} sur TockTick\n${lien}`,
     })
   } catch { /* partage annule */ }
 }

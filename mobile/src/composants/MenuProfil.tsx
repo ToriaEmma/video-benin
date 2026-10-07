@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import {
   View, Pressable, StyleSheet, Modal, ScrollView, Animated, Easing,
 } from 'react-native'
@@ -8,15 +8,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Rect, Circle, Ellipse } from 'react-native-svg'
 import { Text } from './Texte'
 import { Chevron, Studio } from './Icones'
+import { useAuth } from '../lib/auth'
+import { CodeQR, TaMusique, CentreActivites, StudioCreateur } from './SectionsMenuProfil'
 
-// Pourquoi chaque section reste vide : aucune n'a de route cote serveur.
-// Le menu le dit section par section, plutot que d'annoncer une suite.
+// Seule section sans contenu : la lecture hors ligne demanderait de stocker
+// les videos sur l'appareil. Le menu le dit plutot que d'annoncer une suite.
 const RAISONS: Record<string, string> = {
-  'Centre des activités': 'TockTick ne tient pas encore d’historique d’activité : il n’y a rien à afficher ici.',
-  'Vidéos hors ligne': 'Le téléchargement des vidéos n’est pas encore en place : rien n’est gardé sur l’appareil.',
-  'Ton code QR': 'La génération de code QR n’est pas encore en place.',
-  'Ta musique': 'TockTick n’a pas encore de catalogue musical : aucun son ne peut être listé ici.',
-  'Studio créateur': 'Le studio créateur n’est pas encore en place. Tu peux déjà gérer tes publications depuis les paramètres.',
+  'Vidéos hors ligne': 'La lecture hors ligne n’est pas disponible : pour garder une vidéo, utilise « Télécharger » dans ses options.',
 }
 
 const GROUPES = [
@@ -76,6 +74,7 @@ export default function MenuProfil({ onFermer, onDeconnecter, onSolde, onParamet
   onParametres: () => void
 }) {
   const [selection, setSelection] = useState<string | null>(null)
+  const pseudo = useAuth().profil?.pseudo ?? ''
   const { width } = useWindowDimensions()
   const marges = useSafeAreaInsets()
 
@@ -90,7 +89,7 @@ export default function MenuProfil({ onFermer, onDeconnecter, onSolde, onParamet
 
   // `@keyframes menu-profil-entree` : le panneau glisse depuis la droite en
   // .25s. L'animation « slide » de Modal vient du bas, on anime donc nous-meme.
-  const glissement = useRef(new Animated.Value(largeur)).current
+  const [glissement] = useState(() => new Animated.Value(largeur))
   useEffect(() => {
     Animated.timing(glissement, {
       toValue: 0, duration: 250, easing: Easing.out(Easing.ease),
@@ -120,9 +119,13 @@ export default function MenuProfil({ onFermer, onDeconnecter, onSolde, onParamet
                 <Text style={s.deconnexion}>Se déconnecter</Text>
               </Pressable>
             ) : (
-              <Text style={s.indisponible}>
-                {RAISONS[selection] ?? 'Cette section n’est pas encore en place.'}
-              </Text>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {selection === 'Ton code QR' ? <CodeQR pseudo={pseudo} />
+                  : selection === 'Ta musique' ? <TaMusique />
+                  : selection === 'Centre des activités' ? <CentreActivites />
+                  : selection === 'Studio créateur' ? <StudioCreateur pseudo={pseudo} />
+                  : <Text style={s.indisponible}>{RAISONS[selection] ?? ''}</Text>}
+              </ScrollView>
             )}
           </> : (
             <ScrollView showsVerticalScrollIndicator={false}>

@@ -4,16 +4,16 @@
 // deviennent des styles React Native.
 // ============================================================
 
-import React, { useState } from 'react'
-import { View, StyleSheet, Pressable, ScrollView } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { View, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Path, Circle, Rect } from 'react-native-svg'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { Text } from '../composants/Texte'
-import { Chevron, ChevronDroit, Croix } from '../composants/Icones'
-import { etat, type Video } from '../lib/demo'
-
-type Ecran = 'menu' | 'corbeille' | 'visibilite' | 'commentaires' | 'reutilisation'
+import { Chevron, ChevronDroit } from '../composants/Icones'
+import type { Video } from '../lib/demo'
+import { apiVideos, type ModificationVideo } from '../lib/api'
+import { useAuth } from '../lib/auth'
 
 function Icone({ nom, taille = 24, couleur = '#111' }: {
   nom: string; taille?: number; couleur?: string
@@ -25,12 +25,6 @@ function Icone({ nom, taille = 24, couleur = '#111' }: {
   }
   return (
     <Svg {...t}>
-      {nom === 'corbeille' && <>
-        <Path d="M3.8 6.4h16.4" />
-        <Path d="M9.2 6.4V4.2A1.2 1.2 0 0 1 10.4 3h3.2a1.2 1.2 0 0 1 1.2 1.2v2.2" />
-        <Path d="M5.8 6.4 6.9 20a1.8 1.8 0 0 0 1.8 1.6h6.6a1.8 1.8 0 0 0 1.8-1.6l1.1-13.6" />
-        <Path d="M10.2 10.4v6.8M13.8 10.4v6.8" />
-      </>}
       {nom === 'oeil' && <>
         <Path d="M12 5.2c5 0 9 4.3 9 6.8s-4 6.8-9 6.8-9-4.3-9-6.8 4-6.8 9-6.8Z" fill={couleur} stroke="none" />
         <Circle cx="12" cy="12" r="2.8" fill="#fff" stroke="none" />
@@ -50,23 +44,9 @@ function Icone({ nom, taille = 24, couleur = '#111' }: {
         <Rect x="2.5" y="6" width="13.5" height="12" rx="2.5" />
         <Path d="m16 11 5.5-3.2v8.4L16 13v-2Z" />
       </>}
-      {nom === 'info' && <>
-        <Circle cx="12" cy="12" r="9" />
-        <Path d="M12 11v5.5" />
-        <Circle cx="12" cy="7.8" r="1" fill={couleur} stroke="none" />
-      </>}
-      {nom === 'reglages' && <>
-        <Path d="m10.2 2.6-.6 2.1-1.9.8-2.1-.6-1.8 2.8 1.4 1.7-.2 2.1-1.9 1 .9 3.2 2.3.3 1.3 1.6.1 2.3 3.2.9 1.4-1.8 2 .3 1.8 1.4 2.8-1.8-.6-2.3.9-1.8 1.8-.9v-3.3l-2.1-.6-.9-1.8.7-2.1-2.8-1.8-1.8 1.4-2-.2-1-1.9Z" />
-        <Circle cx="12" cy="12" r="4.6" />
-      </>}
       {nom === 'muet' && <>
         <Path d="M3 10.2v3.6a1 1 0 0 0 1 1h2.2L11 18.6V5.4L6.2 9.2H4a1 1 0 0 0-1 1Z" fill={couleur} stroke="none" />
         <Path d="m15 9.5 5 5m0-5-5 5" />
-      </>}
-      {nom === 'copies' && <>
-        <Rect x="7" y="3.5" width="13.5" height="13.5" rx="2.5" />
-        <Path d="M11.6 8.2v4.2l3.4-2.1-3.4-2.1Z" fill={couleur} stroke="none" />
-        <Path d="M4 7v11.5a2 2 0 0 0 2 2h11" />
       </>}
     </Svg>
   )
@@ -104,30 +84,93 @@ const Rond = ({ choisi }: { choisi: boolean }) => (
   </View>
 )
 
-export default function GererPublications({ onRetour }: { onRetour: () => void }) {
-  const [ecran, setEcran] = useState<Ecran>('menu')
-  const [filtre, setFiltre] = useState<'tout' | 'monde' | 'amis' | 'moi'>('tout')
-  const [banniere, setBanniere] = useState(true)
-  const [choix, setChoix] = useState<string | null>(null)
+type Reglage = 'visibilite' | 'commentaires' | 'reutilisation'
 
-  const mesVideos = etat.videos
+// Actions proposees pour la selection, par ecran : chacune est envoyee a
+// l'API pour toutes les publications cochees.
+const ACTIONS: Record<Reglage, { nom: string; valeurs: ModificationVideo; local: Partial<Video> }[]> = {
+  visibilite: [
+    { nom: 'Tout le monde', valeurs: { visibilite: 'monde' }, local: { visibilite: 'monde' } },
+    { nom: 'Ami(e)s', valeurs: { visibilite: 'amis' }, local: { visibilite: 'amis' } },
+    { nom: 'Toi uniquement', valeurs: { visibilite: 'moi' }, local: { visibilite: 'moi' } },
+  ],
+  commentaires: [
+    { nom: 'Autoriser', valeurs: { commentaires_autorises: true }, local: { commentairesAutorises: true } },
+    { nom: 'Désactiver', valeurs: { commentaires_autorises: false }, local: { commentairesAutorises: false } },
+  ],
+  reutilisation: [
+    { nom: 'Autoriser', valeurs: { reutilisation_autorisee: true }, local: { reutilisationAutorisee: true } },
+    { nom: 'Interdire', valeurs: { reutilisation_autorisee: false }, local: { reutilisationAutorisee: false } },
+  ],
+}
+
+const TITRES: Record<Reglage, string> = {
+  visibilite: 'Gérer la visibilité des publications',
+  commentaires: 'Gérer les autorisations de commentaire',
+  reutilisation: "Gérer l'autorisation de réutilisation",
+}
+
+const LIBELLE_VISIBILITE = { monde: 'Tout le monde', amis: 'Ami(e)s', moi: 'Toi uniquement' }
+
+const dateLisible = (iso?: string) =>
+  iso ? new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }) : ''
+
+export default function GererPublications({ onRetour }: { onRetour: () => void }) {
+  const { profil } = useAuth()
+  const [ecran, setEcran] = useState<'menu' | Reglage>('menu')
+  const [filtre, setFiltre] = useState<'tout' | 'monde' | 'amis' | 'moi'>('tout')
+  // Publications cochees, auxquelles s'applique l'action choisie en bas.
+  const [choix, setChoix] = useState<Set<string>>(() => new Set())
+  const [videos, setVideos] = useState<Video[] | null>(null)
+  const [message, setMessage] = useState('')
+  const [occupe, setOccupe] = useState(false)
+
+  // Les vraies publications du compte, toutes visibilites confondues.
+  useEffect(() => {
+    if (!profil) return
+    let valable = true
+    apiVideos.duProfil(profil.pseudo, { limite: 50 })
+      .then(v => { if (valable) setVideos(v) })
+      .catch((e: Error) => { if (valable) { setVideos([]); setMessage(e.message) } })
+    return () => { valable = false }
+  }, [profil])
+
+  const ouvrir = (r: Reglage) => { setChoix(new Set()); setFiltre('tout'); setEcran(r) }
+  const cocher = (id: string) => setChoix(c => {
+    const n = new Set(c)
+    if (n.has(id)) n.delete(id); else n.add(id)
+    return n
+  })
+
+  const appliquer = async (action: typeof ACTIONS[Reglage][number]) => {
+    if (!choix.size || occupe) return
+    setOccupe(true)
+    const ids = [...choix]
+    const resultats = await Promise.allSettled(ids.map(id => apiVideos.modifier(id, action.valeurs)))
+    const reussis = ids.filter((_, i) => resultats[i].status === 'fulfilled')
+    setVideos(l => l && l.map(v => (reussis.includes(v.id) ? { ...v, ...action.local } : v)))
+    setChoix(new Set())
+    setOccupe(false)
+    setMessage(reussis.length === ids.length
+      ? `${reussis.length} publication${reussis.length > 1 ? 's' : ''} mise${reussis.length > 1 ? 's' : ''} à jour.`
+      : `${ids.length - reussis.length} publication(s) n'ont pas pu être modifiées.`)
+    setTimeout(() => setMessage(''), 2600)
+  }
 
   // ---------------- Menu ----------------
   if (ecran === 'menu') {
-    const entrees = [
-      { cle: 'corbeille' as const, nom: 'Suppression récente', icone: 'corbeille' },
-      { cle: 'visibilite' as const, nom: 'Gérer la visibilité des publications', icone: 'oeil' },
-      { cle: 'commentaires' as const, nom: 'Gérer les autorisations de commentaire', icone: 'bulle' },
-      { cle: 'reutilisation' as const, nom: "Gérer l'autorisation de réutilisation des publications", icone: 'reutilisation' },
+    const entrees: { cle: Reglage; nom: string; icone: string }[] = [
+      { cle: 'visibilite', nom: 'Gérer la visibilité des publications', icone: 'oeil' },
+      { cle: 'commentaires', nom: 'Gérer les autorisations de commentaire', icone: 'bulle' },
+      { cle: 'reutilisation', nom: "Gérer l'autorisation de réutilisation des publications", icone: 'reutilisation' },
     ]
     return (
       <SafeAreaView style={s.page} edges={['top']}>
-        <Barre titre="Gérer les publications" onRetour={onRetour}
-          action={<Pressable hitSlop={8}><Icone nom="reglages" taille={26} /></Pressable>} />
+        <Barre titre="Gérer les publications" onRetour={onRetour} />
         <ScrollView contentContainerStyle={s.corps}>
           <View style={s.carte}>
             {entrees.map(e => (
-              <Pressable style={s.ligne} key={e.cle} onPress={() => setEcran(e.cle)}>
+              <Pressable style={s.ligne} key={e.cle} onPress={() => ouvrir(e.cle)} accessibilityRole="button">
                 <Icone nom={e.icone} taille={23} />
                 <Text style={s.nom}>{e.nom}</Text>
                 <ChevronDroit taille={17} couleur="#c4c4c6" />
@@ -139,162 +182,85 @@ export default function GererPublications({ onRetour }: { onRetour: () => void }
     )
   }
 
-  // ---------------- Suppression recente ----------------
-  if (ecran === 'corbeille') {
-    return (
-      <SafeAreaView style={s.page} edges={['top']}>
-        <Barre titre="Suppression récente" onRetour={() => setEcran('menu')}
-          action={<Pressable hitSlop={8}><Icone nom="info" taille={20} /></Pressable>} />
-        <ScrollView contentContainerStyle={[s.corps, s.centre]}>
-          {etat.corbeille.length === 0 ? (
-            <View style={s.vide}>
-              <Icone nom="camera-vide" taille={72} couleur="#aaa" />
-              <Text style={s.videTitre}>Aucune publication supprimée récemment</Text>
-              <Text style={s.videTexte}>
-                Les publications que tu as supprimées au cours des 30 derniers
-                jours apparaîtront ici.
-              </Text>
-            </View>
-          ) : (
-            <View style={s.liste}>
-              {etat.corbeille.map(v => (
-                <View style={s.item} key={v.id}>
-                  <Vignette v={v} />
-                  <View style={s.texte}>
-                    <Text style={s.date}>{v.publieeLe}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    )
-  }
+  const liste = (videos ?? []).filter(v => ecran !== 'visibilite' || filtre === 'tout' || (v.visibilite ?? 'monde') === filtre)
+  const filtres = [
+    ['tout', 'Tout'], ['monde', 'Tout le monde'],
+    ['amis', 'Ami(e)s'], ['moi', 'Toi uniquement'],
+  ] as const
 
-  // ---------------- Visibilite ----------------
-  if (ecran === 'visibilite') {
-    const libelle = { monde: 'Tout le monde', amis: 'Ami(e)s', moi: 'Toi uniquement' }
-    const liste = filtre === 'tout' ? mesVideos : mesVideos.filter(v => v.visibilite === filtre)
-    const filtres = [
-      ['tout', 'Tout'], ['monde', 'Tout le monde'],
-      ['amis', 'Ami(e)s'], ['moi', 'Toi uniquement'],
-    ] as const
+  return (
+    <SafeAreaView style={s.page} edges={['top']}>
+      <Barre titre={TITRES[ecran]} onRetour={() => setEcran('menu')} />
 
-    return (
-      <SafeAreaView style={s.page} edges={['top']}>
-        <Barre titre="Gérer la visibilité des publications"
-          onRetour={() => setEcran('menu')} />
-
-        {banniere && (
-          <View style={s.banniere}>
-            <Text style={s.banniereTexte}>
-              Cette fonctionnalité est en cours de test bêta et ne prend en
-              charge que certaines publications.{' '}
-              <Text style={s.lien}>En savoir plus</Text>
-            </Text>
-            <Pressable hitSlop={8} onPress={() => setBanniere(false)}>
-              <Croix taille={18} couleur="#888" />
-            </Pressable>
-          </View>
-        )}
-
+      {ecran === 'visibilite' && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}
           style={s.bandeFiltres} contentContainerStyle={s.filtres}>
           {filtres.map(([cle, nom]) => (
             <Pressable key={cle} onPress={() => setFiltre(cle)}
               style={[s.filtre, filtre === cle && s.filtreActif]}>
-              <Text style={[s.filtreTexte, filtre === cle && s.filtreTexteActif]}>
-                {nom}
-              </Text>
+              <Text style={[s.filtreTexte, filtre === cle && s.filtreTexteActif]}>{nom}</Text>
             </Pressable>
           ))}
         </ScrollView>
+      )}
 
-        <ScrollView contentContainerStyle={s.corps}>
+      <ScrollView contentContainerStyle={s.corps}>
+        {videos === null ? (
+          <ActivityIndicator style={s.attente} color="#111" />
+        ) : liste.length === 0 ? (
+          <View style={[s.vide, s.attente]}>
+            <Icone nom="camera-vide" taille={64} couleur="#aaa" />
+            <Text style={s.videTitre}>Aucune publication</Text>
+            <Text style={s.videTexte}>Les vidéos que tu publies apparaîtront ici.</Text>
+          </View>
+        ) : (
           <View style={s.liste}>
             {liste.map(v => (
-              <Pressable style={s.item} key={v.id} onPress={() => setChoix(v.id)}>
+              <Pressable style={s.item} key={v.id} onPress={() => cocher(v.id)}
+                accessibilityRole="checkbox" accessibilityState={{ checked: choix.has(v.id) }}>
                 <Vignette v={v} />
                 <View style={s.texte}>
-                  {!!v.legende && (
-                    <Text style={s.legende} numberOfLines={2}>{v.legende}</Text>
+                  {!!v.legende && <Text style={s.legende} numberOfLines={2}>{v.legende}</Text>}
+                  {ecran === 'visibilite' && (
+                    <Text style={s.meta}>{LIBELLE_VISIBILITE[v.visibilite ?? 'monde']} · {dateLisible(v.publieeLe)}</Text>
                   )}
-                  <Text style={s.meta}>
-                    {libelle[v.visibilite ?? 'monde']} · {v.publieeLe}
-                  </Text>
+                  {ecran === 'commentaires' && (
+                    <View style={s.metaIcone}>
+                      {v.commentairesAutorises === false ? <>
+                        <Icone nom="muet" taille={17} couleur="#888" />
+                        <Text style={s.meta}>Commentaires désactivés</Text>
+                      </> : <>
+                        <Icone nom="bulle" taille={17} couleur="#888" />
+                        <Text style={s.meta}>{v.nbCommentaires ?? 0} · autorisés</Text>
+                      </>}
+                    </View>
+                  )}
+                  {ecran === 'reutilisation' && (
+                    <Text style={s.meta}>
+                      {v.reutilisationAutorisee === false ? 'Réutilisation interdite' : 'Réutilisation autorisée'} · {dateLisible(v.publieeLe)}
+                    </Text>
+                  )}
                 </View>
-                <Rond choisi={choix === v.id} />
+                <Rond choisi={choix.has(v.id)} />
               </Pressable>
             ))}
           </View>
-        </ScrollView>
-      </SafeAreaView>
-    )
-  }
-
-  // ---------------- Commentaires ----------------
-  if (ecran === 'commentaires') {
-    return (
-      <SafeAreaView style={s.page} edges={['top']}>
-        <Barre titre="Gérer les autorisations de comm…"
-          onRetour={() => setEcran('menu')} />
-        <ScrollView contentContainerStyle={s.corps}>
-          <View style={s.liste}>
-            {mesVideos.map(v => (
-              <Pressable style={s.item} key={v.id} onPress={() => setChoix(v.id)}>
-                <Vignette v={v} />
-                <View style={s.texte}>
-                  {!!v.legende && (
-                    <Text style={s.legende} numberOfLines={2}>{v.legende}</Text>
-                  )}
-                  <Text style={s.date}>{v.publieeLe}</Text>
-                  <View style={s.metaIcone}>
-                    {v.commentairesAutorises === false ? <>
-                      <Icone nom="muet" taille={17} couleur="#888" />
-                      <Text style={s.meta}>Commentaires non autorisés</Text>
-                    </> : <>
-                      <Icone nom="bulle" taille={17} couleur="#888" />
-                      <Text style={s.meta}>{v.nbCommentaires ?? 0}</Text>
-                    </>}
-                  </View>
-                </View>
-                <Rond choisi={choix === v.id} />
-              </Pressable>
-            ))}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    )
-  }
-
-  // ---------------- Reutilisation ----------------
-  return (
-    <SafeAreaView style={s.page} edges={['top']}>
-      <Barre titre="Gérer l'autorisation de réutilisati…"
-        onRetour={() => setEcran('menu')} />
-      <ScrollView contentContainerStyle={s.corps}>
-        <View style={s.liste}>
-          {mesVideos.map(v => (
-            <Pressable style={s.item} key={v.id} onPress={() => setChoix(v.id)}>
-              <Vignette v={v} />
-              <View style={s.texte}>
-                {!!v.legende && (
-                  <Text style={s.legende} numberOfLines={2}>{v.legende}</Text>
-                )}
-                <View style={s.metaIcone}>
-                  <Icone nom="copies" taille={17} couleur="#888" />
-                  <Text style={s.meta}>1 publication · {v.publieeLe}</Text>
-                </View>
-                {v.reutilisationAutorisee === false && (
-                  <Text style={s.etiquette}>Réutilisation interdite</Text>
-                )}
-              </View>
-              <Rond choisi={choix === v.id} />
-            </Pressable>
-          ))}
-        </View>
+        )}
       </ScrollView>
+
+      {!!message && <Text style={s.message}>{message}</Text>}
+      {choix.size > 0 && (
+        <View style={s.actions}>
+          <Text style={s.actionsTitre}>{choix.size} sélectionnée{choix.size > 1 ? 's' : ''}</Text>
+          <View style={s.actionsBoutons}>
+            {ACTIONS[ecran].map(a => (
+              <Pressable key={a.nom} style={s.action} onPress={() => appliquer(a)} disabled={occupe} accessibilityRole="button">
+                <Text style={s.actionTexte}>{a.nom}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   )
 }
@@ -343,6 +309,15 @@ const s = StyleSheet.create({
   rondChoisi: { backgroundColor: '#ff2856', borderColor: '#ff2856' },
   rondCoeur: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
 
+  attente: { marginTop: 60 },
+  message: { textAlign: 'center', fontSize: 13.5, color: '#111', paddingVertical: 8 },
+  actions: { backgroundColor: '#fff', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#ddd',
+    paddingHorizontal: 16, paddingTop: 12, paddingBottom: 18, gap: 10 },
+  actionsTitre: { fontSize: 13.5, color: '#666' },
+  actionsBoutons: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  action: { flexGrow: 1, minHeight: 42, borderRadius: 8, backgroundColor: '#111',
+    alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12 },
+  actionTexte: { color: '#fff', fontSize: 14.5, fontWeight: '600' },
   banniere: { flexDirection: 'row', alignItems: 'flex-start', gap: 10,
     backgroundColor: '#ececec', borderRadius: 10, marginHorizontal: 12,
     padding: 13 },

@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
-  View, Pressable, StyleSheet, ScrollView, SafeAreaView, Modal,
+  View, Pressable, StyleSheet, ScrollView, SafeAreaView,
 } from 'react-native'
-import { useCadreFeuille } from '../lib/ecran'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Text } from '../composants/Texte'
 import { Chevron, ChevronDroit, Maillon } from '../composants/Icones'
 import IconeParametre from '../composants/IconesParametres'
@@ -194,14 +192,9 @@ const SECTIONS: {
   }
 ]
 
-// Drapeau de premiere visite, sous la meme cle que la version web.
-const CLE_ACCUEIL = 'parametres-reutilisation-vu'
-
 export default function Parametres({ onRetour, pseudo }: {
   onRetour: () => void; pseudo: string
 }) {
-  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
-  const cadre = useCadreFeuille()
   const { deconnecter, profil } = useAuth()
   const [selection, setSelection] = useState<string | null>(null)
   // Panneau « Changer de compte » et feuille « Partager le profil ».
@@ -211,25 +204,6 @@ export default function Parametres({ onRetour, pseudo }: {
   // apres une bascule faite sur place.
   const [, setTour] = useState(0)
   const rafraichir = () => setTour(n => n + 1)
-  // Le panneau de reutilisation n'apparait qu'a la toute premiere visite,
-  // comme sur la reference. Le choix est conserve d'une session a l'autre.
-  const [accueil, setAccueil] = useState(false)
-  const [choix, setChoix] = useState<'oui' | 'non' | null>(null)
-
-  useEffect(() => {
-    let vivant = true
-    AsyncStorage.getItem(CLE_ACCUEIL)
-      .then(vu => { if (vivant && !vu) setAccueil(true) })
-      .catch(() => { /* stockage indisponible : on n'insiste pas */ })
-    return () => { vivant = false }
-  }, [])
-
-  const fermerAccueil = () => {
-    AsyncStorage.setItem(CLE_ACCUEIL, '1')
-      .catch(() => { /* stockage indisponible */ })
-    setAccueil(false)
-  }
-
   const fermer = () => setSelection(null)
 
   // Les trois sections portees depuis la version web.
@@ -354,51 +328,11 @@ export default function Parametres({ onRetour, pseudo }: {
             <Text style={s.partageBoutonTexte}>Copier le lien du profil</Text>
           </Pressable>
           <Text style={s.partageNote}>
-            Le lien ouvre ton profil dans un navigateur. La page web arrive
-            avec la prochaine version du site.
+            Le lien ouvre ton profil sur le site TockTick, depuis n’importe quel navigateur.
           </Text>
         </View>
       </Feuille>
 
-      <Modal visible={accueil} transparent animationType="slide"
-        statusBarTranslucent onRequestClose={() => { /* choix obligatoire */ }}>
-        <View style={s.voile}>
-          <View style={[s.feuille, cadre]}>
-            <Text style={s.feuilleTitre}>Paramètre de réutilisation du contenu</Text>
-            <Text style={s.feuilleTexte}>
-              Les paramètres d&apos;autorisation permettant de choisir qui peut
-              réaliser des Duos ou des Collages avec ta publication, créer des
-              stickers avec celle-ci et l&apos;ajouter, ainsi que tes
-              commentaires, en Story sont maintenant regroupés sous un même
-              paramètre de réutilisation du contenu. Ce paramètre est
-              actuellement défini sur <Text style={s.feuilleGras}>Tout le monde</Text>.
-            </Text>
-            <Text style={s.feuilleTexte}>
-              Les paramètres sont différents pour 1 de tes publications. Pour ces
-              publications, tu peux autoriser les utilisateurs à réutiliser ton
-              contenu ou non.
-            </Text>
-            <Text style={s.feuilleSousTitre}>
-              Autoriser la réutilisation de ces{'\n'}1 publications
-            </Text>
-
-            <View style={s.choix}>
-              {(['oui', 'non'] as const).map((valeur, i) => (
-                <Pressable key={valeur} style={[s.choixLigne, i > 0 && s.choixSuivant]}
-                  onPress={() => setChoix(valeur)}>
-                  <Text style={s.choixTexte}>{valeur === 'oui' ? 'Oui' : 'Non'}</Text>
-                  <View style={choix === valeur ? s.rondChoisi : s.rondVide} />
-                </Pressable>
-              ))}
-            </View>
-
-            <Pressable style={[s.confirmer, !choix && s.confirmerInactif]}
-              disabled={!choix} onPress={fermerAccueil}>
-              <Text style={s.confirmerTexte}>Confirmer</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   )
 }
