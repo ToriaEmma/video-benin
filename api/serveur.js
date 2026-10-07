@@ -23,7 +23,9 @@ import {
 import {
   stockageConfigure,
   TYPES_VIDEO,
+  TYPES_IMAGE,
   TAILLE_MAX,
+  TAILLE_MAX_IMAGE,
   construireCle,
   urlPubliqueDe,
   signerDepot,
@@ -106,6 +108,8 @@ const videoPublique = (v) => ({
   publieeLe: v.publiee_le,
   departement: v.departement,
   sonId: v.son_id,
+  // Image de couverture (aperçu des liens partages, grille du profil).
+  miniature: v.miniature_url ?? null,
   supprimeeLe: v.supprimee_le,
   auteurId: v.auteur_id,
 })
@@ -346,13 +350,17 @@ app.patch('/moi', exigerSession, route(async (req, res) => {
 
 app.post('/televersements', exigerSession, route(async (req, res) => {
   const type = texteRequis(req.body?.type, 'type')
-  if (!TYPES_VIDEO.includes(type)) {
+  const image = TYPES_IMAGE.includes(type)
+  if (!TYPES_VIDEO.includes(type) && !image) {
     throw new Refus(400, 'Format non accepté : MP4, MOV ou WebM uniquement')
   }
 
   const taille = Number(req.body?.taille)
   if (!Number.isSafeInteger(taille) || taille <= 0) {
     throw new Refus(400, 'La taille du fichier est requise')
+  }
+  if (image && taille > TAILLE_MAX_IMAGE) {
+    throw new Refus(413, 'Miniature trop lourde (500 Ko maximum)')
   }
   if (taille > TAILLE_MAX) {
     const mo = Math.round(taille / 1024 / 1024)
@@ -552,7 +560,7 @@ app.post('/videos', exigerSession, route(async (req, res) => {
   const [video] = await sql`
     INSERT INTO videos (
       auteur_id, url, legende, departement, visibilite,
-      commentaires_autorises, reutilisation_autorisee, son_id
+      commentaires_autorises, reutilisation_autorisee, son_id, miniature_url
     ) VALUES (
       ${req.profilId},
       ${url},
@@ -561,7 +569,8 @@ app.post('/videos', exigerSession, route(async (req, res) => {
       ${visibilite},
       ${booleenOuDefaut(req.body?.commentaires_autorises, true)},
       ${booleenOuDefaut(req.body?.reutilisation_autorisee, true)},
-      ${sonValide(req.body?.son_id)}
+      ${sonValide(req.body?.son_id)},
+      ${req.body?.miniature_url ? urlDeLAuteur(req.body.miniature_url, req.profilId) : null}
     )
     RETURNING id
   `
@@ -590,6 +599,7 @@ app.patch('/videos/:id', exigerSession, route(async (req, res) => {
   await videoDeLAuteur(id, req.profilId)
 
   const { legende, visibilite } = req.body || {}
+  const miniature = req.body?.miniature_url ? urlDeLAuteur(req.body.miniature_url, req.profilId) : null
   if (visibilite !== undefined && !VISIBILITES.includes(visibilite)) {
     throw new Refus(400, 'Visibilité inconnue : monde, amis ou moi')
   }
@@ -597,6 +607,7 @@ app.patch('/videos/:id', exigerSession, route(async (req, res) => {
   await sql`
     UPDATE videos SET
       legende     = COALESCE(${legende === undefined ? null : texteFacultatif(legende, 'legende', LIMITES.legende)}, legende),
+      miniature_url = COALESCE(${miniature}, miniature_url),
       visibilite  = COALESCE(${visibilite ?? null}, visibilite),
       commentaires_autorises = COALESCE(
         ${typeof req.body?.commentaires_autorises === 'boolean'
@@ -619,8 +630,11 @@ app.patch('/videos/:id', exigerSession, route(async (req, res) => {
 app.delete('/videos/:id', exigerSession, route(async (req, res) => {
   const id = identifiant(req.params.id, 'Identifiant de vidéo')
   await videoDeLAuteur(id, req.profilId)
-  const [supprimee] = await sql`DELETE FROM videos WHERE id = ${id} RETURNING url`
-  if (supprimee) await effacerFichierOrphelin(supprimee.url)
+  const [supprimee] = await sql`DELETE FROM videos WHERE id = ${id} RETURNING url, miniature_url`
+  if (supprimee) {
+    await effacerFichierOrphelin(supprimee.url)
+    if (supprimee.miniature_url) await supprimerFichier(supprimee.miniature_url).catch(() => {})
+  }
   res.json({ ok: true })
 }))
 

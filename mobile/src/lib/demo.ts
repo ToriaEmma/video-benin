@@ -20,6 +20,8 @@ export type Video = {
   // Son du catalogue joint a la publication, resolu par le fil. Absent
   // des listes de demonstration, qui n'en portent pas.
   sonId?: string | null
+  // Image de couverture (videos de l'API publiees avec une miniature).
+  miniature?: string | null
 }
 
 // Video mise de cote avant publication. Le poids sert a l'etiquette de la

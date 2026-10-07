@@ -8,14 +8,15 @@ import { Text, TextInput } from '../composants/Texte'
 import * as ImagePicker from 'expo-image-picker'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { File } from 'expo-file-system'
-import Couverture from './Couverture'
+import Couverture, { type ChoixCouverture } from './Couverture'
+import { fabriquerMiniature } from '../lib/miniature'
 import {
   FeuilleLien, FeuilleAudience, FeuilleOptions, FeuillePartage,
   FeuilleDepartement,
   AUDIENCES, OPTIONS_PAR_DEFAUT,
   type Audience, type Options, type Application, type Departement,
 } from './FeuillesPublication'
-import { apiBrouillons, apiVideos, televerser, type NouvelleVideo } from '../lib/api'
+import { apiBrouillons, apiVideos, televerser, televerserImage, type NouvelleVideo } from '../lib/api'
 import ChoixSon from './ChoixSon'
 import { dureeLisible, type Son } from '../lib/sons'
 import {
@@ -54,6 +55,9 @@ export default function Publier({
   // sur un reseau mobile, et un bouton muet laisse croire a un blocage.
   const [etape, setEtape] = useState('')
   const [couverture, setCouverture] = useState(false)
+  // Couverture choisie (« Modifier la couverture ») : elle devient la
+  // miniature de la video. Sans choix, une image du debut de la video.
+  const [choixCouverture, setChoixCouverture] = useState<ChoixCouverture | null>(null)
   // Feuille ouverte depuis la liste d'options, s'il y en a une.
   const [feuille, setFeuille] =
     useState<'lien' | 'audience' | 'departement' | 'options' | 'partage' | null>(null)
@@ -122,9 +126,18 @@ export default function Publier({
         setEtape(e === 'preparation' ? 'Préparation…'
           : `Envoi de la vidéo…${pct != null ? ` ${pct} %` : ''}`))
 
+      // Miniature : apercu des liens partages et grille du profil. Son echec
+      // ne bloque pas la publication.
+      let miniature: string | null = null
+      try {
+        const image = await fabriquerMiniature(uri, choixCouverture)
+        if (image) miniature = await televerserImage(image)
+      } catch { /* Publication sans miniature. */ }
+
       setEtape('Publication…')
       await apiVideos.creer({
         url,
+        miniature_url: miniature,
         legende: legende.trim(),
         departement,
         visibilite: VISIBILITES[audience],
@@ -203,7 +216,7 @@ export default function Publier({
   if (couverture && uri) return (
     <Couverture uri={uri}
       onAnnuler={() => setCouverture(false)}
-      onEnregistrer={() => setCouverture(false)} />
+      onEnregistrer={choix => { setChoixCouverture(choix); setCouverture(false) }} />
   )
 
   // --- Ecran de publication, quand une video est prete ---

@@ -169,3 +169,7 @@ CREATE TABLE IF NOT EXISTS sons_favoris (
 -- ---------- Recuperation de compte ----------
 -- Empreinte du code de recuperation (mot de passe oublie, sans SMS).
 ALTER TABLE profils ADD COLUMN IF NOT EXISTS code_recuperation text;
+
+-- ---------- Miniatures ----------
+-- Image de couverture d'une video (apercu des liens, grille du profil).
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS miniature_url text;

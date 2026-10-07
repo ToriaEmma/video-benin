@@ -41,11 +41,19 @@ const Interdit = ({ taille = 30, couleur = '#111' }: { taille?: number; couleur?
   </Svg>
 )
 
+// Couverture retenue : un instant de la video (fraction de sa duree) ou une
+// image importee, avec le titre eventuellement ecrit dessus.
+export type ChoixCouverture = {
+  position?: number
+  image?: string
+  titre?: string
+  couleur?: string
+}
+
 export default function Couverture({ uri, onAnnuler, onEnregistrer }: {
   uri: string
   onAnnuler: () => void
-  // Index de l'image retenue dans la bande.
-  onEnregistrer: (index: number) => void
+  onEnregistrer: (choix: ChoixCouverture) => void
 }) {
   const { width } = useWindowDimensions()
   const lecteur = useVideoPlayer(uri, p => { p.muted = true })
@@ -161,7 +169,11 @@ export default function Couverture({ uri, onAnnuler, onEnregistrer }: {
           <Text style={s.enteteTexte}>Annuler</Text>
         </Pressable>
         <Pressable hitSlop={10}
-          onPress={() => onEnregistrer(choisie)}>
+          onPress={() => onEnregistrer({
+            ...(importee ? { image: importee } : { position: choisie / NB_VIGNETTES }),
+            titre: titre.trim() || undefined,
+            couleur: COULEURS[couleur],
+          })}>
           <Text style={s.enteteTexte}>Enregistrer</Text>
         </Pressable>
       </View>

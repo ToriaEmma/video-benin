@@ -41,13 +41,17 @@ function Vignette({ item, largeur, onSupprimer, onOuvrir, onOptions }: {
   // Sa propre video : « ⋯ » ouvre les options sans ouvrir la video.
   onOptions?: () => void
 }) {
-  const lecteur = useVideoPlayer(item.url, p => { p.muted = true })
+  // Avec une miniature, la case montre une image (~50 Ko) au lieu de
+  // charger la video entiere : la grille s'affiche vite et coute peu.
+  const lecteur = useVideoPlayer(item.miniature ? null : item.url, p => { p.muted = true })
   return (
     <Pressable style={[s.case, { width: largeur, height: largeur * 4 / 3 }]}
       onPress={onOuvrir}
       onLongPress={() => onSupprimer?.(item.id)}>
-      <VideoView player={lecteur} style={StyleSheet.absoluteFill}
-        contentFit="cover" nativeControls={false} />
+      {item.miniature
+        ? <Image source={{ uri: item.miniature }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        : <VideoView player={lecteur} style={StyleSheet.absoluteFill}
+            contentFit="cover" nativeControls={false} />}
       <View style={s.vues}>
         <Lecture taille={11} couleur="#fff" />
         <Text style={s.vuesTexte}>{abreger(item.vues)}</Text>
@@ -345,7 +349,7 @@ export default function Profil({
                     <Text style={[s.statNombre, petitEcran.nombre]} numberOfLines={1}>
                       {abreger(totalAime)}
                     </Text>
-                    <Text style={[s.statNom, petitEcran.nom]} numberOfLines={1}>J'aime</Text>
+                    <Text style={[s.statNom, petitEcran.nom]} numberOfLines={1}>J’aime</Text>
                   </View>
                 </View>
               </View>

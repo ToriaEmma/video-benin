@@ -26,8 +26,11 @@ export const stockageConfigure = Boolean(cleAcces && cleSecrete)
 
 // Types acceptes : ce que les deux clients produisent reellement.
 export const TYPES_VIDEO = ['video/mp4', 'video/quicktime', 'video/webm']
+// Miniature d'une video (image de couverture), produite par l'application.
+export const TYPES_IMAGE = ['image/jpeg']
 
 export const TAILLE_MAX = 100 * 1024 * 1024
+export const TAILLE_MAX_IMAGE = 500 * 1024
 
 // `force_path_style` : le stockage Neon expose le seau dans le chemin et
 // non dans le sous-domaine, contrairement a S3 par defaut.
@@ -46,6 +49,7 @@ const EXTENSIONS = {
   'video/mp4': 'mp4',
   'video/quicktime': 'mov',
   'video/webm': 'webm',
+  'image/jpeg': 'jpg',
 }
 
 // Une cle par profil et par envoi : deux publications simultanees ne

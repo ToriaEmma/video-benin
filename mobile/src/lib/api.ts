@@ -137,6 +137,8 @@ export type CompteApi = {
 // La video de l'API porte deux champs de plus que celle de demo.ts :
 // l'identifiant de l'auteur et la date de mise a la corbeille.
 export type VideoApi = Video & {
+  // Image de couverture (null pour les videos publiees avant les miniatures).
+  miniature?: string | null
   // Extrait Deezer du son, joint par l'API quand elle a pu le resoudre.
   deezer?: PisteDeezer
   favori: boolean
@@ -167,9 +169,12 @@ export type NouvelleVideo = {
   commentaires_autorises?: boolean
   reutilisation_autorisee?: boolean
   son_id?: string | null
+  // Image de couverture, televersee a part (televerserImage).
+  miniature_url?: string | null
 }
 
 export type ModificationVideo = {
+  miniature_url?: string
   legende?: string
   visibilite?: 'monde' | 'amis' | 'moi'
   commentaires_autorises?: boolean
@@ -224,6 +229,17 @@ const typeDepuisUri = (uri: string) => {
 // Televerse la video designee par son URI locale et rend l'adresse
 // durable. Les octets vont directement au stockage : l'API ne delivre
 // que l'autorisation d'envoi.
+// Image (miniature d'une video) : meme circuit que la video, en un envoi.
+export async function televerserImage(image: Blob): Promise<string> {
+  const depot = await requete<AutorisationDepot>('/televersements', {
+    methode: 'POST',
+    corps: { type: 'image/jpeg', taille: image.size },
+  })
+  const r = await fetch(depot.url, { method: 'PUT', headers: depot.entetes ?? { 'Content-Type': 'image/jpeg' }, body: image })
+  if (!r.ok) throw new Error(`Le stockage a refusé la miniature (erreur ${r.status})`)
+  return depot.urlPublique
+}
+
 export async function televerser(
   uri: string,
   surEtape?: (etape: 'preparation' | 'envoi' | 'fini', pourcentage?: number) => void,

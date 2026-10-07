@@ -37,12 +37,12 @@
   ],
   "rewrites": [
     {
-      "source": "/v/:id",
-      "destination": "/index.html"
+      "source": "/v/:video",
+      "destination": "/api/apercu?video=:video"
     },
     {
       "source": "/@:pseudo",
-      "destination": "/index.html"
+      "destination": "/api/apercu?pseudo=:pseudo"
     }
   ]
 }
