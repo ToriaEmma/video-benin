@@ -104,7 +104,18 @@ function Carte({
   // suivante l'est avant d'etre regardee, sa musique part donc tout de
   // suite et se recale sans silence. Un son original (piste d'une video,
   // lourde) reste lu en continu.
-  const sonLocal = useSonEnMemoire(son && !son.original ? son.url : null)
+  // La carte regardee des son montage lit son extrait directement (le
+  // telecharger aussi en memoire le ferait venir deux fois). Les cartes
+  // voisines le prechargent, 1,5 s apres leur montage : la video en cours
+  // garde ainsi tout le debit pour demarrer.
+  const [regardeeAuMontage] = useState(actif)
+  const [precharger, setPrecharger] = useState(false)
+  useEffect(() => {
+    if (regardeeAuMontage) return
+    const t = setTimeout(() => setPrecharger(true), 1500)
+    return () => clearTimeout(t)
+  }, [regardeeAuMontage])
+  const sonLocal = useSonEnMemoire(son && !son.original && precharger ? son.url : null)
   // L'adresse est choisie quand la carte devient celle qu'on regarde (la
   // memoire si elle est prete, sinon le flux) et gardee pendant toute la
   // lecture : en changer en cours de route couperait la musique.
