@@ -43,20 +43,27 @@ function obtenirPlatine(): HTMLAudioElement {
   platine = new Audio()
   platine.preload = 'auto'
   platine.loop = true
-  // Premier geste : la platine joue un instant de silence, ce qui l'autorise
-  // pour la suite. Inutile si une vraie piste l'occupe deja.
+  // Premiers gestes : la platine joue un instant de silence, ce qui
+  // l'autorise pour la suite. Les ecouteurs ne sont retires qu'apres un
+  // essai reussi : sur iPhone, le contact du doigt (pointerdown) est refuse,
+  // seule la fin du toucher (touchend, click) autorise le son.
+  const EVENEMENTS = ['pointerdown', 'touchend', 'click', 'keydown']
+  let debloquee = false
   const debloquer = () => {
-    window.removeEventListener('pointerdown', debloquer, true)
-    window.removeEventListener('touchend', debloquer, true)
-    window.removeEventListener('keydown', debloquer, true)
     const p = platine!
-    if (proprietaire) return
+    // Une vraie piste occupe la platine : la sourdine automatique
+    // (web/demarrage.ts) se charge de lui rendre le son.
+    if (debloquee || proprietaire) return
     p.src = silence()
-    p.play().then(() => { if (!proprietaire) p.pause() }).catch(() => { /* Refus : le prochain son le redemandera. */ })
+    p.play()
+      .then(() => {
+        debloquee = true
+        EVENEMENTS.forEach(e => window.removeEventListener(e, debloquer, true))
+        if (!proprietaire) p.pause()
+      })
+      .catch(() => { /* Refus : le geste suivant reessaiera. */ })
   }
-  window.addEventListener('pointerdown', debloquer, true)
-  window.addEventListener('touchend', debloquer, true)
-  window.addEventListener('keydown', debloquer, true)
+  EVENEMENTS.forEach(e => window.addEventListener(e, debloquer, true))
   return platine
 }
 if (typeof window !== 'undefined') obtenirPlatine()

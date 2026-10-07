@@ -91,21 +91,68 @@ function installerSonAutomatique() {
   // Le geste qui active le son ne doit rien faire d'autre (sinon il mettrait
   // aussi la video en pause) : on l'absorbe quand une sourdine automatique attend.
   const absorber = (e: Event) => { e.stopPropagation(); e.preventDefault() }
-  const debloquer = (e: Event) => {
+
+  // Rend le son a un lecteur. Il ne quitte la sourdine que si le navigateur
+  // accepte de le jouer : sur iPhone, un essai hors d'un geste valide est
+  // refuse, et le lecteur doit alors rester en sourdine (et continuer a
+  // jouer) jusqu'au prochain toucher, sinon il resterait muet pour de bon.
+  const rendreLeSon = (m: HTMLMediaElement) => {
+    const voulu = !m.paused || aRelancer.has(m)
+    assourdir(m, false)
+    if (!voulu) { sourdine.delete(m); return }
+    jouer.call(m)
+      .then(() => {
+        sourdine.delete(m); aRelancer.delete(m)
+        if (!sourdine.size) { pastille?.remove(); pastille = null }
+      })
+      .catch(() => { assourdir(m, true); jouer.call(m).catch(() => {}) })
+  }
+  const essayer = () => { [...sourdine].forEach(rendreLeSon) }
+
+  // Debut du geste : le toucher qui active le son ne doit rien faire
+  // d'autre (sinon il mettrait aussi la video en pause), on l'absorbe donc
+  // tant que la bulle est affichee. Android et ordinateur acceptent deja
+  // le son a ce moment-la.
+  const debutGeste = (e: Event) => {
     if (!sourdine.size) { pastille?.remove(); pastille = null; return }
     if (pastille && e.type !== 'keydown') {
       for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.addEventListener(t, absorber, { capture: true })
       absorber(e)
       setTimeout(() => { for (const t of ['pointerup', 'click', 'touchend', 'mouseup']) window.removeEventListener(t, absorber, { capture: true }) }, 450)
     }
-    // Le son revient. Relancer pendant le toucher autorise aussi le lecteur
-    // pour la suite (iPhone) ; ceux mis en pause par l'application restent en pause.
-    sourdine.forEach(m => {
-      assourdir(m, false)
-      if (!m.paused || aRelancer.has(m)) jouer.call(m).catch(() => {})
-    })
-    sourdine.clear(); aRelancer.clear()
-    pastille?.remove(); pastille = null
+    essayer()
   }
-  for (const evt of ['pointerdown', 'touchstart', 'keydown']) window.addEventListener(evt, debloquer, { capture: true })
+  // Fin du geste : Safari (iPhone) n'autorise le son qu'ici, pas au simple
+  // contact du doigt. Ecouteurs poses avant l'absorbeur : ils passent
+  // toujours (stopPropagation n'arrete pas les ecouteurs de la meme cible).
+  const finGeste = () => { if (sourdine.size) essayer() }
+  for (const evt of ['touchend', 'click']) window.addEventListener(evt, finGeste, { capture: true })
+  for (const evt of ['pointerdown', 'touchstart', 'keydown']) window.addEventListener(evt, debutGeste, { capture: true })
+
+  // Diagnostic du son, sur demande (adresse terminee par ?diagnostic) :
+  // un panneau montre en direct l'etat de chaque lecteur, pour comprendre
+  // un probleme de son sur un telephone qu'on n'a pas sous la main.
+  if (/[?&]diagnostic\b/.test(location.search)) afficherDiagnostic()
+}
+
+function afficherDiagnostic() {
+  const panneau = document.createElement('pre')
+  panneau.style.cssText = 'position:fixed;left:6px;right:6px;bottom:6px;z-index:9999;margin:0;padding:8px;max-height:45vh;overflow:auto;background:rgba(0,0,0,.82);color:#7CFC00;font:11px/1.35 ui-monospace,Menlo,monospace;border-radius:8px;white-space:pre-wrap;pointer-events:none'
+  document.body.appendChild(panneau)
+  const erreurs: string[] = []
+  window.addEventListener('error', e => erreurs.push(String(e.message).slice(0, 120)))
+  window.addEventListener('unhandledrejection', e => erreurs.push(String(e.reason).slice(0, 120)))
+  setInterval(() => {
+    const medias = [...((window as unknown as { __medias?: Set<HTMLMediaElement> }).__medias ?? [])]
+    const lignes = medias.map(m => {
+      const src = (m.currentSrc || m.src || '').replace(/^https?:\/\//, '').slice(0, 38)
+      return `${m.tagName === 'AUDIO' ? 'musique' : 'video  '} ${m.paused ? 'PAUSE' : 'JOUE '} ${m.muted ? 'MUET' : 'son '} t=${m.currentTime.toFixed(1)} pret=${m.readyState} err=${m.error?.code ?? '-'} ${src}`
+    })
+    panneau.textContent = [
+      `TockTick diagnostic · ${navigator.userAgent.match(/(iPhone|Android|Macintosh|Windows)[^;)]*/)?.[0] ?? '?'}`,
+      `en sourdine auto : ${sourdine.size} · a relancer : ${aRelancer.size} · bulle : ${document.body.innerText.includes('activer le son') ? 'oui' : 'non'}`,
+      ...lignes,
+      ...(erreurs.length ? ['erreurs :', ...erreurs.slice(-4)] : []),
+    ].join('\n')
+  }, 500)
 }
