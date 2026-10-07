@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import {
   View, Pressable, StyleSheet, ScrollView, SafeAreaView, Modal,
 } from 'react-native'
+import { useCadreFeuille } from '../lib/ecran'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Text } from '../composants/Texte'
 import { Chevron, ChevronDroit, Maillon } from '../composants/Icones'
@@ -199,6 +200,8 @@ const CLE_ACCUEIL = 'parametres-reutilisation-vu'
 export default function Parametres({ onRetour, pseudo }: {
   onRetour: () => void; pseudo: string
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { deconnecter, profil } = useAuth()
   const [selection, setSelection] = useState<string | null>(null)
   // Panneau « Changer de compte » et feuille « Partager le profil ».
@@ -360,7 +363,7 @@ export default function Parametres({ onRetour, pseudo }: {
       <Modal visible={accueil} transparent animationType="slide"
         statusBarTranslucent onRequestClose={() => { /* choix obligatoire */ }}>
         <View style={s.voile}>
-          <View style={s.feuille}>
+          <View style={[s.feuille, cadre]}>
             <Text style={s.feuilleTitre}>Paramètre de réutilisation du contenu</Text>
             <Text style={s.feuilleTexte}>
               Les paramètres d&apos;autorisation permettant de choisir qui peut

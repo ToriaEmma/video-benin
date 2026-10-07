@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import {
   View, StyleSheet, Pressable, Modal, ScrollView, Image,
 } from 'react-native'
+import { useCadreFeuille } from '../lib/ecran'
 import Svg, { Path } from 'react-native-svg'
 import { Text } from './Texte'
 import Connexion from '../ecrans/Connexion'
@@ -26,13 +27,15 @@ const Coche = ({ taille = 27 }: { taille?: number }) => (
 export default function ComptesProfil({ pseudo, avatar, onFermer }: {
   pseudo: string; avatar?: string | null; onFermer: () => void
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const [ajouter, setAjouter] = useState(false)
 
   return (
     <Modal transparent animationType="slide" onRequestClose={onFermer}>
       <View style={s.voileZone}>
         <Pressable style={s.voile} onPress={onFermer} />
-        <View style={s.panneau}>
+        <View style={[s.panneau, cadre]}>
           <View style={s.entete}>
             <Text style={s.titre}>
               {ajouter ? 'Ajouter un compte' : 'Changer de compte'}

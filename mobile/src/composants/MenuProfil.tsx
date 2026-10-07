@@ -2,7 +2,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import {
   View, Pressable, StyleSheet, Modal, ScrollView, Animated, Easing,
 } from 'react-native'
-import { useWindowDimensions } from '../lib/ecran'
+import { useWindowDimensions, useColonne } from '../lib/ecran'
+import { useWindowDimensions as useFenetre } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Path, Rect, Circle, Ellipse } from 'react-native-svg'
 import { Text } from './Texte'
@@ -81,6 +82,11 @@ export default function MenuProfil({ onFermer, onDeconnecter, onSolde, onParamet
   // `.menu-profil-panneau { inset: 0 0 0 15% }` : le panneau couvre 85 % de la
   // largeur et vient se coller a droite.
   const largeur = width * .85
+  // Grand ecran : le panneau glisse depuis le bord droit de la colonne, pas
+  // depuis celui de la fenetre.
+  const colonne = useColonne()
+  const fenetre = useFenetre()
+  const margeDroite = colonne ? Math.max(0, fenetre.width - colonne.gauche - colonne.largeur) : 0
 
   // `@keyframes menu-profil-entree` : le panneau glisse depuis la droite en
   // .25s. L'animation « slide » de Modal vient du bas, on anime donc nous-meme.
@@ -98,6 +104,7 @@ export default function MenuProfil({ onFermer, onDeconnecter, onSolde, onParamet
         <Pressable style={s.voile} onPress={onFermer} />
         <Animated.View style={[s.panneau, {
           width: largeur,
+          marginRight: margeDroite,
           paddingTop: 26 + marges.top,
           paddingBottom: 32 + marges.bottom,
           transform: [{ translateX: glissement }],

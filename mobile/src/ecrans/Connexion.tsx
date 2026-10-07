@@ -11,7 +11,7 @@ import {
   View, Pressable, StyleSheet, ScrollView, Modal,
   KeyboardAvoidingView, Platform, ActivityIndicator,
 } from 'react-native'
-import { useWindowDimensions } from '../lib/ecran'
+import { useWindowDimensions, useCadreFeuille } from '../lib/ecran'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { Text, TextInput } from '../composants/Texte'
 import {
@@ -80,6 +80,8 @@ export function Inscription({ visible, onFermer, onConnexion, onSucces }: {
   onConnexion: () => void
   onSucces?: () => void
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
   const { inscrire } = useAuth()
   const [tel, setTel] = useState('')
@@ -121,7 +123,7 @@ export function Inscription({ visible, onFermer, onConnexion, onSucces }: {
         <Pressable style={s.voile} onPress={onFermer} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[s.feuille, { maxHeight: height * .92 }]}>
+          <View style={[s.feuille, { maxHeight: height * .92 }, cadre]}>
             <EnteteFeuille onFermer={onFermer} />
 
             <ScrollView showsVerticalScrollIndicator={false}
@@ -213,6 +215,8 @@ export function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
   onInscription: () => void
   onSucces?: () => void
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
   const { connecter } = useAuth()
   // Compte choisi dans la liste : le mot de passe lui est demande.
@@ -259,7 +263,7 @@ export function ListeComptes({ visible, onFermer, onInscription, onSucces }: {
         <Pressable style={s.voile} onPress={onFermer} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={[s.feuille, { maxHeight: height * .92 }]}>
+          <View style={[s.feuille, { maxHeight: height * .92 }, cadre]}>
             <EnteteFeuille onFermer={onFermer} />
 
             <ScrollView showsVerticalScrollIndicator={false}

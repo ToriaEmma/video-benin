@@ -9,7 +9,7 @@ import React, { useEffect, useState } from 'react'
 import {
   View, StyleSheet, Pressable, Modal, ScrollView, ActivityIndicator,
 } from 'react-native'
-import { useWindowDimensions } from '../lib/ecran'
+import { useWindowDimensions, useCadreFeuille } from '../lib/ecran'
 import { Text } from './Texte'
 import { FeuilleCroix } from './Icones'
 import LigneCompte from './LigneCompte'
@@ -23,6 +23,8 @@ export default function ListeComptes({ pseudo, sens, onFermer, onVisiter }: {
   onFermer: () => void
   onVisiter?: (pseudo: string) => void
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
   const [comptes, setComptes] = useState<CompteApi[]>([])
   const [chargement, setChargement] = useState(true)
@@ -50,7 +52,7 @@ export default function ListeComptes({ pseudo, sens, onFermer, onVisiter }: {
       onRequestClose={onFermer} statusBarTranslucent>
       <View style={s.fond}>
         <Pressable style={s.voile} onPress={onFermer} />
-        <View style={[s.feuille, { maxHeight: height * .72 }]}>
+        <View style={[s.feuille, { maxHeight: height * .72 }, cadre]}>
           <View style={s.entete}>
             <Text style={s.titre}>{titre}</Text>
             <Pressable style={s.fermer} hitSlop={10} onPress={onFermer}>

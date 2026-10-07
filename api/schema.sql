@@ -154,3 +154,14 @@ CREATE TABLE IF NOT EXISTS signalements (
   cree_le    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (video_id, profil_id)
 );
+
+-- ---------- Sons favoris ----------
+-- Ranges par compte ; `son` garde de quoi l'afficher (titre, artiste,
+-- pochette…), l'adresse d'ecoute etant redemandee a l'affichage.
+CREATE TABLE IF NOT EXISTS sons_favoris (
+  profil_id  uuid NOT NULL REFERENCES profils(id) ON DELETE CASCADE,
+  son_id     text NOT NULL,
+  son        jsonb NOT NULL,
+  cree_le    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (profil_id, son_id)
+);

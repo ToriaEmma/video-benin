@@ -53,7 +53,7 @@ app.disable('x-powered-by')
 app.set('trust proxy', true)
 // Les sessions passent par l'en-tete Authorization et non par un cookie :
 // ouvrir CORS a toutes les origines n'expose donc pas aux requetes forgees.
-app.use(cors({ methods: ['GET', 'POST', 'PATCH', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'] }))
+app.use(cors({ methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], allowedHeaders: ['Content-Type', 'Authorization'] }))
 // 512 Ko : de quoi porter une photo de profil, pas davantage.
 app.use(express.json({ limit: '512kb' }))
 app.use((_req, res, suite) => {
@@ -866,6 +866,51 @@ app.get('/suggestions', exigerSession, route(async (req, res) => {
     LIMIT ${limiteDemandee(req.query.limite)}
   `
   res.json(lignes.map(comptePublic))
+}))
+
+// ------------------------------------------------------------
+// Sons favoris
+//
+// Ranges par compte (ils suivent l'utilisateur d'un appareil a l'autre).
+// Seuls l'identifiant et de quoi afficher le son sont gardes : l'adresse
+// d'un extrait Deezer expire, le client la redemande a l'affichage.
+// ------------------------------------------------------------
+
+const sonFavoriPublic = (l) => ({ ...l.son, id: l.son_id })
+
+app.get('/sons-favoris', exigerSession, route(async (req, res) => {
+  const lignes = await sql`
+    SELECT son_id, son FROM sons_favoris WHERE profil_id = ${req.profilId}
+    ORDER BY cree_le DESC LIMIT 200
+  `
+  res.json(lignes.map(sonFavoriPublic))
+}))
+
+app.put('/sons-favoris/:id', exigerSession, route(async (req, res) => {
+  const id = sonValide(req.params.id)
+  if (!id) throw new Refus(400, 'Son invalide')
+  const b = req.body || {}
+  const son = {
+    titre: texteRequis(b.titre, 'titre', 200),
+    artiste: texteFacultatif(b.artiste, 'artiste', 200) ?? '',
+    pochette: typeof b.pochette === 'string' && /^https:\/\//.test(b.pochette) && b.pochette.length < 500 ? b.pochette : null,
+    duree: Number.isFinite(b.duree) && b.duree >= 0 && b.duree < 3600 ? Math.round(b.duree) : 0,
+    couleur: typeof b.couleur === 'string' && /^#[0-9a-f]{6}$/i.test(b.couleur) ? b.couleur : '#3a3a3c',
+    original: b.original === true,
+    licence: texteFacultatif(b.licence, 'licence', 200) ?? '',
+  }
+  await sql`
+    INSERT INTO sons_favoris (profil_id, son_id, son) VALUES (${req.profilId}, ${id}, ${JSON.stringify(son)}::jsonb)
+    ON CONFLICT (profil_id, son_id) DO UPDATE SET son = EXCLUDED.son
+  `
+  res.json({ favori: true })
+}))
+
+app.delete('/sons-favoris/:id', exigerSession, route(async (req, res) => {
+  const id = sonValide(req.params.id)
+  if (!id) throw new Refus(400, 'Son invalide')
+  await sql`DELETE FROM sons_favoris WHERE profil_id = ${req.profilId} AND son_id = ${id}`
+  res.json({ favori: false })
 }))
 
 // ------------------------------------------------------------

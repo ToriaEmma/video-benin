@@ -2,7 +2,7 @@ import React from 'react'
 import {
   View, StyleSheet, Pressable, Modal, ScrollView,
 } from 'react-native'
-import { useWindowDimensions } from '../lib/ecran'
+import { useWindowDimensions, useCadreFeuille } from '../lib/ecran'
 import { Text } from './Texte'
 import { FeuilleCroix } from './Icones'
 import { feuille as F } from '../lib/theme'
@@ -23,6 +23,8 @@ export default function Feuille({
   fondGris?: boolean
   children: React.ReactNode
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
 
   return (
@@ -30,7 +32,7 @@ export default function Feuille({
       onRequestClose={onFermer} statusBarTranslucent>
       <View style={s.fond}>
         <Pressable style={s.voile} onPress={onFermer} />
-        <View style={[s.feuille, fondGris && s.feuilleGrise,
+        <View style={[s.feuille, fondGris && s.feuilleGrise, cadre,
           { maxHeight: height * .72 }]}>
           <View style={s.entete}>
             <Text style={s.titre}>{titre}</Text>

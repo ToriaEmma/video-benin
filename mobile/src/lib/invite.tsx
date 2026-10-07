@@ -9,6 +9,7 @@ import { StyleSheet, Pressable, Modal } from 'react-native'
 import { Text } from '../composants/Texte'
 import { useAuth } from './auth'
 import { ListeComptes, Inscription } from '../ecrans/Connexion'
+import { useColonne } from './ecran'
 
 type Exiger = (raison: string) => boolean
 
@@ -29,12 +30,15 @@ export function FournisseurInvite({ children }: { children: React.ReactNode }) {
   }, [profil])
 
   const fermer = () => { setRaison(null); setFeuille(null) }
+  // Grand ecran : la carte se centre sur la colonne, pas sur la fenetre.
+  const colonne = useColonne()
+  const zone = colonne ? { width: colonne.largeur, marginLeft: colonne.gauche, alignSelf: 'flex-start' as const } : undefined
 
   return (
     <Contexte.Provider value={exiger}>
       {children}
       <Modal visible={!!raison && !feuille} transparent animationType="fade" onRequestClose={fermer}>
-        <Pressable style={s.voile} onPress={fermer}>
+        <Pressable style={[s.voile, zone]} onPress={fermer}>
           <Pressable style={s.carte} onPress={() => { /* Garde la carte ouverte. */ }}>
             <Text style={s.titre}>Connecte-toi à TockTick</Text>
             <Text style={s.texte}>Crée un compte ou connecte-toi pour {raison}.</Text>

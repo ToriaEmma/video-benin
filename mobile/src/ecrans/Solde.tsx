@@ -7,7 +7,7 @@ import React, { useState } from 'react'
 import {
   View, StyleSheet, Pressable, ScrollView, Modal,
 } from 'react-native'
-import { useWindowDimensions } from '../lib/ecran'
+import { useWindowDimensions, useCadreFeuille } from '../lib/ecran'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import Svg, { Path, Circle, Rect } from 'react-native-svg'
 import { Text, TextInput } from '../composants/Texte'
@@ -116,6 +116,8 @@ function Fenetre({ visible, onFermer, fondGris = false, flottante = false, child
   flottante?: boolean
   children: React.ReactNode
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
   return (
     <Modal visible={visible} transparent animationType="slide"
@@ -124,7 +126,7 @@ function Fenetre({ visible, onFermer, fondGris = false, flottante = false, child
         <Pressable style={s.voile} onPress={onFermer} />
         <View style={[
           s.feuille, fondGris && s.feuilleGrise, flottante && s.feuilleFlottante,
-          { maxHeight: height * .85 },
+          { maxHeight: height * .85 }, cadre,
         ]}>
           <Pressable style={s.feuilleFermer} hitSlop={8} onPress={onFermer}>
             <Icone nom="fermer" taille={22} />

@@ -4,6 +4,7 @@ import {
   Platform, SafeAreaView, ActivityIndicator, Alert,
   type TextInput as SaisieNative
 } from 'react-native'
+import { useCadreFeuille } from '../lib/ecran'
 import { Text, TextInput } from './Texte'
 import { type Commentaire, type Video } from '../lib/demo'
 import { apiCommentaires } from '../lib/api'
@@ -33,6 +34,8 @@ export default function Commentaires({
   // retire (-1) : son compteur suit sans recharger la video.
   onVariation?: (n: number) => void
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const [texte, setTexte] = useState('')
   const [liste, setListe] = useState<Commentaire[]>([])
   const [chargement, setChargement] = useState(true)
@@ -104,7 +107,7 @@ export default function Commentaires({
       <Pressable style={s.voile} onPress={onFermer} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={s.feuille}>
+        style={[s.feuille, cadre]}>
         <SafeAreaView style={{ flex: 1 }}>
           <View style={s.entete}>
             <View style={s.enteteGauche}>

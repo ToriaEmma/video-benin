@@ -8,7 +8,7 @@ import {
   View, StyleSheet, Pressable, FlatList, Modal, Animated, PanResponder,
   ScrollView, ActivityIndicator, Image,
 } from 'react-native'
-import { useWindowDimensions } from '../lib/ecran'
+import { useWindowDimensions, useCadreFeuille } from '../lib/ecran'
 import { usePiste, usePisteJoue } from '../lib/piste'
 import { Text, TextInput } from '../composants/Texte'
 import {
@@ -19,6 +19,7 @@ import {
 } from '../lib/sons'
 import { rechercherSons, sonsPopulaires, sonsPourToi } from '../lib/deezer'
 import { basculerFavoriSon, useFavorisSons } from '../lib/favorisSons'
+import { useExigerCompte } from '../lib/invite'
 
 // Derniers sons retenus, pour l'onglet « Récents » (le temps de la session).
 const recents: Son[] = []
@@ -102,6 +103,8 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
   onFermer: () => void
   onChoisir: (son: Son | null) => void
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
   // Deux crans : la feuille s'arrete d'abord a mi-hauteur, puis se
   // deploie quand on tire la poignee.
@@ -162,6 +165,7 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
   const [choisiSon, setChoisiSon] = useState<Son | null>(null)
   const choisi = choisiSon?.id ?? null
   const { favoris, estFavori } = useFavorisSons()
+  const exiger = useExigerCompte()
 
   // Listes Deezer chargees a l'ouverture ; le catalogue libre de droits
   // prend le relais si Deezer ne repond pas.
@@ -264,7 +268,7 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
       <View style={s.fond}>
         <Pressable style={s.voile} onPress={onFermer} />
 
-        <Animated.View style={[s.feuille, { height: hauteur }]}>
+        <Animated.View style={[s.feuille, { height: hauteur }, cadre]}>
           {/* Haut de la feuille : glisser pour deployer, replier ou fermer */}
           <View {...poignee.panHandlers} style={s.haut}>
           <View style={s.poigneeZone}>
@@ -340,7 +344,7 @@ export default function ChoixSon({ visible, onFermer, onChoisir }: {
                 rang={onglet === 'Populaire' && !enRecherche ? index + 1 : undefined}
                 favori={estFavori(item.id)}
                 onChoisir={() => retenir(item)}
-                onFavori={() => basculerFavoriSon(item)}
+                onFavori={() => exiger('enregistrer ce son') && basculerFavoriSon(item)}
                 onUtiliser={() => { noterRecent(item); onChoisir(item); onFermer() }} />
             )}
           />

@@ -71,6 +71,8 @@ function Application() {
   const fenetre = useWindowDimensions()
   const large = useMiseEnPageLarge()
   const compact = fenetre.width < 1100
+  // Position de la colonne dans la scene, pour y caler les feuilles du bas.
+  const [gaucheColonne, setGaucheColonne] = useState(0)
 
   // Destinations du menu lateral : memes regles que la barre du bas.
   const aller = (d: Destination) => {
@@ -221,8 +223,11 @@ function Application() {
         <MenuLateral actif={onglet} pseudo={profil?.pseudo ?? null} compact={compact}
           clair={clair && !lecture} onAller={aller} />
         <View style={[s.scene, clair && !lecture && s.sceneClaire]}>
-          <View style={[s.colonne, { width: largeurColonne }, formatVideo && s.colonneVideo]}>
-            <FournisseurColonne width={largeurColonne} height={fenetre.height}>
+          <View style={[s.colonne, { width: largeurColonne }, formatVideo && s.colonneVideo]}
+            onLayout={e => setGaucheColonne(e.nativeEvent.layout.x)}>
+            <FournisseurColonne width={largeurColonne} height={fenetre.height}
+              gauche={(compact ? 76 : 240) + gaucheColonne}
+              bas={formatVideo ? Math.round(fenetre.height * 0.02) : 0}>
               {contenu}
             </FournisseurColonne>
           </View>

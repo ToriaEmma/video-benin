@@ -1,5 +1,6 @@
 // ============================================================
 // Client de l'API TockTick (api/serveur.js).
+import type { Son } from './sons'
 //
 // Tout l'acces reseau de l'application passe par ce fichier : les
 // ecrans appellent les enveloppes typees et n'ont jamais a connaitre
@@ -49,7 +50,7 @@ export async function lireJeton(): Promise<string | null> {
 }
 
 export type OptionsRequete = {
-  methode?: 'GET' | 'POST' | 'PATCH' | 'DELETE'
+  methode?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   // Corps serialise en JSON par le client.
   corps?: unknown
   // Requete anonyme : utile pour l'inscription et la connexion, qui ne
@@ -406,6 +407,18 @@ export const apiCommentaires = {
 // ------------------------------------------------------------
 // Brouillons
 // ------------------------------------------------------------
+
+// Sons favoris, ranges par compte. L'identifiant (« dz:123 », « video:… »)
+// passe dans l'adresse : il est encode.
+export const apiSonsFavoris = {
+  liste: () => requete<(Partial<Son> & { id: string })[]>('/sons-favoris'),
+  ajouter: (son: Son) => requete<{ favori: true }>(`/sons-favoris/${encodeURIComponent(son.id)}`, {
+    methode: 'PUT',
+    corps: { titre: son.titre, artiste: son.artiste, pochette: son.pochette, duree: son.duree,
+      couleur: son.couleur, original: !!son.original, licence: son.licence },
+  }),
+  retirer: (id: string) => requete<{ favori: false }>(`/sons-favoris/${encodeURIComponent(id)}`, { methode: 'DELETE' }),
+}
 
 export const apiBrouillons = {
   liste: () => requete<Brouillon[]>('/brouillons'),

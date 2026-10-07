@@ -17,7 +17,7 @@ import {
   View, StyleSheet, Pressable, ScrollView, Modal, Share, Linking, Platform,
   ActivityIndicator,
 } from 'react-native'
-import { useWindowDimensions } from '../lib/ecran'
+import { useWindowDimensions, useCadreFeuille } from '../lib/ecran'
 import { Text, TextInput } from './Texte'
 import {
   FeuilleCroix, Maillon, Telecharger, Statistiques, Crayon2, CadenasPlein,
@@ -59,6 +59,8 @@ export default function OptionsVideo({
   onModifiee: (id: string, valeurs: Partial<Video>) => void
   onPasInteresse: (id: string) => void
 }) {
+  // Grand ecran : la feuille se cale sur la colonne (voir lib/ecran).
+  const cadre = useCadreFeuille()
   const { height } = useWindowDimensions()
   const { profil } = useAuth()
   const exiger = useExigerCompte()
@@ -230,7 +232,7 @@ export default function OptionsVideo({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onFermer} statusBarTranslucent>
       <View style={s.fond}>
         <Pressable style={s.voile} onPress={onFermer} accessibilityLabel="Fermer" />
-        <View style={[s.feuille, { maxHeight: height * .7 }]}>
+        <View style={[s.feuille, { maxHeight: height * .7 }, cadre]}>
           <View style={s.entete}>
             {ecran !== 'principal'
               ? <Pressable hitSlop={10} onPress={() => setEcran('principal')} accessibilityRole="button"><Text style={s.retour}>Retour</Text></Pressable>

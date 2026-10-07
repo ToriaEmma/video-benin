@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { apiComptes, lireJeton, poserJeton, type ProfilApi } from './api'
 import { etat } from './demo'
+import { chargerFavorisSons } from './favorisSons'
 
 // Meme forme que le profil de la version web (app/src/lib/auth.tsx) : les
 // deux plateformes lisent la meme table `profils`, leurs champs doivent donc
@@ -49,6 +50,8 @@ export const FournisseurAuth = ({ children }: { children: React.ReactNode }) => 
     etat.connecte = Boolean(suivant)
     etat.pseudo = suivant?.pseudo ?? ''
     setProfil(suivant)
+    // Les sons favoris sont ceux du compte : recharges a chaque changement.
+    chargerFavorisSons(suivant?.id ?? null)
   }
 
   useEffect(() => {
