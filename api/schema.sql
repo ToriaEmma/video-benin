@@ -173,3 +173,17 @@ ALTER TABLE profils ADD COLUMN IF NOT EXISTS code_recuperation text;
 -- ---------- Miniatures ----------
 -- Image de couverture d'une video (apercu des liens, grille du profil).
 ALTER TABLE videos ADD COLUMN IF NOT EXISTS miniature_url text;
+
+-- ---------- Directs (LIVE) ----------
+-- Registre des directs : l'image passe par LiveKit, pas par la base.
+-- `vu_le` est rafraichi par le diffuseur toutes les 20 s : un direct
+-- dont l'onglet a ete ferme sans « Terminer » disparait de la liste.
+CREATE TABLE IF NOT EXISTS lives (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  profil_id  uuid NOT NULL REFERENCES profils(id) ON DELETE CASCADE,
+  titre      text NOT NULL DEFAULT '',
+  debut      timestamptz NOT NULL DEFAULT now(),
+  vu_le      timestamptz NOT NULL DEFAULT now(),
+  fin        timestamptz
+);
+CREATE INDEX IF NOT EXISTS lives_en_cours ON lives(vu_le) WHERE fin IS NULL;

@@ -558,3 +558,26 @@ export type EvenementApi = {
 export const apiNotifications = {
   liste: () => requete<EvenementApi[]>('/notifications'),
 }
+
+// ------------------------------------------------------------
+// Directs (LIVE). L'image passe par LiveKit : l'API rend la liste des
+// directs et l'acces a une salle (adresse du serveur + jeton).
+// ------------------------------------------------------------
+
+export type Live = {
+  id: string
+  titre: string
+  pseudo: string
+  avatarUrl: string | null
+  debut: number
+}
+
+export type AccesLive = { live: Live; url: string; jeton: string }
+
+export const apiLive = {
+  liste: () => requete<{ disponible: boolean; lives: Live[] }>('/lives'),
+  lancer: (titre: string) => requete<AccesLive>('/lives', { methode: 'POST', corps: { titre } }),
+  presence: (id: string) => requete<{ ok: true }>(`/lives/${id}/presence`, { methode: 'POST' }),
+  terminer: (id: string) => requete<{ ok: true }>(`/lives/${id}/fin`, { methode: 'POST' }),
+  rejoindre: (id: string) => requete<AccesLive>(`/lives/${id}/jeton`, { methode: 'POST' }),
+}

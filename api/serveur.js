@@ -8,6 +8,7 @@
 
 import 'dotenv/config'
 import express from 'express'
+import { randomUUID } from 'node:crypto'
 import cors from 'cors'
 
 import { sql } from './base.js'
@@ -51,6 +52,7 @@ import {
   limiteDemandee,
   normaliserCode,
 } from './regles.js'
+import { liveConfigure, urlLiveKit, jetonSalle } from './live.js'
 
 const app = express()
 // Rien ne doit trahir la technologie du serveur.
@@ -1397,6 +1399,117 @@ app.get('/notifications', exigerSession, route(async (req, res) => {
     texte: l.texte,
     date: new Date(l.date).getTime(),
   })))
+}))
+
+// ------------------------------------------------------------
+// Directs (LIVE)
+//
+// L'image passe par LiveKit ; ces routes tiennent la liste des directs
+// en cours et delivrent l'acces aux salles (voir live.js).
+// ------------------------------------------------------------
+
+// Sans signe de vie du diffuseur depuis ce delai, le direct est tenu
+// pour termine (onglet ferme, reseau coupe).
+const SILENCE_LIVE = '60 seconds'
+const estUuid = (x) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(x || '')
+
+const exigerLive = () => {
+  if (!liveConfigure()) throw new Refus(503, 'Le LIVE n’est pas encore disponible.')
+}
+
+const liveCourant = async (id) => {
+  if (!estUuid(id)) throw new Refus(404, 'Ce LIVE est terminé.')
+  const [live] = await sql`
+    SELECT l.id, l.titre, l.debut, l.profil_id, p.pseudo, p.avatar_url
+    FROM lives l JOIN profils p ON p.id = l.profil_id
+    WHERE l.id = ${id} AND l.fin IS NULL AND l.vu_le > now() - ${SILENCE_LIVE}::interval
+  `
+  if (!live) throw new Refus(404, 'Ce LIVE est terminé.')
+  return live
+}
+
+const livePublic = (l) => ({
+  id: l.id,
+  titre: l.titre,
+  pseudo: l.pseudo,
+  avatarUrl: l.avatar_url,
+  debut: new Date(l.debut).getTime(),
+})
+
+app.get('/lives', route(async (_req, res) => {
+  const lignes = await sql`
+    SELECT l.id, l.titre, l.debut, p.pseudo, p.avatar_url
+    FROM lives l JOIN profils p ON p.id = l.profil_id
+    WHERE l.fin IS NULL AND l.vu_le > now() - ${SILENCE_LIVE}::interval
+    ORDER BY l.debut DESC
+    LIMIT 50
+  `
+  res.json({ disponible: liveConfigure(), lives: lignes.map(livePublic) })
+}))
+
+// Lancer un direct : un seul a la fois par compte (le precedent, s'il
+// est reste ouvert, est clos).
+app.post('/lives', exigerSession, route(async (req, res) => {
+  exigerLive()
+  await verifierEssais([{ cle: `live:${req.profilId}`, max: 10 }])
+  await noterEssais([`live:${req.profilId}`])
+  const titre = texteFacultatif(req.body?.titre, 'titre', 80) ?? ''
+  await sql`UPDATE lives SET fin = now() WHERE profil_id = ${req.profilId} AND fin IS NULL`
+  const [live] = await sql`
+    INSERT INTO lives (profil_id, titre) VALUES (${req.profilId}, ${titre})
+    RETURNING id
+  `
+  const complet = await liveCourant(live.id)
+  res.status(201).json({
+    live: livePublic(complet),
+    url: urlLiveKit(),
+    jeton: jetonSalle({ salle: live.id, identite: req.profilId, nom: complet.pseudo, diffuseur: true }),
+  })
+}))
+
+// Signe de vie du diffuseur.
+app.post('/lives/:id/presence', exigerSession, route(async (req, res) => {
+  if (!estUuid(req.params.id)) throw new Refus(404, 'Ce LIVE est terminé.')
+  const [live] = await sql`
+    UPDATE lives SET vu_le = now()
+    WHERE id = ${req.params.id} AND profil_id = ${req.profilId} AND fin IS NULL
+    RETURNING id
+  `
+  if (!live) throw new Refus(404, 'Ce LIVE est terminé.')
+  res.json({ ok: true })
+}))
+
+app.post('/lives/:id/fin', exigerSession, route(async (req, res) => {
+  if (!estUuid(req.params.id)) throw new Refus(404, 'Ce LIVE est terminé.')
+  await sql`
+    UPDATE lives SET fin = now()
+    WHERE id = ${req.params.id} AND profil_id = ${req.profilId} AND fin IS NULL
+  `
+  res.json({ ok: true })
+}))
+
+// Entrer dans un direct comme spectateur. Sans compte, on regarde ; avec
+// un compte, on peut aussi ecrire et envoyer des coeurs.
+app.post('/lives/:id/jeton', sessionFacultative, route(async (req, res) => {
+  exigerLive()
+  const live = await liveCourant(req.params.id)
+  let identite, nom
+  if (req.profilId) {
+    const [moi] = await sql`SELECT pseudo FROM profils WHERE id = ${req.profilId}`
+    identite = req.profilId
+    nom = moi?.pseudo ?? 'invité'
+  } else {
+    identite = `visiteur-${randomUUID()}`
+    nom = 'visiteur'
+  }
+  // Le diffuseur qui ouvre son propre direct depuis un autre appareil
+  // le regarde sans le remplacer.
+  if (identite === live.profil_id) identite = `${identite}-spectateur`
+  res.json({
+    live: livePublic(live),
+    url: urlLiveKit(),
+    jeton: jetonSalle({ salle: live.id, identite, nom, tchat: Boolean(req.profilId) }),
+  })
 }))
 
 // ------------------------------------------------------------

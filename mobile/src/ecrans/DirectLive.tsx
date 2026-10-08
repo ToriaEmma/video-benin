@@ -1,45 +1,46 @@
 // ============================================================
 // Pseudo-categorie « LIVE » du fil, atteinte par le clap en haut a
-// gauche. Elle se tient en deux etats :
+// gauche. Trois etats :
 //
-//  - « Découvrir » : la feuille sombre qui liste les comptes en direct
-//    et montre un apercu du direct en cours dans un panneau arrondi ;
-//  - le direct en plein ecran, obtenu en depliant ce panneau par sa
-//    poignee ou par un balayage vers le haut.
+//  - « Découvrir » : les comptes en direct en ce moment (liste de l'API,
+//    rafraichie toutes les 10 s) et l'entree « Passer en LIVE » ;
+//  - regarder un direct, en plein ecran ;
+//  - diffuser : apercu de sa camera, puis le direct lui-meme.
 //
-// Les deux etats partagent le meme lecteur : deplier le panneau ne
-// relance donc pas la video depuis le debut.
+// L'image et le son passent par LiveKit (src/lib/salleLive.web.ts) ; le
+// tchat et les coeurs par les messages de la salle.
 // ============================================================
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  View, Pressable, StyleSheet, ScrollView, Animated, Easing,
+  View, Pressable, StyleSheet, ScrollView, Animated, Easing, Platform, ActivityIndicator,
 } from 'react-native'
 import { BARRE_ETAT_WEB } from '../lib/theme'
-import { useVideoPlayer, VideoView } from 'expo-video'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Text, TextInput } from '../composants/Texte'
-import {
-  etat, abreger, livesDemo, messagesLiveDemo, messagesLiveSuite,
-  type MessageLive,
-} from '../lib/demo'
+import VideoLive from '../composants/VideoLive'
+import { abreger } from '../lib/demo'
 import { useAuth } from '../lib/auth'
+import { useExigerCompte } from '../lib/invite'
+import { apiLive, type AccesLive, type Live } from '../lib/api'
 import {
-  CalendrierEtoile, CameraLive, Croix, ChevronBas, ChevronHaut,
-  Couronne, CoeurPlein, InvitesLive, CadeauLive, Emoji, PartageFil,
+  useSalleLive, preparerCamera, libererCamera, basculerCamera, type MessageSalle,
+} from '../lib/salleLive'
+import {
+  CameraLive, Croix, ChevronHaut, CoeurPlein, Envoyer, Retourner,
 } from '../composants/Icones'
 
 // Nombre de messages gardes a l'ecran : au-dela, les plus anciens
 // sortent par le haut, comme dans un tchat de direct.
 const MESSAGES_VISIBLES = 6
-// Cadence d'arrivee des nouveaux messages.
-const CADENCE = 3200
+// Rafraichissement de la liste des directs, et signe de vie du diffuseur.
+const CADENCE_LISTE = 10_000
+const CADENCE_PRESENCE = 20_000
 
-// Diffusion regardee : le premier compte en direct de la liste.
-const DIFFUSION = livesDemo[0]
+type Piste = Awaited<ReturnType<typeof preparerCamera>>[number]
 
 // ------------------------------------------------------------
-// Avatar : une initiale dans un rond gris, faute de portrait.
+// Avatar : la photo du compte, sinon son initiale dans un rond gris.
 // ------------------------------------------------------------
 function Avatar({ pseudo, taille, bordure = false }: {
   pseudo: string; taille: number; bordure?: boolean
@@ -64,20 +65,17 @@ function Avatar({ pseudo, taille, bordure = false }: {
 function CoeurVolant({ decalage, onFini }: {
   decalage: number; onFini: () => void
 }) {
-  // Valeur stable sur la duree de vie du coeur : `useState` avec une
-  // fonction d'initialisation la cree une seule fois, la ou un `useRef`
-  // ferait lire `.current` pendant le rendu.
   const [montee] = useState(() => new Animated.Value(0))
 
   useEffect(() => {
     Animated.timing(montee, {
       toValue: 1, duration: 2600, easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
+      useNativeDriver: Platform.OS !== 'web',
     }).start(({ finished }) => { if (finished) onFini() })
   }, [montee, onFini])
 
   return (
-    <Animated.View style={[s.coeurVolant, {
+    <Animated.View pointerEvents="none" style={[s.coeurVolant, {
       right: decalage,
       opacity: montee.interpolate({
         inputRange: [0, 0.7, 1], outputRange: [0.9, 0.6, 0],
@@ -93,13 +91,31 @@ function CoeurVolant({ decalage, onFini }: {
   )
 }
 
+// Coeurs en vol : un par coeur recu (le compteur de la salle augmente).
+function useCoeursVolants(total: number) {
+  const [coeurs, setCoeurs] = useState<{ id: number; decalage: number }[]>([])
+  const [vus, setVus] = useState(total)
+  if (total !== vus) {
+    // Ajustement pendant le rendu (et non dans un effet) : un seul rendu.
+    setVus(total)
+    if (total > vus) {
+      const nouveaux = Array.from({ length: Math.min(total - vus, 5) }, (_, i) => ({
+        id: vus + i + 1, decalage: 10 + ((total + i) % 3) * 16,
+      }))
+      setCoeurs(l => [...l, ...nouveaux].slice(-20))
+    }
+  }
+  const retirer = useCallback((id: number) => setCoeurs(l => l.filter(c => c.id !== id)), [])
+  return { coeurs, retirer }
+}
+
 // ------------------------------------------------------------
 // Tchat du direct, en bas a gauche.
 // ------------------------------------------------------------
-function Tchat({ messages }: { messages: MessageLive[] }) {
+function Tchat({ messages }: { messages: MessageSalle[] }) {
   return (
     <View style={s.tchat} pointerEvents="none">
-      {messages.map(m => (
+      {messages.slice(-MESSAGES_VISIBLES).map(m => (
         <View key={m.id} style={s.message}>
           {m.systeme ? (
             <Text style={s.messageSysteme} numberOfLines={2}>
@@ -121,173 +137,276 @@ function Tchat({ messages }: { messages: MessageLive[] }) {
   )
 }
 
+// ------------------------------------------------------------
+// Le direct en plein ecran, cote spectateur ou cote diffuseur.
+// ------------------------------------------------------------
+function Salle({ acces, diffuseur, pistes, onQuitter }: {
+  acces: AccesLive
+  diffuseur: boolean
+  pistes?: Piste[]
+  onQuitter: () => void
+}) {
+  const { profil } = useAuth()
+  const exiger = useExigerCompte()
+  const moi = profil?.pseudo ?? 'visiteur'
+  const salle = useSalleLive(acces, { diffuseur, pistes: pistes as never, moi })
+  const { coeurs, retirer } = useCoeursVolants(salle.coeurs)
+  const [saisie, setSaisie] = useState('')
+  const [face, setFace] = useState<'user' | 'environment'>('user')
+
+  // Signe de vie du diffuseur : sans lui, le direct sort de la liste.
+  useEffect(() => {
+    if (!diffuseur) return
+    const t = setInterval(() => { apiLive.presence(acces.live.id).catch(() => { /* Reessaye. */ }) }, CADENCE_PRESENCE)
+    return () => clearInterval(t)
+  }, [diffuseur, acces.live.id])
+
+  const envoyer = () => {
+    if (!exiger('écrire dans le LIVE')) return
+    salle.envoyer(saisie)
+    setSaisie('')
+  }
+
+  return (
+    <View style={s.pagePleine}>
+      <VideoLive refVideo={salle.refVideo} miroir={diffuseur && face === 'user'}
+        ajuster={diffuseur ? 'cover' : 'contain'} />
+
+      <LinearGradient colors={['rgba(0,0,0,.45)', 'transparent']}
+        style={s.voileHaut} pointerEvents="none" />
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,.55)']}
+        style={s.voileBas} pointerEvents="none" />
+
+      {/* Toucher l'image : un coeur (comme sur TikTok). */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => { if (exiger('envoyer des cœurs')) salle.envoyerCoeur() }}
+        accessibilityLabel="Envoyer un cœur" />
+
+      <View style={s.rangeeHaute}>
+        <View style={s.pilleDiffuseur}>
+          <Avatar pseudo={acces.live.pseudo} taille={30} bordure />
+          <View style={s.diffuseurTextes}>
+            <Text style={s.diffuseurPseudo} numberOfLines={1}>{acces.live.pseudo}</Text>
+            <View style={s.diffuseurAbonnes}>
+              <CoeurPlein taille={10} couleur="#ff6b86" />
+              <Text style={s.diffuseurCompte}>{abreger(salle.coeurs)}</Text>
+            </View>
+          </View>
+          <View style={s.badgeEnDirect}><Text style={s.badgeDirectTexte}>LIVE</Text></View>
+        </View>
+
+        <View style={s.pilleSpectateurs}>
+          <Text style={s.spectateursTexte}>👁 {abreger(salle.spectateurs)}</Text>
+        </View>
+
+        <View style={{ flex: 1 }} />
+        {diffuseur && (
+          <Pressable style={s.rond} hitSlop={6} accessibilityLabel="Retourner la caméra"
+            onPress={() => {
+              const suivante = face === 'user' ? 'environment' : 'user'
+              setFace(suivante)
+              basculerCamera(pistes as never ?? [], suivante).catch(() => setFace(face))
+            }}>
+            <Retourner taille={17} couleur="#fff" />
+          </Pressable>
+        )}
+        <Pressable style={[s.rond, diffuseur && s.rondTerminer]} hitSlop={6} onPress={onQuitter}
+          accessibilityLabel={diffuseur ? 'Terminer le LIVE' : 'Quitter le LIVE'}>
+          {diffuseur ? <Text style={s.terminerTexte}>Terminer</Text> : <Croix taille={17} couleur="#fff" />}
+        </Pressable>
+      </View>
+
+      {acces.live.titre ? (
+        <View style={s.rangeeRang} pointerEvents="none">
+          <View style={s.pilleLigue}><Text style={s.ligueTexte} numberOfLines={1}>{acces.live.titre}</Text></View>
+        </View>
+      ) : null}
+
+      {salle.etat === 'connexion' && (
+        <View style={s.centre} pointerEvents="none">
+          <ActivityIndicator color="#fff" />
+          <Text style={s.centreTexte}>{diffuseur ? 'Lancement du LIVE…' : 'Connexion au LIVE…'}</Text>
+        </View>
+      )}
+      {(salle.etat === 'termine' || salle.etat === 'erreur') && (
+        <View style={s.fin}>
+          <Text style={s.finTitre}>{salle.etat === 'termine' ? 'Le LIVE est terminé' : 'Connexion au LIVE impossible'}</Text>
+          {salle.etat === 'erreur' && <Text style={s.centreTexte}>Vérifie ta connexion internet puis réessaie.</Text>}
+          <Pressable style={s.principal} onPress={onQuitter}><Text style={s.principalTexte}>Retour</Text></Pressable>
+        </View>
+      )}
+      {salle.sonBloque && salle.etat === 'direct' && (
+        <Pressable style={s.activerSon} onPress={salle.activerSon}>
+          <Text style={s.activerSonTexte}>🔊 Touche pour activer le son</Text>
+        </Pressable>
+      )}
+
+      <Tchat messages={salle.messages} />
+
+      {coeurs.map(c => (
+        <CoeurVolant key={c.id} decalage={c.decalage} onFini={() => retirer(c.id)} />
+      ))}
+
+      <View style={s.barreBasse}>
+        <View style={s.champ}>
+          <TextInput style={s.champSaisie} value={saisie}
+            onChangeText={setSaisie} maxLength={150}
+            onFocus={() => { exiger('écrire dans le LIVE') }}
+            onSubmitEditing={envoyer} returnKeyType="send"
+            placeholder={profil ? 'Saisis ton message…' : 'Connecte-toi pour écrire…'}
+            placeholderTextColor="rgba(255,255,255,.65)" />
+        </View>
+        {!!saisie.trim() && (
+          <Pressable style={s.action} hitSlop={6} onPress={envoyer} accessibilityLabel="Envoyer">
+            <Envoyer taille={23} couleur="#fff" />
+          </Pressable>
+        )}
+        <Pressable style={s.action} hitSlop={6} accessibilityLabel="Envoyer un cœur"
+          onPress={() => { if (exiger('envoyer des cœurs')) salle.envoyerCoeur() }}>
+          <CoeurPlein taille={25} couleur="#ff2856" />
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+// ------------------------------------------------------------
+// Avant de diffuser : la camera, un titre, puis « Lancer le LIVE ».
+// ------------------------------------------------------------
+function Preparation({ onLance, onAnnuler }: {
+  onLance: (acces: AccesLive, pistes: Piste[]) => void
+  onAnnuler: () => void
+}) {
+  const [pistes, setPistes] = useState<Piste[] | null>(null)
+  const [erreur, setErreur] = useState<string | null>(null)
+  const [titre, setTitre] = useState('')
+  const [envoi, setEnvoi] = useState(false)
+  // Pistes confiees au direct : la fermeture de cet ecran ne les coupe plus.
+  const lance = useRef(false)
+
+  useEffect(() => {
+    let annule = false
+    let obtenues: Piste[] = []
+    preparerCamera('user')
+      .then(p => { obtenues = p; if (annule) libererCamera(p); else setPistes(p) })
+      .catch((e: Error) => {
+        if (annule) return
+        setErreur(e?.name === 'NotAllowedError'
+          ? 'Autorise la caméra et le micro pour passer en LIVE (aA › Réglages du site web sur iPhone), puis recharge la page.'
+          : e?.message || 'Caméra indisponible.')
+      })
+    return () => { annule = true; if (!lance.current) libererCamera(obtenues) }
+  }, [])
+
+  const apercu = useCallback((e: HTMLVideoElement | null) => {
+    const v = pistes?.find(p => (p as { kind?: string }).kind === 'video') as { attach?: (el: HTMLVideoElement) => void } | undefined
+    if (e && v?.attach) v.attach(e)
+  }, [pistes])
+
+  const lancer = () => {
+    if (!pistes || envoi) return
+    setEnvoi(true)
+    apiLive.lancer(titre.trim())
+      .then(acces => { lance.current = true; onLance(acces, pistes) })
+      .catch((e: Error) => { setErreur(e.message); setEnvoi(false) })
+  }
+
+  return (
+    <View style={s.pagePleine}>
+      {pistes && <VideoLive refVideo={apercu} miroir />}
+      <LinearGradient colors={['rgba(0,0,0,.5)', 'transparent']} style={s.voileHaut} pointerEvents="none" />
+      <LinearGradient colors={['transparent', 'rgba(0,0,0,.7)']} style={s.voileBas} pointerEvents="none" />
+      <View style={s.rangeeHaute}>
+        <View style={{ flex: 1 }} />
+        <Pressable style={s.rond} hitSlop={6} onPress={onAnnuler} accessibilityLabel="Annuler">
+          <Croix taille={17} couleur="#fff" />
+        </Pressable>
+      </View>
+      {!pistes && !erreur && (
+        <View style={s.centre}><ActivityIndicator color="#fff" /><Text style={s.centreTexte}>Ouverture de la caméra…</Text></View>
+      )}
+      <View style={s.preparation}>
+        {erreur ? <Text style={s.erreur}>{erreur}</Text> : null}
+        <TextInput style={s.titreLive} value={titre} onChangeText={setTitre} maxLength={80}
+          placeholder="Titre du LIVE (facultatif)" placeholderTextColor="rgba(255,255,255,.6)" />
+        <Pressable style={[s.principal, (!pistes || envoi) && { opacity: 0.5 }]} disabled={!pistes || envoi} onPress={lancer}>
+          <Text style={s.principalTexte}>{envoi ? 'Lancement…' : 'Lancer le LIVE'}</Text>
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
 export default function DirectLive({ onFermer }: {
   // Croix de l'entete : le fil revient a la categorie precedente.
   onFermer: () => void
 }) {
   const { profil } = useAuth()
+  const exiger = useExigerCompte()
   const moi = profil?.pseudo ?? 'moi'
 
-  // Plein ecran ou feuille « Découvrir ».
-  const [plein, setPlein] = useState(false)
-  const [suivi, setSuivi] = useState(false)
-  const [messages, setMessages] = useState<MessageLive[]>(
-    () => messagesLiveDemo.slice(-MESSAGES_VISIBLES),
-  )
-  // Coeurs en vol : chaque entree porte son identifiant et son ecart au
-  // bord, pour que deux coeurs ne se superposent pas exactement.
-  const [coeurs, setCoeurs] = useState<{ id: number; decalage: number }[]>([])
-  const [saisie, setSaisie] = useState('')
+  const [lives, setLives] = useState<Live[] | null>(null)
+  const [disponible, setDisponible] = useState(true)
+  const [erreur, setErreur] = useState<string | null>(null)
+  // Direct regarde, ou diffuse.
+  const [regarde, setRegarde] = useState<AccesLive | null>(null)
+  const [diffusion, setDiffusion] = useState<{ acces: AccesLive; pistes: Piste[] } | null>(null)
+  const [preparation, setPreparation] = useState(false)
+  const [ouverture, setOuverture] = useState<string | null>(null)
 
-  // Video du direct : la premiere du fil, faute de vraie diffusion.
-  const url = useMemo(
-    () => etat.videos[0]?.url ?? '', [],
-  )
-  const lecteur = useVideoPlayer(url, p => { p.loop = true; p.play() })
-
-  // Arrivee des messages et des coeurs : la mise a jour se fait dans la
-  // fonction du minuteur, jamais dans le corps de l'effet.
-  //
-  // Les coeurs ne sont semes qu'en plein ecran : ailleurs, rien ne les
-  // affiche, donc rien ne signalerait la fin de leur animation et la
-  // liste n'arreterait pas de grandir.
+  // Liste des directs, rafraichie tant que la feuille est affichee.
   useEffect(() => {
-    let rang = 0
-    const minuteur = setInterval(() => {
-      const modele = messagesLiveSuite[rang % messagesLiveSuite.length]
-      rang += 1
-      const suite = rang
-      setMessages(liste => [
-        ...liste, { ...modele, id: `${modele.id}-${suite}` },
-      ].slice(-MESSAGES_VISIBLES))
-      if (plein) {
-        setCoeurs(liste => [
-          ...liste, { id: Date.now() + suite, decalage: 10 + (suite % 3) * 16 },
-        ])
-      }
-    }, CADENCE)
-    return () => clearInterval(minuteur)
-  }, [plein])
+    if (regarde || diffusion || preparation) return
+    let valable = true
+    const charger = () => apiLive.liste()
+      .then(r => { if (valable) { setLives(r.lives); setDisponible(r.disponible) } })
+      .catch(() => { if (valable) setLives(l => l ?? []) })
+    charger()
+    const t = setInterval(charger, CADENCE_LISTE)
+    return () => { valable = false; clearInterval(t) }
+  }, [regarde, diffusion, preparation])
 
-  const retirerCoeur = (id: number) =>
-    setCoeurs(liste => liste.filter(c => c.id !== id))
-
-  // ----------------------------------------------------------
-  // Etat B : le direct en plein ecran.
-  // ----------------------------------------------------------
-  if (plein) {
-    return (
-      <View style={s.pagePleine}>
-        {/* Plein ecran : « contain », pour qu'un direct filme en paysage
-            ne perde pas ses bords. L'apercu reduit du bas garde « cover »,
-            son cadre etant une vignette. */}
-        <VideoView player={lecteur} style={StyleSheet.absoluteFill}
-          contentFit="contain" nativeControls={false} />
-
-        <LinearGradient colors={['rgba(0,0,0,.45)', 'transparent']}
-          style={s.voileHaut} pointerEvents="none" />
-        <LinearGradient colors={['transparent', 'rgba(0,0,0,.55)']}
-          style={s.voileBas} pointerEvents="none" />
-
-        {/* Premiere rangee : le diffuseur, le nombre de spectateurs et
-            les deux boutons de sortie. */}
-        <View style={s.rangeeHaute}>
-          <View style={s.pilleDiffuseur}>
-            <Avatar pseudo={DIFFUSION.pseudo} taille={30} bordure />
-            <View style={s.diffuseurTextes}>
-              <Text style={s.diffuseurPseudo} numberOfLines={1}>
-                {DIFFUSION.pseudo}
-              </Text>
-              <View style={s.diffuseurAbonnes}>
-                <CoeurPlein taille={10} couleur="#ff6b86" />
-                <Text style={s.diffuseurCompte}>
-                  {abreger(DIFFUSION.abonnes)}
-                </Text>
-              </View>
-            </View>
-            <Pressable style={[s.suivre, suivi && s.suivreFait]} hitSlop={6}
-              onPress={() => setSuivi(!suivi)}>
-              <Text style={s.suivreTexte}>
-                {suivi ? 'Suivi' : '+ Suivre'}
-              </Text>
-            </Pressable>
-          </View>
-
-          <View style={s.pilleSpectateurs}>
-            <Text style={s.spectateursTexte}>
-              20+ · {abreger(DIFFUSION.spectateurs)}
-            </Text>
-          </View>
-
-          <Pressable style={s.rond} hitSlop={6}
-            onPress={() => { setPlein(false); setCoeurs([]) }}>
-            <ChevronBas taille={17} couleur="#fff" />
-          </Pressable>
-          <Pressable style={s.rond} hitSlop={6} onPress={onFermer}>
-            <Croix taille={17} couleur="#fff" />
-          </Pressable>
-        </View>
-
-        {/* Seconde rangee : le rang de la ligue et le compte de places. */}
-        <View style={s.rangeeRang}>
-          <View style={s.pilleLigue}>
-            <Text style={s.ligueTexte}>Top 80 % de la Ligue C5</Text>
-          </View>
-          <View style={s.pillePlaces}>
-            <Couronne taille={13} couleur="#fcd116" />
-            <Text style={s.placesTexte}>0/4</Text>
-          </View>
-        </View>
-
-        <Tchat messages={messages} />
-
-        {coeurs.map(c => (
-          <CoeurVolant key={c.id} decalage={c.decalage}
-            onFini={() => retirerCoeur(c.id)} />
-        ))}
-
-        {/* Barre du bas : le bouton coloré, la saisie, puis les actions. */}
-        <View style={s.barreBasse}>
-          <Pressable style={s.boutonCouleur} hitSlop={4}>
-            <Text style={s.boutonCouleurTexte}>229</Text>
-          </Pressable>
-
-          <View style={s.champ}>
-            <TextInput style={s.champSaisie} value={saisie}
-              onChangeText={setSaisie}
-              placeholder="Saisis ton message…"
-              placeholderTextColor="rgba(255,255,255,.65)" />
-          </View>
-
-          <Pressable style={s.action} hitSlop={6}>
-            <Emoji taille={23} couleur="#fff" />
-          </Pressable>
-          <Pressable style={s.action} hitSlop={6}>
-            <InvitesLive taille={23} couleur="#fff" />
-          </Pressable>
-          <Pressable style={s.action} hitSlop={6}>
-            <CadeauLive taille={23} couleur="#fff" />
-          </Pressable>
-          <Pressable style={s.action} hitSlop={6}>
-            <PartageFil taille={23} couleur="#fff" />
-            <Text style={s.actionCompte}>12</Text>
-          </Pressable>
-        </View>
-      </View>
-    )
+  const regarder = (live: Live) => {
+    if (ouverture) return
+    setOuverture(live.id); setErreur(null)
+    apiLive.rejoindre(live.id)
+      .then(setRegarde)
+      .catch((e: Error) => setErreur(e.message))
+      .finally(() => setOuverture(null))
   }
 
-  // ----------------------------------------------------------
-  // Etat A : la feuille « Découvrir ».
-  // ----------------------------------------------------------
+  const passerEnLive = () => {
+    if (!exiger('passer en LIVE')) return
+    if (Platform.OS !== 'web') { setErreur('Le LIVE est disponible sur le site tocktick-web.vercel.app'); return }
+    if (!disponible) { setErreur('Le LIVE n’est pas encore disponible.'); return }
+    setPreparation(true)
+  }
+
+  const terminer = () => {
+    if (!diffusion) return
+    apiLive.terminer(diffusion.acces.live.id).catch(() => { /* Expire seul en 60 s. */ })
+    libererCamera(diffusion.pistes)
+    setDiffusion(null)
+  }
+
+  if (diffusion) {
+    return <Salle acces={diffusion.acces} diffuseur pistes={diffusion.pistes} onQuitter={terminer} />
+  }
+  if (preparation) {
+    return <Preparation onAnnuler={() => setPreparation(false)}
+      onLance={(acces, pistes) => { setPreparation(false); setDiffusion({ acces, pistes }) }} />
+  }
+  if (regarde) {
+    return <Salle acces={regarde} diffuseur={false} onQuitter={() => setRegarde(null)} />
+  }
+
+  const premier = lives?.[0]
+
   return (
     <View style={s.pageSombre}>
       <View style={s.enteteDecouvrir}>
-        <Pressable hitSlop={10}>
-          <CalendrierEtoile taille={22} couleur="#fff" />
-        </Pressable>
+        <View style={{ width: 22 }} />
         <Text style={s.titreDecouvrir}>Découvrir</Text>
-        <Pressable hitSlop={10} onPress={onFermer}>
+        <Pressable hitSlop={10} onPress={onFermer} accessibilityLabel="Fermer">
           <Croix taille={22} couleur="#fff" />
         </Pressable>
       </View>
@@ -296,7 +415,7 @@ export default function DirectLive({ onFermer }: {
           propre diffusion, puis les comptes deja en direct. */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}
         style={s.rangeeRonds} contentContainerStyle={s.rondsContenu}>
-        <Pressable style={s.entree}>
+        <Pressable style={s.entree} onPress={passerEnLive}>
           <View style={s.entreeRond}>
             <Avatar pseudo={moi} taille={58} />
             <View style={s.badgeCamera}>
@@ -306,8 +425,8 @@ export default function DirectLive({ onFermer }: {
           <Text style={s.entreeLibelle} numberOfLines={1}>Passer en LIVE</Text>
         </Pressable>
 
-        {livesDemo.map(l => (
-          <Pressable key={l.id} style={s.entree} onPress={() => setPlein(true)}>
+        {(lives ?? []).map(l => (
+          <Pressable key={l.id} style={s.entree} onPress={() => regarder(l)}>
             <View style={s.entreeRond}>
               <Avatar pseudo={l.pseudo} taille={58} bordure />
               <View style={s.badgeDirect}>
@@ -319,21 +438,28 @@ export default function DirectLive({ onFermer }: {
         ))}
       </ScrollView>
 
-      {/* Panneau d'apercu : sa poignee et son chevron deplient le direct
-          en plein ecran. */}
-      <Pressable style={s.panneau} onPress={() => setPlein(true)}>
+      {erreur ? <Text style={s.erreurListe}>{erreur}</Text> : null}
+
+      {/* Panneau : le direct le plus recent, ou l'invitation a lancer le sien. */}
+      <Pressable style={s.panneau} onPress={() => premier ? regarder(premier) : passerEnLive()}>
         <View style={s.poignee} />
         <View style={s.chevronPanneau}>
           <ChevronHaut taille={18} couleur="rgba(255,255,255,.9)" />
         </View>
-        <View style={s.apercu}>
-          <VideoView player={lecteur} style={StyleSheet.absoluteFill}
-            contentFit="cover" nativeControls={false} />
-          <View style={s.apercuPille}>
-            <Text style={s.apercuPilleTexte} numberOfLines={1}>
-              {DIFFUSION.pseudo} · {abreger(DIFFUSION.spectateurs)}
-            </Text>
-          </View>
+        <View style={[s.apercu, s.apercuVide]}>
+          {lives === null ? <ActivityIndicator color="#fff" /> : premier ? <>
+            <Avatar pseudo={premier.pseudo} taille={84} bordure />
+            <Text style={s.videTitre}>{premier.pseudo} est en LIVE</Text>
+            {premier.titre ? <Text style={s.videTexte}>{premier.titre}</Text> : null}
+            <View style={s.principal}><Text style={s.principalTexte}>
+              {ouverture === premier.id ? 'Connexion…' : 'Regarder'}
+            </Text></View>
+          </> : <>
+            <CameraLive taille={40} couleur="#fff" />
+            <Text style={s.videTitre}>Personne n’est en LIVE pour le moment</Text>
+            <Text style={s.videTexte}>Lance le premier : tes abonnés pourront te regarder et t’écrire en direct.</Text>
+            <View style={s.principal}><Text style={s.principalTexte}>Passer en LIVE</Text></View>
+          </>}
         </View>
       </Pressable>
     </View>
@@ -487,4 +613,36 @@ const s = StyleSheet.create({
   champSaisie: { color: '#fff', fontSize: 12.5, padding: 0 },
   action: { alignItems: 'center', justifyContent: 'center', minWidth: 26 },
   actionCompte: { color: '#fff', fontSize: 10.5, marginTop: -2 },
+
+  // --- Etats du direct ---
+  badgeEnDirect: { marginRight: 4 },
+  rondTerminer: { width: undefined, paddingHorizontal: 12, backgroundColor: '#ff2856' },
+  terminerTexte: { color: '#fff', fontSize: 12.5, fontWeight: '700' },
+  centre: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', gap: 10 },
+  centreTexte: { color: 'rgba(255,255,255,.85)', fontSize: 13.5, textAlign: 'center', paddingHorizontal: 24 },
+  fin: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 6, backgroundColor: 'rgba(0,0,0,.82)',
+    alignItems: 'center', justifyContent: 'center', gap: 14, padding: 24,
+  },
+  finTitre: { color: '#fff', fontSize: 19, fontWeight: '700', textAlign: 'center' },
+  principal: {
+    backgroundColor: '#ff2856', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 26,
+    alignItems: 'center', alignSelf: 'center',
+  },
+  principalTexte: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  activerSon: {
+    position: 'absolute', top: '45%', alignSelf: 'center', zIndex: 5,
+    backgroundColor: 'rgba(0,0,0,.7)', borderRadius: 22, paddingVertical: 11, paddingHorizontal: 18,
+  },
+  activerSonTexte: { color: '#fff', fontSize: 14.5, fontWeight: '700' },
+  preparation: { position: 'absolute', left: 16, right: 16, bottom: 30, zIndex: 4, gap: 14 },
+  titreLive: {
+    color: '#fff', fontSize: 15, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12,
+    backgroundColor: 'rgba(255,255,255,.16)',
+  },
+  erreur: { color: '#ffd166', fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  erreurListe: { color: '#ffd166', fontSize: 13, textAlign: 'center', paddingHorizontal: 16, paddingBottom: 10 },
+  apercuVide: { alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
+  videTitre: { color: '#fff', fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  videTexte: { color: 'rgba(255,255,255,.75)', fontSize: 13.5, textAlign: 'center', lineHeight: 19, maxWidth: 300 },
 })
