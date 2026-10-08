@@ -33,22 +33,9 @@
           "value": "no-cache"
         }
       ]
-    },
-    {
-      "source": "/media/(.*)",
-      "headers": [
-        {
-          "key": "CDN-Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
     }
   ],
   "rewrites": [
-    {
-      "source": "/media/:chemin*",
-      "destination": "https://br-fragrant-brook-b17ufkim.storage.c-5.eu-central-1.aws.neon.tech/videos-publiques/:chemin*"
-    },
     {
       "source": "/v/:video",
       "destination": "/api/apercu?video=:video"

@@ -8,6 +8,7 @@ import { useFinDefilementWeb } from '../lib/finDefilement'
 import { Text } from '../composants/Texte'
 import { useVideoPlayer, VideoView } from 'expo-video'
 import { usePiste } from '../lib/piste'
+import { usePrechargementFil, useSourceVideo } from '../lib/precharge'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useEvent } from 'expo'
 import { abreger, type Video } from '../lib/demo'
@@ -94,7 +95,9 @@ function Carte({
   const avatarSon = !proprietaireSon ? null
     : proprietaireSon === moi?.pseudo ? moi?.avatar_url ?? avatarProprietaire : avatarProprietaire
 
-  const lecteur = useVideoPlayer(item.url, p => {
+  // Copie en memoire si la video a ete prechargee (demarrage immediat).
+  const source = useSourceVideo(item.url, actif)
+  const lecteur = useVideoPlayer(source, p => {
     p.loop = true; p.timeUpdateEventInterval = 0.25
     // La piste de la video ne se coupe que s'il y a une musique a mettre
     // a sa place : sans son attache, c'est elle qu'on entend.
@@ -297,6 +300,11 @@ function Carte({
             noir de la carte occupe la place laissee libre. */}
         <VideoView player={lecteur} style={StyleSheet.absoluteFill}
           contentFit="contain" nativeControls={false} />
+        {/* Miniature pendant le chargement : pas d'ecran noir. */}
+        {!!item.miniature && !isPlaying && progression === 0 && (
+          <Image source={{ uri: item.miniature }} style={StyleSheet.absoluteFill}
+            resizeMode="contain" accessibilityIgnoresInvertColors />
+        )}
       </Pressable>
 
       <LinearGradient
@@ -510,6 +518,8 @@ export default function Fil({
     .filter(v => !masquees.has(v.id))
     .map(v => (modifiees[v.id] ? { ...v, ...modifiees[v.id] } : v)),
   [videos, listeApi, masquees, modifiees])
+  // Les deux videos suivantes se telechargent pendant qu'on regarde.
+  usePrechargementFil(useMemo(() => liste.map(v => v.url), [liste]), index)
   const masquer = (id: string) => setMasquees(m => new Set(m).add(id))
   const modifier = (id: string, valeurs: Partial<VideoFil>) =>
     setModifiees(m => ({ ...m, [id]: { ...m[id], ...valeurs } }))
