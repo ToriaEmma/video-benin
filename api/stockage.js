@@ -60,11 +60,13 @@ export const construireCle = (profilId, type) =>
 export const urlPubliqueDe = (cle) =>
   `${POINT_DACCES}/${SEAU}/${cle}`
 
-// Adresse de lecture : le meme fichier, servi par le CDN du site (cache
-// proche des spectateurs, au lieu du stockage en Allemagne, 5 a 20 fois
-// plus lent depuis le Benin). La base garde l'adresse du stockage, qui
-// sert aux controles de propriete et a la suppression.
-const CDN_MEDIAS = process.env.CDN_MEDIAS ?? 'https://tocktick-web.vercel.app/media'
+// Adresse de lecture : le meme fichier, eventuellement servi par un CDN
+// (CDN_MEDIAS). Desactive par defaut : le relais du site par Vercel
+// gardait en cache une reponse partielle (2 octets d'une lecture par
+// plages) et la resservait a toutes les requetes, ce qui empechait toute
+// lecture. La base garde l'adresse du stockage (controles de propriete,
+// suppression).
+const CDN_MEDIAS = process.env.CDN_MEDIAS || ''
 export const urlDiffusion = (url) => {
   const base = urlPubliqueDe('')
   return url && CDN_MEDIAS && url.startsWith(base) ? `${CDN_MEDIAS}/${url.slice(base.length)}` : url
