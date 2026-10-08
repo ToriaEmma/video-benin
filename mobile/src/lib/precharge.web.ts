@@ -66,12 +66,12 @@ export function useSourceVideo(url: string, actif: boolean): string {
 }
 
 // Lance le prechargement des `n` videos qui suivent la carte regardee,
-// apres un court delai pour laisser le debit a celle qui demarre.
-export function usePrechargementFil(urls: string[], index: number, n = 2) {
-  const cle = urls.slice(index + 1, index + 1 + n).join('|')
+// une fois qu'elle joue vraiment : tant qu'elle charge, tout le debit lui
+// est laisse (sinon les telechargements se partagent la connexion et la
+// video regardee, et donc son son, demarrent plus tard).
+export function usePrechargementFil(urls: string[], index: number, regardeeJoue: boolean, n = 2) {
+  const cle = regardeeJoue ? urls.slice(index + 1, index + 1 + n).join('|') : ''
   useEffect(() => {
-    if (!cle) return
-    const t = setTimeout(() => precharger(cle.split('|')), 1200)
-    return () => clearTimeout(t)
+    if (cle) precharger(cle.split('|'))
   }, [cle])
 }

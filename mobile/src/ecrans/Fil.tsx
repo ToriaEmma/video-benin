@@ -56,7 +56,7 @@ const SEUIL_LATERAL = 55
 
 function Carte({
   item, actif, hauteur, onCommenter, onVisiter, sienne, nbCommentaires, onErreur,
-  suivi, onSuivi, son, onSon, onSupprimee, onModifiee, onPasInteresse,
+  suivi, onSuivi, son, onSon, onSupprimee, onModifiee, onPasInteresse, onJoue,
 }: {
   item: VideoFil; actif: boolean; hauteur: number
   onCommenter: (v: VideoFil) => void
@@ -80,6 +80,8 @@ function Carte({
   onSupprimee: (id: string) => void
   onModifiee: (id: string, valeurs: Partial<VideoFil>) => void
   onPasInteresse: (id: string) => void
+  // La carte regardee a commence a jouer (le fil precharge alors la suite).
+  onJoue?: () => void
 }) {
   // Visiteur sans compte : il regarde, toute interaction l'invite a se connecter.
   const exiger = useExigerCompte()
@@ -160,6 +162,7 @@ function Carte({
   // L'etat de lecture et la position viennent du lecteur : on les suit pour
   // afficher le bouton « lire » et la barre de progression.
   const { isPlaying } = useEvent(lecteur, 'playingChange', { isPlaying: lecteur.playing })
+  useEffect(() => { if (actif && isPlaying) onJoue?.() }, [actif, isPlaying]) // eslint-disable-line react-hooks/exhaustive-deps
   // Pendant un glissement la barre appartient au doigt : la relever depuis
   // le lecteur la ferait sauter en arriere a chaque tour du minuteur.
   useEffect(() => {
@@ -518,8 +521,10 @@ export default function Fil({
     .filter(v => !masquees.has(v.id))
     .map(v => (modifiees[v.id] ? { ...v, ...modifiees[v.id] } : v)),
   [videos, listeApi, masquees, modifiees])
-  // Les deux videos suivantes se telechargent pendant qu'on regarde.
-  usePrechargementFil(useMemo(() => liste.map(v => v.url), [liste]), index)
+  // Les deux videos suivantes se telechargent pendant qu'on regarde,
+  // des que la video regardee joue (rang de la derniere carte lancee).
+  const [rangQuiJoue, setRangQuiJoue] = useState(-1)
+  usePrechargementFil(useMemo(() => liste.map(v => v.url), [liste]), index, rangQuiJoue === index)
   const masquer = (id: string) => setMasquees(m => new Set(m).add(id))
   const modifier = (id: string, valeurs: Partial<VideoFil>) =>
     setModifiees(m => ({ ...m, [id]: { ...m[id], ...valeurs } }))
@@ -705,6 +710,7 @@ export default function Fil({
             ? <View style={{ height: hauteur, backgroundColor: '#000' }} />
             : (
             <Carte item={item} actif={!enVeille && i === index} hauteur={hauteur}
+              onJoue={() => setRangQuiJoue(i)}
               sienne={item.pseudo === profil?.pseudo}
               suivi={suivis.has(item.pseudo)} onSuivi={marquerSuivi}
               nbCommentaires={item.nbCommentaires + (ajouts[item.id] ?? 0)}
